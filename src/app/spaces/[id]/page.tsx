@@ -28,14 +28,14 @@ import {
   Share2,
   ChevronRight,
   Info,
-  AlertCircle,
   Building2,
   Lock,
   Layers,
   Zap,
-  Coffee,
   Check,
   ArrowRight,
+  ChevronLeft,
+  X,
 } from "lucide-react";
 
 export default function SpaceDetailPage({
@@ -46,7 +46,7 @@ export default function SpaceDetailPage({
   const unwrappedParams = use(params);
   const spaceId = unwrappedParams.id;
   const router = useRouter();
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const { success, error } = useToast();
 
   const [space, setSpace] = useState<Space | null>(null);
@@ -82,7 +82,7 @@ export default function SpaceDetailPage({
 
   if (!space) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
         <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <Building2 className="w-12 h-12 text-slate-300 mb-3" />
@@ -165,7 +165,7 @@ export default function SpaceDetailPage({
         return;
       }
 
-      // Success!
+      // Success
       setConfirmedBooking(result.booking || null);
       confetti({
         particleCount: 80,
@@ -184,17 +184,17 @@ export default function SpaceDetailPage({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <Navbar />
 
       {/* Breadcrumb Navigation */}
-      <div className="bg-white border-b border-slate-200 py-3">
+      <div className="bg-white border-b border-slate-200/80 py-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-2 text-xs text-slate-500">
-          <Link href="/" className="hover:text-slate-900">
+          <Link href="/" className="hover:text-slate-900 transition-colors">
             Home
           </Link>
           <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          <Link href="/spaces" className="hover:text-slate-900">
+          <Link href="/spaces" className="hover:text-slate-900 transition-colors">
             Workspaces
           </Link>
           <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
@@ -204,8 +204,8 @@ export default function SpaceDetailPage({
         </div>
       </div>
 
-      {/* Main Detail Header */}
-      <div className="bg-white border-b border-slate-200 py-6">
+      {/* Main Detail Header (Airbnb Layout) */}
+      <div className="bg-white border-b border-slate-200/80 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-2">
@@ -214,8 +214,8 @@ export default function SpaceDetailPage({
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase tracking-wider">
                   {space.category.replace("_", " ")}
                 </span>
-                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  ★ {space.rating} ({space.review_count} verified reviews)
+                <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  ★ {space.rating} ({space.review_count} reviews)
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
@@ -234,7 +234,7 @@ export default function SpaceDetailPage({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleFavoriteToggle}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <Heart className={`w-4 h-4 ${isFavorited ? "fill-rose-500 text-rose-500" : "text-slate-500"}`} />
                 <span>{isFavorited ? "Saved" : "Save"}</span>
@@ -244,7 +244,7 @@ export default function SpaceDetailPage({
                   navigator.clipboard?.writeText(window.location.href);
                   success("Link Copied", "Workspace link copied to clipboard.");
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <Share2 className="w-4 h-4 text-slate-500" />
                 <span>Share</span>
@@ -254,7 +254,7 @@ export default function SpaceDetailPage({
         </div>
       </div>
 
-      {/* Image Gallery Hero Grid */}
+      {/* Image Gallery Bento Grid (Airbnb 5-Photo Hero) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 h-80 sm:h-[420px] rounded-3xl overflow-hidden shadow-xs border border-slate-200">
           
@@ -273,7 +273,7 @@ export default function SpaceDetailPage({
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-              Click to enlarge
+              Click to enlarge photo
             </div>
           </div>
 
@@ -310,30 +310,30 @@ export default function SpaceDetailPage({
           <div className="lg:col-span-7 space-y-8">
             
             {/* Quick Specs Bar */}
-            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-xs text-center">
+            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs text-center">
               <div>
                 <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Capacity</span>
-                <span className="text-base font-black text-slate-900 mt-0.5 inline-flex items-center gap-1">
+                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
                   <Users className="w-4 h-4 text-teal-600" /> Up to {space.capacity}
                 </span>
               </div>
               <div>
                 <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Floor Area</span>
-                <span className="text-base font-black text-slate-900 mt-0.5 inline-flex items-center gap-1">
+                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
                   <Layers className="w-4 h-4 text-teal-600" /> {space.square_feet.toLocaleString()} sq.ft.
                 </span>
               </div>
               <div>
                 <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Confirmation</span>
-                <span className="text-base font-black text-slate-900 mt-0.5 inline-flex items-center gap-1">
+                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
                   <Sparkles className="w-4 h-4 text-teal-600" /> {space.instant_book ? "Instant Book" : "Host Approval"}
                 </span>
               </div>
             </div>
 
             {/* Description */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-3">
-              <h2 className="text-lg font-bold text-slate-900">About This Workspace</h2>
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-3">
+              <h2 className="text-base font-bold text-slate-950">About This Workspace</h2>
               <p className="text-sm text-slate-600 leading-relaxed font-normal">
                 {space.description}
               </p>
@@ -347,50 +347,50 @@ export default function SpaceDetailPage({
                     <ShieldCheck className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      SpaceGo Space Passport™
+                    <h3 className="text-sm font-bold text-slate-950">
+                      SpaceGo Space Passport™ Audit Record
                     </h3>
                     <p className="text-[11px] text-teal-800">
-                      Documented evidence record • Inspected on {formatDate(space.passport.inspected_at)}
+                      Inspected on {formatDate(space.passport.inspected_at)} • Official Safety Certification
                     </p>
                   </div>
                 </div>
                 <VerificationBadge level={space.verification_level} />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
                   <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-slate-900">Authority & Permitted Use</span>
+                    <span className="text-xs font-bold text-slate-950">Authority & Permitted Use</span>
                     <p className="text-[11px] text-slate-500">Commercial zoning and legal operating authority verified.</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100">
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
                   <Wifi className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-slate-900">Tested Connectivity</span>
+                    <span className="text-xs font-bold text-slate-950">Tested Connectivity</span>
                     <p className="text-[11px] text-slate-500">
-                      Field-measured speed: <span className="font-bold text-teal-700">{space.passport.connectivity_tested_mbps} Mbps</span> redundant fiber.
+                      Field-measured: <span className="font-bold text-teal-700">{space.passport.connectivity_tested_mbps} Mbps</span> redundant fiber.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100">
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
                   <Zap className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-slate-900">Power Redundancy</span>
+                    <span className="text-xs font-bold text-slate-950">Power Redundancy</span>
                     <p className="text-[11px] text-slate-500">
                       {space.passport.power_backup_tested ? "UPS & Standby generator backup tested." : "Standard utility grid."}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100">
+                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
                   <Lock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-xs font-bold text-slate-900">Fire & Life Safety</span>
+                    <span className="text-xs font-bold text-slate-950">Fire & Life Safety</span>
                     <p className="text-[11px] text-slate-500">
                       {space.passport.fire_safety_inspected ? "Emergency exits, extinguishers & alarms inspected." : "Checks pending."}
                     </p>
@@ -398,14 +398,14 @@ export default function SpaceDetailPage({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-teal-100/50 text-[11px] text-teal-950 font-medium">
+              <div className="p-3 rounded-xl bg-teal-100/40 text-[11px] text-teal-950 font-medium">
                 Audited by: {space.passport.inspected_by} • Next renewal scheduled for {formatDate(space.passport.renewal_date)}
               </div>
             </div>
 
             {/* Amenities & Equipment */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-              <h2 className="text-lg font-bold text-slate-900">Amenities & Facilities</h2>
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h2 className="text-base font-bold text-slate-950">Amenities & Facilities</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {space.amenities.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
@@ -419,13 +419,13 @@ export default function SpaceDetailPage({
             </div>
 
             {/* Operating Hours & House Rules */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-              <h2 className="text-lg font-bold text-slate-900">Operating Hours & House Rules</h2>
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
+              <h2 className="text-base font-bold text-slate-950">Operating Hours & House Rules</h2>
               
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                 <Clock className="w-5 h-5 text-teal-600 shrink-0" />
                 <div>
-                  <span className="font-bold text-slate-900">
+                  <span className="font-bold text-slate-950">
                     {space.operating_hours.open} – {space.operating_hours.close}
                   </span>
                   <span className="text-slate-500 ml-2">
@@ -435,7 +435,7 @@ export default function SpaceDetailPage({
               </div>
 
               <div className="space-y-2 pt-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Rules & Guidelines</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Rules & Guidelines</span>
                 <ul className="space-y-1.5 text-xs text-slate-600">
                   {space.house_rules.map((rule, idx) => (
                     <li key={idx} className="flex items-start gap-2">
@@ -448,23 +448,23 @@ export default function SpaceDetailPage({
             </div>
 
             {/* Host Profile Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex items-center gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={space.owner_avatar}
                 alt={space.owner_name}
-                className="w-14 h-14 rounded-2xl object-cover border border-slate-200"
+                className="w-12 h-12 rounded-xl object-cover border border-slate-200"
               />
               <div className="flex-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Hosted by</span>
-                <h3 className="text-base font-bold text-slate-900">{space.owner_name}</h3>
-                <p className="text-xs text-slate-500">SpaceGo Partner • Fast response time (under 1 hour)</p>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hosted by</span>
+                <h3 className="text-sm font-bold text-slate-950">{space.owner_name}</h3>
+                <p className="text-xs text-slate-500">SpaceGo Partner Host • Fast response rate (under 1 hour)</p>
               </div>
             </div>
 
           </div>
 
-          {/* Right Column: Interactive Booking Panel */}
+          {/* Right Column: Interactive Booking Panel (Airbnb / Uber friction-free) */}
           <div className="lg:col-span-5 sticky top-24">
             <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xl space-y-6">
               
@@ -478,7 +478,7 @@ export default function SpaceDetailPage({
                     / {durationType}
                   </span>
                 </div>
-                <div className="text-xs font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
+                <div className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
                   {space.instant_book ? "⚡ Instant Reservation" : "⏳ Host Approval Required"}
                 </div>
               </div>
@@ -487,7 +487,7 @@ export default function SpaceDetailPage({
                 
                 {/* Duration Type Tabs */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                     Duration Model
                   </label>
                   <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
@@ -499,7 +499,7 @@ export default function SpaceDetailPage({
                           setDurationType(type);
                           setDurationUnits(1);
                         }}
-                        className={`text-xs py-2 rounded-lg font-semibold capitalize transition-all ${
+                        className={`text-xs py-2 rounded-lg font-semibold capitalize transition-all cursor-pointer ${
                           durationType === type
                             ? "bg-white text-slate-950 shadow-xs"
                             : "text-slate-600 hover:text-slate-900"
@@ -520,14 +520,14 @@ export default function SpaceDetailPage({
                     value={bookingDate}
                     min={new Date().toISOString().split("T")[0]}
                     onChange={(e) => setBookingDate(e.target.value)}
-                    leftIcon={<Calendar className="w-4 h-4" />}
+                    leftIcon={<Calendar className="w-4 h-4 text-slate-400" />}
                   />
                 </div>
 
                 {/* Units & Capacity */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                       {durationType === "hourly" ? "Hours" : durationType === "daily" ? "Days" : "Months"}
                     </label>
                     <Input
@@ -536,12 +536,12 @@ export default function SpaceDetailPage({
                       max={durationType === "hourly" ? 12 : 30}
                       value={durationUnits}
                       onChange={(e) => setDurationUnits(Math.max(1, Number(e.target.value)))}
-                      leftIcon={<Clock className="w-4 h-4" />}
+                      leftIcon={<Clock className="w-4 h-4 text-slate-400" />}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                       Guests / Seats
                     </label>
                     <Input
@@ -550,7 +550,7 @@ export default function SpaceDetailPage({
                       max={space.capacity}
                       value={seats}
                       onChange={(e) => setSeats(Math.max(1, Number(e.target.value)))}
-                      leftIcon={<Users className="w-4 h-4" />}
+                      leftIcon={<Users className="w-4 h-4 text-slate-400" />}
                     />
                   </div>
                 </div>
@@ -560,7 +560,7 @@ export default function SpaceDetailPage({
                   <Textarea
                     label="Special Notes or Requirements"
                     rows={2}
-                    placeholder="e.g. Need quiet focus desk, monitor adapters, guest registration..."
+                    placeholder="e.g. Quiet focus desk, dual monitors, client guest passes..."
                     value={specialRequests}
                     onChange={(e) => setSpecialRequests(e.target.value)}
                   />
@@ -574,7 +574,7 @@ export default function SpaceDetailPage({
                       {durationType === "hourly" ? "hrs" : durationType === "daily" ? "days" : "mo"}
                       {durationType !== "monthly" && ` × ${seats} seats`}
                     </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-slate-950">
                       {formatCurrency(pricingSummary.baseCost, space.pricing.currency)}
                     </span>
                   </div>
@@ -584,13 +584,13 @@ export default function SpaceDetailPage({
                       Platform service & security fee (10%)
                       <Info className="w-3 h-3 text-slate-400" />
                     </span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-slate-950">
                       {formatCurrency(pricingSummary.serviceFee, space.pricing.currency)}
                     </span>
                   </div>
 
                   <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                    <span className="text-sm font-bold text-slate-900">Total Price</span>
+                    <span className="text-sm font-bold text-slate-950">Total Price</span>
                     <span className="text-xl font-black text-slate-950">
                       {formatCurrency(pricingSummary.total, space.pricing.currency)}
                     </span>
@@ -602,7 +602,7 @@ export default function SpaceDetailPage({
                   type="submit"
                   variant="teal"
                   size="lg"
-                  className="w-full font-bold shadow-md shadow-teal-700/20"
+                  className="w-full font-bold shadow-md shadow-teal-700/20 rounded-full"
                   isLoading={isSubmitting}
                 >
                   <span>{space.instant_book ? "Confirm & Book Now" : "Request to Book"}</span>
@@ -611,8 +611,8 @@ export default function SpaceDetailPage({
 
                 <p className="text-[11px] text-center text-slate-400">
                   {space.instant_book
-                    ? "Instant confirmation. Real-time availability verified."
-                    : "You will not be billed until the host approves your request."}
+                    ? "Instant confirmation. Double-booking conflict check passed."
+                    : "You will not be billed until the host confirms availability."}
                 </p>
               </form>
 
@@ -643,7 +643,7 @@ export default function SpaceDetailPage({
               </div>
               {confirmedBooking.access_code && (
                 <div className="flex justify-between items-center pt-2 border-t border-teal-200/60">
-                  <span className="text-xs uppercase font-bold text-teal-700">Access Pass</span>
+                  <span className="text-xs uppercase font-bold text-teal-700">Electronic Access Pass</span>
                   <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 rounded border border-teal-300">
                     {confirmedBooking.access_code}
                   </span>

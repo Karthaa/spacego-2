@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
 import { SpaceCard } from "@/components/common/SpaceCard";
@@ -24,20 +24,23 @@ import {
   ShieldCheck,
   Grid,
   List,
-  Map,
+  Map as MapIcon,
   X,
   RotateCcw,
+  ChevronDown,
+  Navigation,
 } from "lucide-react";
 
 export default function SpacesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading spaces...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-sm font-semibold text-slate-500">Loading workspaces...</div>}>
       <SpacesContent />
     </Suspense>
   );
 }
 
 function SpacesContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -60,6 +63,7 @@ function SpacesContent() {
 
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [showMap, setShowMap] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // Demand Request Modal
@@ -202,33 +206,32 @@ function SpacesContent() {
     (selectedVerification !== "all" ? 1 : 0) +
     selectedAmenities.length;
 
+  const quickCategories = [
+    { id: "all", label: "All Spaces" },
+    { id: "coworking", label: "Coworking" },
+    { id: "private_office", label: "Private Office" },
+    { id: "meeting_room", label: "Meeting Rooms" },
+    { id: "training_room", label: "Training" },
+    { id: "studio", label: "Studios" },
+    { id: "event_space", label: "Events" },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <Navbar />
 
-      {/* Header Bar */}
-      <div className="bg-white border-b border-slate-200 py-6 sm:py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-700">
-                <Sparkles className="w-4 h-4" /> SpaceGo Marketplace
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
-                Explore Flexible Workspaces
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Showing {filteredSpaces.length} verified spaces matching your criteria
-              </p>
-            </div>
-
-            {/* Quick Search Input */}
+      {/* Header Bar with Uber-inspired Location Bar & Category Pills */}
+      <div className="bg-white border-b border-slate-200/80 sticky top-16 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            
+            {/* Location & Keyword Search Input */}
             <div className="w-full md:w-96 relative">
               <Input
-                placeholder="Search by city, address, or name..."
+                placeholder="Search city, neighborhood, or landmark..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                leftIcon={<Search className="w-4 h-4" />}
+                leftIcon={<Search className="w-4 h-4 text-slate-400" />}
                 rightIcon={
                   query ? (
                     <button onClick={() => setQuery("")} className="cursor-pointer">
@@ -236,8 +239,50 @@ function SpacesContent() {
                     </button>
                   ) : undefined
                 }
+                className="rounded-full text-xs py-2 bg-slate-50 border-slate-200"
               />
             </div>
+
+            {/* Category Quick Pills (Airbnb/Uber style horizontal scroller) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
+              {quickCategories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategory(cat.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    category === cat.id
+                      ? "bg-slate-950 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Map Toggle & Mobile Filter Button */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowMap(!showMap)}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                  showMap
+                    ? "bg-teal-50 text-teal-800 border-teal-300 shadow-xs"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                <MapIcon className="w-3.5 h-3.5 text-teal-600" />
+                <span>{showMap ? "Hide Map" : "Show Map"}</span>
+              </button>
+
+              <button
+                onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+                className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-teal-600" />
+                <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
@@ -246,14 +291,14 @@ function SpacesContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* Desktop Filter Sidebar */}
+          {/* Desktop Filter Sidebar (Linear clean refinement) */}
           <aside className="hidden lg:block lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-6 sticky top-24">
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-6 sticky top-36">
               
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-teal-600" />
-                  <span className="text-sm font-bold text-slate-900">Filters</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Filters</span>
                   {activeFilterCount > 0 && (
                     <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center">
                       {activeFilterCount}
@@ -272,15 +317,15 @@ function SpacesContent() {
 
               {/* Workspace Category */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Space Type
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Workspace Type
                 </label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as any)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                 >
-                  <option value="all">All Workspace Types</option>
+                  <option value="all">All Categories</option>
                   <option value="coworking">Coworking Desks</option>
                   <option value="private_office">Private Office</option>
                   <option value="meeting_room">Meeting Room</option>
@@ -290,9 +335,9 @@ function SpacesContent() {
                 </select>
               </div>
 
-              {/* Booking Duration */}
+              {/* Booking Duration Model */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Rate Duration
                 </label>
                 <div className="grid grid-cols-3 gap-1">
@@ -300,7 +345,7 @@ function SpacesContent() {
                     <button
                       key={dur}
                       onClick={() => setDurationFilter(dur)}
-                      className={`text-xs py-1.5 px-2 rounded-lg font-medium capitalize transition-colors ${
+                      className={`text-xs py-1.5 px-2 rounded-lg font-medium capitalize transition-colors cursor-pointer ${
                         durationFilter === dur
                           ? "bg-teal-50 text-teal-900 border border-teal-300 font-bold"
                           : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
@@ -314,7 +359,7 @@ function SpacesContent() {
 
               {/* Capacity Filter */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Minimum Capacity
                 </label>
                 <Input
@@ -323,13 +368,13 @@ function SpacesContent() {
                   placeholder="e.g. 4 seats"
                   value={minSeats}
                   onChange={(e) => setMinSeats(e.target.value ? Number(e.target.value) : "")}
-                  leftIcon={<Users className="w-4 h-4" />}
+                  leftIcon={<Users className="w-4 h-4 text-slate-400" />}
                 />
               </div>
 
-              {/* Verification Level */}
+              {/* Space Passport Tier */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Space Passport™ Standard
                 </label>
                 <select
@@ -346,10 +391,10 @@ function SpacesContent() {
 
               {/* Amenities Checklist */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Important Amenities
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Key Amenities
                 </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                   {allAmenitiesList.map((amenity) => (
                     <label
                       key={amenity}
@@ -367,14 +412,14 @@ function SpacesContent() {
                 </div>
               </div>
 
-              {/* Unlisted Demand Box */}
+              {/* Unlisted Demand Box (Uber/Airbnb demand engine) */}
               <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
                   <Sparkles className="w-3.5 h-3.5 text-teal-600" />
                   <span>Looking for unlisted space?</span>
                 </div>
                 <p className="text-[11px] text-teal-800 leading-snug">
-                  Tell us where and what capacity you need. We use real demand signals to activate spaces.
+                  Tell us where you need desks. We use qualified demand to activate dormant commercial buildings.
                 </p>
                 <button
                   onClick={() => setIsDemandModalOpen(true)}
@@ -390,49 +435,75 @@ function SpacesContent() {
           {/* Results Grid / List Area */}
           <main className="lg:col-span-3 space-y-6">
             
-            {/* Controls Bar: Sort & View Toggle & Mobile Filter Button */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-              
-              {/* Mobile Filter Button */}
-              <div className="lg:hidden flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-                  className="font-semibold gap-1.5"
-                >
-                  <SlidersHorizontal className="w-4 h-4 text-teal-600" />
-                  <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
-                </Button>
-              </div>
+            {/* Interactive Simulated Map Banner (Uber-inspired Location Pin Map) */}
+            {showMap && (
+              <div className="rounded-3xl border border-slate-200 bg-slate-900 text-white p-6 relative overflow-hidden shadow-lg animate-in fade-in duration-300">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-4 h-4 text-teal-400" />
+                    <span className="text-xs font-bold tracking-wider uppercase text-teal-400">Interactive Location Map</span>
+                  </div>
+                  <span className="text-xs text-slate-400">{filteredSpaces.length} locations mapped</span>
+                </div>
 
+                <div className="h-64 sm:h-72 rounded-2xl bg-slate-800/80 border border-slate-700 relative flex items-center justify-center overflow-hidden">
+                  {/* Stylized geometric grid map */}
+                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
+                  
+                  {/* Space pins */}
+                  <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 w-full">
+                    {filteredSpaces.slice(0, 6).map((space, idx) => (
+                      <div
+                        key={space.id}
+                        onClick={() => router.push(`/spaces/${space.id}`)}
+                        className="p-2.5 rounded-xl bg-slate-900/95 border border-teal-500/40 hover:border-teal-400 hover:scale-105 transition-all shadow-md cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                          <span className="text-xs font-bold text-white truncate">{space.location.city}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{space.title}</p>
+                        <div className="mt-1 text-xs font-black text-teal-300">
+                          ${space.pricing.daily || space.pricing.hourly}/
+                          {space.pricing.daily ? "day" : "hr"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Controls Bar: Sort & View Toggle */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+              
               {/* Result Summary */}
               <div className="text-xs text-slate-600 font-medium">
-                <span className="font-bold text-slate-900">{filteredSpaces.length}</span> spaces available
+                Showing <span className="font-bold text-slate-950">{filteredSpaces.length}</span> verified spaces
               </div>
 
-              {/* Sort Dropdown */}
+              {/* Sort Dropdown & View Mode */}
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-slate-500 hidden sm:block">Sort by:</label>
+                  <label className="text-xs font-semibold text-slate-400 hidden sm:block">Sort:</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as any)}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   >
                     <option value="recommended">Recommended & Verified</option>
                     <option value="price_asc">Price: Low to High</option>
                     <option value="price_desc">Price: High to Low</option>
-                    <option value="rating">Highest Customer Rating</option>
+                    <option value="rating">Highest Rating</option>
                     <option value="capacity">Largest Capacity</option>
                   </select>
                 </div>
 
                 {/* View Mode Switcher */}
-                <div className="hidden sm:flex items-center border border-slate-200 rounded-xl p-0.5 bg-slate-50">
+                <div className="flex items-center border border-slate-200 rounded-xl p-0.5 bg-slate-50">
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`p-1.5 rounded-lg text-slate-600 transition-colors ${
+                    className={`p-1.5 rounded-lg text-slate-600 transition-colors cursor-pointer ${
                       viewMode === "grid" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
                     }`}
                     aria-label="Grid View"
@@ -441,7 +512,7 @@ function SpacesContent() {
                   </button>
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`p-1.5 rounded-lg text-slate-600 transition-colors ${
+                    className={`p-1.5 rounded-lg text-slate-600 transition-colors cursor-pointer ${
                       viewMode === "list" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
                     }`}
                     aria-label="List View"
@@ -451,72 +522,6 @@ function SpacesContent() {
                 </div>
               </div>
             </div>
-
-            {/* Mobile Filters Dropdown Panel */}
-            {mobileFilterOpen && (
-              <div className="lg:hidden bg-white rounded-2xl border border-slate-200 p-5 shadow-lg space-y-4 animate-in slide-in-from-top-2">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-sm font-bold text-slate-900">Mobile Filters</span>
-                  <button
-                    onClick={() => setMobileFilterOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700">Space Type</label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value as any)}
-                      className="w-full mt-1 rounded-xl border border-slate-300 p-2 text-xs"
-                    >
-                      <option value="all">All Types</option>
-                      <option value="coworking">Coworking Desks</option>
-                      <option value="private_office">Private Office</option>
-                      <option value="meeting_room">Meeting Room</option>
-                      <option value="training_room">Training Hall</option>
-                      <option value="studio">Production Studio</option>
-                      <option value="event_space">Event Space</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700">Verification</label>
-                    <select
-                      value={selectedVerification}
-                      onChange={(e) => setSelectedVerification(e.target.value as any)}
-                      className="w-full mt-1 rounded-xl border border-slate-300 p-2 text-xs"
-                    >
-                      <option value="all">Any Tier</option>
-                      <option value="pro">SpaceGo Pro</option>
-                      <option value="ready">SpaceGo Ready</option>
-                      <option value="checked">Checked</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    variant="teal"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setMobileFilterOpen(false)}
-                  >
-                    Apply Filters
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResetFilters}
-                  >
-                    Reset
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {/* Results Display */}
             {isLoading ? (

@@ -28,6 +28,8 @@ import {
   Coffee,
   HelpCircle,
   FileCheck,
+  Compass,
+  ArrowUpRight,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -55,7 +57,7 @@ export default function HomePage() {
     if (date) params.set("date", date);
     if (seats) params.set("seats", seats);
 
-    // Record in demand analytics
+    // Record search demand signal
     SpaceGoStore.logSearchQuery({
       location: location || "All Locations",
       category: category !== "all" ? category : undefined,
@@ -72,48 +74,48 @@ export default function HomePage() {
       name: "Coworking Desks",
       desc: "Quiet ergonomic workstations with redundant 500 Mbps fiber & artisan coffee.",
       count: "From $12/hr",
-      icon: <Users className="w-6 h-6 text-teal-600" />,
-      bg: "bg-teal-50/70 border-teal-200/60",
+      icon: <Users className="w-5 h-5 text-teal-600" />,
+      bg: "bg-teal-50/50 border-teal-100 hover:border-teal-300",
     },
     {
       id: "private_office",
       name: "Private Offices",
       desc: "Turnkey lockable suites for teams of 4 to 20 with dedicated meeting rooms.",
       count: "From $320/day",
-      icon: <Building2 className="w-6 h-6 text-sky-600" />,
-      bg: "bg-sky-50/70 border-sky-200/60",
+      icon: <Building2 className="w-5 h-5 text-sky-600" />,
+      bg: "bg-sky-50/50 border-sky-100 hover:border-sky-300",
     },
     {
       id: "meeting_room",
       name: "Meeting & Boardrooms",
       desc: "Client-ready rooms with 4K videoconferencing, beamforming mics & privacy glass.",
       count: "From $65/hr",
-      icon: <Layers className="w-6 h-6 text-indigo-600" />,
-      bg: "bg-indigo-50/70 border-indigo-200/60",
+      icon: <Layers className="w-5 h-5 text-indigo-600" />,
+      bg: "bg-indigo-50/50 border-indigo-100 hover:border-indigo-300",
     },
     {
       id: "training_room",
       name: "Training & Workshops",
       desc: "Reconfigurable lecture spaces with dual projectors, audio PA & break-out terraces.",
       count: "From $45/hr",
-      icon: <TrendingUp className="w-6 h-6 text-emerald-600" />,
-      bg: "bg-emerald-50/70 border-emerald-200/60",
+      icon: <TrendingUp className="w-5 h-5 text-emerald-600" />,
+      bg: "bg-emerald-50/50 border-emerald-100 hover:border-emerald-300",
     },
     {
       id: "studio",
       name: "Production Studios",
       desc: "Sound-isolated multi-camera setups with broadcast mics and cinema lighting.",
       count: "From $65/hr",
-      icon: <Zap className="w-6 h-6 text-amber-600" />,
-      bg: "bg-amber-50/70 border-amber-200/60",
+      icon: <Zap className="w-5 h-5 text-amber-600" />,
+      bg: "bg-amber-50/50 border-amber-100 hover:border-amber-300",
     },
     {
       id: "event_space",
       name: "Events & Demo Halls",
       desc: "Panoramic venues for investor demo days, hackathons, and corporate mixers.",
       count: "From $180/hr",
-      icon: <Sparkles className="w-6 h-6 text-purple-600" />,
-      bg: "bg-purple-50/70 border-purple-200/60",
+      icon: <Sparkles className="w-5 h-5 text-purple-600" />,
+      bg: "bg-purple-50/50 border-purple-100 hover:border-purple-300",
     },
   ];
 
@@ -141,20 +143,20 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative pt-12 pb-20 md:pt-20 md:pb-32 overflow-hidden bg-gradient-to-b from-white via-slate-50/50 to-slate-100/50 border-b border-slate-200/70">
+      {/* Hero Section — Airbnb Grandeur & Linear Precision */}
+      <section className="relative pt-12 pb-24 md:pt-20 md:pb-32 overflow-hidden bg-white border-b border-slate-200/80">
         
-        {/* Subtle decorative mesh background */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-tr from-teal-100/30 via-sky-100/20 to-transparent blur-3xl pointer-events-none" />
+        {/* Subtle geometric background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[450px] bg-gradient-to-b from-teal-50/60 via-slate-50/30 to-transparent blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
-          {/* Badge */}
+          {/* Eyebrow Pill */}
           <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-teal-200 bg-teal-50/80 text-teal-900 text-xs font-semibold shadow-xs">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-teal-200 bg-teal-50/70 text-teal-900 text-xs font-semibold shadow-xs">
               <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
               <span>Demand-Backed Workspace Marketplace & PropTech</span>
             </div>
@@ -176,27 +178,27 @@ export default function HomePage() {
           {/* Quick Dual CTA Buttons */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/spaces">
-              <Button variant="primary" size="lg" className="shadow-md">
+              <Button variant="primary" size="lg" className="rounded-full shadow-md font-semibold px-6">
                 <span>Explore Workspaces</span>
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
             <Link href="/activation">
-              <Button variant="outline" size="lg" className="font-semibold bg-white border-slate-300">
+              <Button variant="outline" size="lg" className="rounded-full font-semibold px-6 bg-white border-slate-300 hover:border-slate-400">
                 <Sparkles className="w-4 h-4 text-teal-600" />
                 <span>Activate Your Property</span>
               </Button>
             </Link>
           </div>
 
-          {/* Search Bar Interface */}
+          {/* Airbnb-Calibre Floating Search Bar */}
           <div className="mt-12 max-w-4xl mx-auto">
             <form
               onSubmit={handleSearch}
-              className="glassmorphism p-3 sm:p-4 rounded-3xl shadow-xl border border-slate-200/90 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center"
+              className="bg-white p-2.5 sm:p-3 rounded-3xl sm:rounded-full shadow-xl border border-slate-200/90 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2 items-center"
             >
-              {/* Location Input */}
-              <div className="lg:col-span-4 p-2.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500 transition-colors">
+              {/* Location Segment */}
+              <div className="lg:col-span-4 px-4 py-2.5 rounded-2xl sm:rounded-full hover:bg-slate-50 transition-colors">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Where
                 </label>
@@ -206,14 +208,14 @@ export default function HomePage() {
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="San Francisco, London, Berlin..."
+                    placeholder="San Francisco, London..."
                     className="w-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 bg-transparent focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Category Dropdown */}
-              <div className="lg:col-span-3 p-2.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500 transition-colors">
+              {/* Space Type Segment */}
+              <div className="lg:col-span-3 px-4 py-2.5 rounded-2xl sm:rounded-full hover:bg-slate-50 transition-colors border-t sm:border-t-0 sm:border-l border-slate-100">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Space Type
                 </label>
@@ -235,8 +237,8 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Date Input */}
-              <div className="lg:col-span-2 p-2.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500 transition-colors">
+              {/* Date Segment */}
+              <div className="lg:col-span-2 px-4 py-2.5 rounded-2xl sm:rounded-full hover:bg-slate-50 transition-colors border-t sm:border-t-0 sm:border-l border-slate-100">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Date
                 </label>
@@ -251,8 +253,8 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Capacity / People */}
-              <div className="lg:col-span-2 p-2.5 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500 transition-colors">
+              {/* Capacity Segment */}
+              <div className="lg:col-span-2 px-4 py-2.5 rounded-2xl sm:rounded-full hover:bg-slate-50 transition-colors border-t sm:border-t-0 sm:border-l border-slate-100">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Capacity
                 </label>
@@ -271,19 +273,19 @@ export default function HomePage() {
               </div>
 
               {/* Search Submit Button */}
-              <div className="lg:col-span-1 flex items-center justify-center">
+              <div className="lg:col-span-1 flex items-center justify-center p-1">
                 <button
                   type="submit"
-                  className="w-full h-12 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center shadow-md shadow-teal-700/20 transition-transform active:scale-95"
+                  className="w-full sm:w-11 sm:h-11 h-11 rounded-full bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center shadow-md shadow-teal-700/20 transition-all hover:scale-105 active:scale-95 cursor-pointer"
                   aria-label="Search"
                 >
-                  <Search className="w-5 h-5" />
+                  <Search className="w-4 h-4" />
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Popular Cities pills */}
+          {/* Popular Cities Pills */}
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-slate-700">Popular hubs:</span>
             {["San Francisco", "New York", "London", "Berlin", "Bengaluru", "Singapore"].map((city) => (
@@ -293,7 +295,7 @@ export default function HomePage() {
                   setLocation(city);
                   router.push(`/spaces?location=${encodeURIComponent(city)}`);
                 }}
-                className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 transition-colors font-medium cursor-pointer"
+                className="px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:shadow-xs transition-all font-medium cursor-pointer"
               >
                 {city}
               </button>
@@ -303,22 +305,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Workspaces Section */}
+      {/* Featured Workspaces Section (Airbnb Presentation) */}
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-700">
-              <ShieldCheck className="w-4 h-4" /> Space Passport Verified
+              <ShieldCheck className="w-4 h-4" /> Space Passport™ Certified
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-1">
               Featured Premium Workspaces
             </h2>
             <p className="text-sm text-slate-500 mt-1 max-w-xl">
-              Fully inspected spaces with verified fiber connectivity, ergonomic setups, and active host commitments.
+              Inspected locations with guaranteed 300+ Mbps redundant fiber, ergonomic furniture, and active host commitments.
             </p>
           </div>
-          <Link href="/spaces" className="inline-flex items-center gap-1 text-sm font-bold text-teal-700 hover:text-teal-800 group">
-            <span>Browse All Spaces ({spaces.length})</span>
+          <Link href="/spaces" className="inline-flex items-center gap-1.5 text-sm font-bold text-teal-700 hover:text-teal-800 group">
+            <span>Browse All {spaces.length} Spaces</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
@@ -330,30 +332,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Explore By Workspace Type */}
+      {/* Explore By Workspace Category (Airbnb Task-Oriented Discovery) */}
       <section className="py-20 bg-white border-y border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
+              Tailored Environments
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-1">
               Spaces Designed for Every Task
             </h2>
             <p className="text-sm text-slate-500 mt-2">
-              Make discovery about your specific job to be done — whether focus coding, client pitches, sprint bootcamps, or podcast production.
+              Discovery oriented around your immediate job to be done — from focus sprints and confidential meetings to live broadcasts.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {categoriesList.map((cat) => (
               <Link
                 key={cat.id}
                 href={`/spaces?category=${cat.id}`}
                 className={`p-6 rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group ${cat.bg}`}
               >
-                <div className="w-12 h-12 rounded-xl bg-white border border-slate-200/60 shadow-xs flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200/70 shadow-xs flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
                   {cat.icon}
                 </div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-slate-900">{cat.name}</h3>
+                  <h3 className="text-base font-bold text-slate-950">{cat.name}</h3>
                   <span className="text-xs font-semibold text-slate-500">{cat.count}</span>
                 </div>
                 <p className="text-xs text-slate-600 mt-2 leading-relaxed">
@@ -369,37 +374,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How SpaceGo Works (Customer Journey vs Owner Journey) */}
+      {/* How SpaceGo Works — Dual Journey Orchestration */}
       <section id="how-it-works" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             End-to-End Orchestration
           </span>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight mt-1">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-1">
             How SpaceGo Works
           </h2>
           <p className="text-sm text-slate-500 mt-2">
             One connected platform that orchestrates seamless discovery for customers and intelligent activation for property owners.
           </p>
 
-          {/* Journey Toggle */}
-          <div className="mt-6 inline-flex p-1 rounded-2xl bg-slate-200/80 border border-slate-300/80">
+          {/* Linear-Style Journey Segment Switcher */}
+          <div className="mt-6 inline-flex p-1 rounded-full bg-slate-200/70 border border-slate-300/70">
             <button
               onClick={() => setActiveJourney("seeker")}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeJourney === "seeker"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-slate-950 shadow-xs"
+                  : "text-slate-600 hover:text-slate-950"
               }`}
             >
               For Workspace Seekers
             </button>
             <button
               onClick={() => setActiveJourney("owner")}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeJourney === "owner"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-slate-950 shadow-xs"
+                  : "text-slate-600 hover:text-slate-950"
               }`}
             >
               For Property Owners
@@ -408,92 +413,92 @@ export default function HomePage() {
         </div>
 
         {activeJourney === "seeker" ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">01</span>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">01</span>
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold mb-4">
                 <Search className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Define & Discover</h3>
+              <h3 className="text-sm font-bold text-slate-950">Define & Discover</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Filter by job purpose, exact seating capacity, high-speed fiber specifications, and real-time calendar availability.
+                Filter by specific job purpose, exact seating capacity, high-speed fiber specifications, and real-time availability.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">02</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">02</span>
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold mb-4">
                 <FileCheck className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Inspect Space Passport</h3>
+              <h3 className="text-sm font-bold text-slate-950">Inspect Space Passport™</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Review verified internet speed tests, acoustic noise ratings, emergency power backup status, and facility photos.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">03</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">03</span>
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold mb-4">
                 <Lock className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Book & Secure</h3>
+              <h3 className="text-sm font-bold text-slate-950">Book & Secure</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Instant reservation lock prevents double bookings. Transparent pricing with no hidden fees and clear cancellation rules.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">04</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">04</span>
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold mb-4">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Check In Seamlessly</h3>
+              <h3 className="text-sm font-bold text-slate-950">Check In Seamlessly</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Receive electronic QR passes, WiFi credentials, host check-in instructions, and dedicated customer support.
               </p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">01</span>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">01</span>
               <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold mb-4">
                 <Building2 className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Submit Property Data</h3>
+              <h3 className="text-sm font-bold text-slate-950">Submit Property Data</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Share your square footage, current floor condition, photos, and ownership authority for instant feasibility review.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">02</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">02</span>
               <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold mb-4">
                 <BarChart3 className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Demand & Economics</h3>
+              <h3 className="text-sm font-bold text-slate-950">Demand & Economics</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Receive an explainable 100-Point Activation Score based on verified local search volume, conversion CapEx, and payback projections.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">03</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">03</span>
               <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold mb-4">
                 <ShieldCheck className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Verify & Stage-Gate</h3>
+              <h3 className="text-sm font-bold text-slate-950">Verify & Stage-Gate</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Coordinate approved vendor fit-outs, fire and internet checks, and earn your official Space Passport™ certification.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-slate-200 bg-white relative">
-              <span className="text-4xl font-black text-slate-200 absolute top-4 right-4">04</span>
+            <div className="p-6 rounded-2xl border border-slate-200/90 bg-white relative shadow-xs">
+              <span className="text-3xl font-black text-slate-200 absolute top-4 right-4">04</span>
               <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center font-bold mb-4">
                 <TrendingUp className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Earn & Monitor</h3>
+              <h3 className="text-sm font-bold text-slate-950">Earn & Monitor</h3>
               <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                 Automated booking calendars, host payout settlements, occupancy tracking, and owner contribution dashboards.
               </p>
@@ -502,7 +507,7 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Property Activation Hero Feature */}
+      {/* Property Activation Hero Section (Stripe / PropTech Authority) */}
       <section className="py-20 bg-[#0B132B] text-white relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -510,18 +515,18 @@ export default function HomePage() {
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-500/30 text-teal-300 text-xs font-semibold">
                 <Sparkles className="w-3.5 h-3.5" />
-                The SpaceGo Strategic Wedge
+                The SpaceGo Strategic Advantage
               </div>
               <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
                 Demand-Backed Space Activation
               </h2>
-              <p className="text-base text-slate-300 leading-relaxed font-normal">
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal">
                 Don’t spend capital on conversion based on blind guesswork. SpaceGo links qualified local search demand to property suitability, conversion economics, and readiness testing before recommending capital expenditure.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                  <h4 className="text-sm font-bold text-teal-400">100-Point Matrix</h4>
+                  <h4 className="text-sm font-bold text-teal-400">100-Point Scoring Matrix</h4>
                   <p className="text-xs text-slate-300 mt-1">
                     Evaluates local demand (30%), conversion economics (25%), readiness (20%), location access (15%), and operations (10%).
                   </p>
@@ -536,30 +541,30 @@ export default function HomePage() {
 
               <div className="pt-4 flex flex-wrap items-center gap-4">
                 <Link href="/activation">
-                  <Button variant="teal" size="lg">
+                  <Button variant="teal" size="lg" className="rounded-full shadow-lg">
                     <span>Submit Property for Activation</span>
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
                 <Link href="/activation/track">
-                  <Button variant="ghost" size="lg" className="text-slate-300 hover:text-white hover:bg-white/10">
+                  <Button variant="ghost" size="lg" className="rounded-full text-slate-300 hover:text-white hover:bg-white/10">
                     Track Existing Request
                   </Button>
                 </Link>
               </div>
             </div>
 
-            {/* Visual Activation Matrix Card */}
+            {/* Interactive 100-Point Activation Matrix Card */}
             <div className="lg:col-span-5">
               <div className="rounded-3xl border border-slate-700 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-md space-y-5">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Sample Assessment</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Live Sample Evaluation</span>
                     <h4 className="text-base font-bold text-white">Mission Street Tech Loft</h4>
                   </div>
                   <div className="text-right">
                     <span className="text-2xl font-black text-teal-400">86/100</span>
-                    <div className="text-[10px] font-semibold text-emerald-400">Ready for Assessment</div>
+                    <div className="text-[10px] font-semibold text-emerald-400">Approved for Assessment</div>
                   </div>
                 </div>
 
@@ -569,7 +574,7 @@ export default function HomePage() {
                       <span>Qualified Local Demand (30%)</span>
                       <span className="font-bold text-teal-300">27 / 30</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div className="h-full bg-teal-400 rounded-full" style={{ width: "90%" }} />
                     </div>
                   </div>
@@ -579,7 +584,7 @@ export default function HomePage() {
                       <span>Conversion Economics & CapEx (25%)</span>
                       <span className="font-bold text-teal-300">22 / 25</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div className="h-full bg-teal-400 rounded-full" style={{ width: "88%" }} />
                     </div>
                   </div>
@@ -589,7 +594,7 @@ export default function HomePage() {
                       <span>Workspace Physical Readiness (20%)</span>
                       <span className="font-bold text-teal-300">17 / 20</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div className="h-full bg-teal-400 rounded-full" style={{ width: "85%" }} />
                     </div>
                   </div>
@@ -599,7 +604,7 @@ export default function HomePage() {
                       <span>Location Transit & Access (15%)</span>
                       <span className="font-bold text-teal-300">12 / 15</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div className="h-full bg-teal-400 rounded-full" style={{ width: "80%" }} />
                     </div>
                   </div>
@@ -609,7 +614,7 @@ export default function HomePage() {
                       <span>Operational Feasibility (10%)</span>
                       <span className="font-bold text-teal-300">8 / 10</span>
                     </div>
-                    <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div className="h-full bg-teal-400 rounded-full" style={{ width: "80%" }} />
                     </div>
                   </div>
@@ -627,13 +632,13 @@ export default function HomePage() {
       </section>
 
       {/* Space Passport Section (Trust, Quality & Service Accountability) */}
-      <section id="passport" className="py-20 bg-slate-100/60 border-b border-slate-200">
+      <section id="passport" className="py-20 bg-slate-100/70 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-14">
+          <div className="text-center max-w-2xl mx-auto mb-12">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-700">
               <ShieldCheck className="w-4 h-4" /> Evidence-Backed Standards
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-1">
               The SpaceGo Space Passport™
             </h2>
             <p className="text-sm text-slate-600 mt-2">
@@ -642,11 +647,11 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
                 <Lock className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Identity & Property Authority</h3>
+              <h3 className="text-sm font-bold text-slate-950">Identity & Property Authority</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 Legal ownership or sanctioned operating authority is documented. No listing implies statutory approval that has not been confirmed.
               </p>
@@ -655,11 +660,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
                 <Zap className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Connectivity & Power Tests</h3>
+              <h3 className="text-sm font-bold text-slate-950">Connectivity & Power Tests</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 We test actual download, upload, and latency under load. Backup generators and UPS batteries are field-tested with logged date stamps.
               </p>
@@ -668,11 +673,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
               <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold">
                 <ShieldCheck className="w-5 h-5" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">Physical Facilities & Life Safety</h3>
+              <h3 className="text-sm font-bold text-slate-950">Physical Facilities & Life Safety</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 Acoustic baseline checks, ergonomic seating, fire extinguisher inspection, clean restrooms, and emergency exit routes verified.
               </p>
@@ -690,7 +695,7 @@ export default function HomePage() {
           <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-700">
             <HelpCircle className="w-4 h-4" /> Got Questions?
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-1">
             Frequently Asked Questions
           </h2>
           <p className="text-sm text-slate-500 mt-2">
@@ -702,11 +707,11 @@ export default function HomePage() {
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs transition-colors"
+              className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs transition-colors"
             >
               <button
                 onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
-                className="w-full flex items-center justify-between p-5 text-left font-bold text-sm sm:text-base text-slate-900 hover:text-teal-700 transition-colors"
+                className="w-full flex items-center justify-between p-5 text-left font-bold text-sm text-slate-950 hover:text-teal-700 transition-colors cursor-pointer"
               >
                 <span>{faq.q}</span>
                 <ChevronDown
@@ -716,7 +721,7 @@ export default function HomePage() {
                 />
               </button>
               {expandedFaq === index && (
-                <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100">
+                <div className="px-5 pb-5 pt-1 text-xs text-slate-600 leading-relaxed border-t border-slate-100">
                   {faq.a}
                 </div>
               )}
@@ -736,12 +741,12 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
             <Link href="/spaces">
-              <Button size="lg" className="bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-lg">
+              <Button size="lg" className="rounded-full bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-lg px-8">
                 Explore Workspaces
               </Button>
             </Link>
             <Link href="/activation">
-              <Button size="lg" variant="outline" className="border-teal-300 text-white hover:bg-teal-700/50">
+              <Button size="lg" variant="outline" className="rounded-full border-teal-300 text-white hover:bg-teal-700/50 px-8">
                 Activate Your Space
               </Button>
             </Link>
