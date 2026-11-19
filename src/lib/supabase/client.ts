@@ -12,9 +12,15 @@ export function createClient() {
 }
 
 export const isSupabaseConfigured = (): boolean => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
   return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
-      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
+    url &&
+      anonKey &&
+      !url.includes("placeholder") &&
+      !url.includes("your-project-id") &&
+      !anonKey.includes("placeholder") &&
+      !anonKey.includes("your-supabase-anon-key")
   );
 };
