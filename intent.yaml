@@ -1,7 +1,7 @@
 # Orun intent for spacego-2 (ported from Vercel). Placeholders:
 #   spacego-2     repo name (also the Orun project slug)
 #   ws_RF9QTVRZ          workspace id (ws_...)
-#   PLACEHOLDER   the Cloudflare account's workers.dev subdomain
+#   orun-pool-9b971c2c   the Cloudflare account's workers.dev subdomain
 #   0.23.0  stack-tectonic tag the current baselines pin (e.g. 0.20.0)
 # Delete the OPTIONAL blocks the survey did not call for.
 apiVersion: sourceplane.io/v1
@@ -76,7 +76,7 @@ automation:
 environments:
   stage:
     description: Deployed on every merge to main, before prod. Pull requests plan and verify here.
-    url: https://spacego-2-web-stage.PLACEHOLDER.workers.dev
+    url: https://spacego-2-web-stage.orun-pool-9b971c2c.workers.dev
     activation:
       triggerRefs: [github-pull-request, github-push-main, local-development]
     parameterDefaults:
@@ -90,7 +90,7 @@ environments:
       requireApproval: "false"
   prod:
     description: Where visitors are. Deploys after stage converges on the same commit.
-    url: https://spacego-2-web-prod.PLACEHOLDER.workers.dev
+    url: https://spacego-2-web-prod.orun-pool-9b971c2c.workers.dev
     activation:
       triggerRefs: [github-push-main, local-development]
     promotion:
@@ -148,7 +148,7 @@ components:
       assetsDir: .open-next/assets
       workerName: spacego-2-web
       environmentAwareWorkerName: true
-      workersDevSubdomain: PLACEHOLDER  # replaced with the account's real subdomain after the first deploy
+      workersDevSubdomain: orun-pool-9b971c2c  # replaced with the account's real subdomain after the first deploy
       environmentBuildVar: ORUN_ENVIRONMENT
       installCommand: npm ci
       # build:worker renders the git-ignored wrangler.jsonc from the fixture
@@ -159,10 +159,9 @@ components:
       # Space-separated Orun secrets (from secretEnv) written into the Worker
       # after deploy and before smoke. Empty: nothing written.
       workerSecrets: ""
-      # Temporary: the workers.dev subdomain is only known after the first
-      # deploy. Replace with the real route check below once it is discovered.
-      smokeCommand: 'echo "deployed ${EFFECTIVE_WORKER_NAME}; smoke enabled after subdomain discovery"'
-      # smokeCommand: 'html=$(curl -sfL --max-time 30 "${DEPLOYED_URL}/") && grep -qi "Find the right space" <<< "${html}"'
+      # Check the deployed home page for the seeded demo's hero text. The
+      # retries absorb a cold workers.dev route and transient edge timeouts.
+      smokeCommand: 'html=$(curl -sfL --connect-timeout 10 --max-time 30 --retry 2 --retry-all-errors "${DEPLOYED_URL}/") && grep -qi "Find the right space" <<< "${html}"'
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       NEXT_TELEMETRY_DISABLED: "1"
@@ -174,7 +173,7 @@ components:
           profile: verify
           env:
             # Build-time public values per environment (NEXT_PUBLIC_*, VITE_*, PUBLIC_*).
-            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-stage.PLACEHOLDER.workers.dev
+            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-stage.orun-pool-9b971c2c.workers.dev
           profileRules:
             - profile: deploy
               when:
@@ -182,7 +181,7 @@ components:
         - name: prod
           profile: verify
           env:
-            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-prod.PLACEHOLDER.workers.dev
+            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-prod.orun-pool-9b971c2c.workers.dev
           profileRules:
             - profile: deploy
               when:
