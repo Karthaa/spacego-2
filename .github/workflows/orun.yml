@@ -87,18 +87,24 @@ jobs:
               fi
               plan_args+=(--component "$c")
             done
-          else
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
             # orun reads the base intent.yaml from the base branch by name, and
             # a pull request checkout only has origin/<base>.
-            if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-              git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
-            fi
+            git branch --force "$GITHUB_BASE_REF" "origin/$GITHUB_BASE_REF"
             plan_args=(
               --from-ci github
               --event-file "$GITHUB_EVENT_PATH"
               --intent intent.yaml
               --output plan.json
               --changed
+            )
+          else
+            # A push to main deploys every environment. Changed-only planning
+            # would skip a deploy when only intent.yaml or the workflow changed.
+            plan_args=(
+              --trigger github-push-main
+              --intent intent.yaml
+              --output plan.json
             )
           fi
 
