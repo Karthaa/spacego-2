@@ -1,0 +1,223 @@
+# Orun intent for spacego-2 (ported from Vercel). Placeholders:
+#   spacego-2     repo name (also the Orun project slug)
+#   ws_RF9QTVRZ          workspace id (ws_...)
+#   PLACEHOLDER   the Cloudflare account's workers.dev subdomain
+#   0.23.0  stack-tectonic tag the current baselines pin (e.g. 0.20.0)
+# Delete the OPTIONAL blocks the survey did not call for.
+apiVersion: sourceplane.io/v1
+kind: Intent
+
+metadata:
+  name: spacego-2
+  description: spacego-2 on Cloudflare Workers through Orunbase (ported from Vercel).
+  namespace: spacego-2
+
+execution:
+  state:
+    backendUrl: https://api-edge-prod.oruncloud.workers.dev
+    # Declaring the workspace implies strict mode: a non-interactive run that
+    # resolves no workspace fails fast.
+    workspace: ws_RF9QTVRZ
+    requireOrg: true
+    autopushCatalog: true
+  lanes:
+    mode: auto
+    maxLanes: 6
+    concurrency: 6
+
+compositions:
+  sources:
+    # Pinned: bumping the tag is the deliberate upgrade step.
+    - name: stack-tectonic
+      kind: oci
+      ref: oci://ghcr.io/sourceplane/stack-tectonic:0.23.0
+    # Repo-local: workers-app (Worker build/deploy/secrets/smoke) and
+    # gated-deploy (an external backend's deploy), which stack-tectonic lacks.
+    - name: local
+      kind: dir
+      path: infra/stack
+  resolution:
+    precedence:
+      - local
+      - stack-tectonic
+
+# Infra roots (and apps under apps/) are discovered by their component.yaml.
+# An app at the repository root is declared inline below instead, so the
+# upstream layout does not have to move.
+discovery:
+  roots:
+    - infra/
+    # - apps/          # OPTIONAL: monorepo apps with their own component.yaml
+
+automation:
+  triggerBindings:
+    github-pull-request:
+      description: Pull request validation
+      on:
+        provider: github
+        event: pull_request
+        actions: [opened, synchronize, reopened, ready_for_review]
+        baseBranches: [main]
+      plan:
+        scope: changed
+        base: pull_request.base.sha
+        head: pull_request.head.sha
+    github-push-main:
+      description: Main branch convergence after merge
+      on:
+        provider: github
+        event: push
+        branches: [main]
+    local-development:
+      description: Local planning
+      on:
+        provider: local
+
+environments:
+  stage:
+    description: Deployed on every merge to main, before prod. Pull requests plan and verify here.
+    url: https://spacego-2-web-stage.PLACEHOLDER.workers.dev
+    activation:
+      triggerRefs: [github-pull-request, github-push-main, local-development]
+    parameterDefaults:
+      terraform:
+        lane: verify
+        namespace: spacego-2
+        namespacePrefix: ""
+        owner: Karthaa
+        repo: spacego-2
+    policies:
+      requireApproval: "false"
+  prod:
+    description: Where visitors are. Deploys after stage converges on the same commit.
+    url: https://spacego-2-web-prod.PLACEHOLDER.workers.dev
+    activation:
+      triggerRefs: [github-push-main, local-development]
+    promotion:
+      dependsOn:
+        - environment: stage
+    parameterDefaults:
+      terraform:
+        lane: verify
+        namespace: spacego-2
+        namespacePrefix: ""
+        owner: Karthaa
+        repo: spacego-2
+    policies:
+      requireApproval: "false"
+
+components:
+  # The main app, at the repository root (the upstream layout).
+  - name: web
+    type: workers-app
+    domain: app          # not the component's own name: a domain and a component share the catalog's name space
+    path: .
+    lane: isolated
+    # A root-path component owns no files under `orun plan --changed`: list
+    # what changes the Worker, or merges will not redeploy it.
+    change:
+      inputs:
+        - "app/**"
+        - "src/**"
+        - "pages/**"
+        - "components/**"
+        - "lib/**"
+        - "public/**"
+        - "content/**"
+        - "*.config.*"
+        - "middleware.ts"
+        - "proxy.ts"
+        - "instrumentation.ts"
+        - "worker.ts"
+        - "package.json"
+        - "package-lock.json"
+        - "tsconfig.json"
+        - "wrangler.template.jsonc"
+        - "wiring.fixture.json"
+        - "open-next.config.ts"
+        - "tooling/**"
+        - "scripts/**"
+        - "infra/stack/compositions/workers-app/**"
+    parameters:
+      nodeVersion: "22"
+      pnpmVersion: "10.12.1"
+      workspaceDir: .
+      appDir: .
+      wranglerConfig: wrangler.jsonc
+      workerEntrypoint: .open-next/worker.js
+      assetsDir: .open-next/assets
+      workerName: spacego-2-web
+      environmentAwareWorkerName: true
+      workersDevSubdomain: PLACEHOLDER  # replaced with the account's real subdomain after the first deploy
+      environmentBuildVar: ORUN_ENVIRONMENT
+      installCommand: npm ci
+      # build:worker renders the git-ignored wrangler.jsonc from the fixture
+      # (no bindings in this port), then builds Next and the Worker. pnpm stays
+      # pinned in CI only because the worker composition invokes
+      # `pnpm exec wrangler`; dependencies come from npm ci.
+      buildCommand: 'npm run build:worker'
+      # Space-separated Orun secrets (from secretEnv) written into the Worker
+      # after deploy and before smoke. Empty: nothing written.
+      workerSecrets: ""
+      # Temporary: the workers.dev subdomain is only known after the first
+      # deploy. Replace with the real route check below once it is discovered.
+      smokeCommand: 'echo "deployed ${EFFECTIVE_WORKER_NAME}; smoke enabled after subdomain discovery"'
+      # smokeCommand: 'html=$(curl -sfL --max-time 30 "${DEPLOYED_URL}/") && grep -qi "Find the right space" <<< "${html}"'
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      NEXT_TELEMETRY_DISABLED: "1"
+    # secretEnv:                          # OPTIONAL: required runtime secrets
+    #   SOME_SECRET: "secret://ws_RF9QTVRZ/spacego-2/{{ .environment }}/SOME_SECRET"
+    subscribe:
+      environments:
+        - name: stage
+          profile: verify
+          env:
+            # Build-time public values per environment (NEXT_PUBLIC_*, VITE_*, PUBLIC_*).
+            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-stage.PLACEHOLDER.workers.dev
+          profileRules:
+            - profile: deploy
+              when:
+                triggerRef: github-push-main
+        - name: prod
+          profile: verify
+          env:
+            NEXT_PUBLIC_SITE_URL: https://spacego-2-web-prod.PLACEHOLDER.workers.dev
+          profileRules:
+            - profile: deploy
+              when:
+                triggerRef: github-push-main
+
+  # OPTIONAL: a backend that stays outside Cloudflare and has its own deploy
+  # step. Replace <backend-dir>, <check> and <deploy> with its CLI's.
+  # - name: backend
+  #   type: gated-deploy
+  #   domain: services
+  #   path: .
+  #   change:
+  #     inputs: ["<backend-dir>/**", "package.json", "pnpm-lock.yaml"]
+  #   parameters:
+  #     nodeVersion: "22"
+  #     pnpmVersion: "10.12.1"
+  #     installCommand: pnpm install --frozen-lockfile
+  #     verifyCommand: <check: non-mutating, e.g. the CLI's --version>
+  #     deployCommand: <deploy>
+  #     gateSecret: BACKEND_DEPLOY_KEY
+  #   optionalSecretEnv:
+  #     BACKEND_DEPLOY_KEY: "secret://ws_RF9QTVRZ/spacego-2/{{ .environment }}/BACKEND_DEPLOY_KEY"
+  #   subscribe:
+  #     environments:
+  #       - name: stage
+  #         profile: verify
+  #         profileRules: [{ profile: deploy, when: { triggerRef: github-push-main } }]
+  #       - name: prod
+  #         profile: verify
+  #         profileRules: [{ profile: deploy, when: { triggerRef: github-push-main } }]
+
+repo:
+  displayName: spacego-2
+  docs:
+    overview: README.md
+    pages:
+      - { path: specs/epics/spacego-2-on-orunbase/README.md, role: reference, title: The epic }
+      - { path: specs/epics/spacego-2-on-orunbase/design.md, role: architecture, title: Design }

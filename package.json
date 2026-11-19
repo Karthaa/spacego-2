@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "build:worker": "npm run wire:fixture && npm run build && opennextjs-cloudflare build --skipBuild",
+    "preview:worker": "npm run wire:fixture && opennextjs-cloudflare preview",
+    "wire:fixture": "node tooling/wire/render.mjs --template wrangler.template.jsonc --out wrangler.jsonc --map wiring.fixture.json --env \"${ORUN_ENVIRONMENT:-stage}\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -21,6 +25,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.16",
+    "wrangler": "^4.148.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@tailwindcss/turbopack": "^4",
     "@types/canvas-confetti": "^1.9.0",
