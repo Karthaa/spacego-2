@@ -19,6 +19,17 @@ import {
   INITIAL_ENQUIRIES,
   INITIAL_NOTIFICATIONS,
 } from "./mockData";
+import {
+  deleteRow,
+  fetchFavourites,
+  fetchRows,
+  isRemoteEnabled as isSupabaseBackendEnabled,
+  REMOTE_TABLES,
+  saveRow,
+  seedFavourites,
+  seedRows,
+  setFavouriteRow,
+} from "./remote";
 
 // Storage keys
 const SPACES_KEY = "spacego_spaces";
@@ -28,6 +39,18 @@ const DEMAND_KEY = "spacego_demand";
 const ENQUIRIES_KEY = "spacego_enquiries";
 const NOTIFICATIONS_KEY = "spacego_notifications";
 const FAVOURITES_KEY = "spacego_favourites";
+
+const DEFAULT_FAVOURITES: Record<string, string[]> = {
+  "user-seeker-1": ["space-1", "space-3"],
+};
+
+let hydratePromise: Promise<boolean> | null = null;
+
+function newestFirst<T extends { created_at?: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) =>
+    (b.created_at ?? "").localeCompare(a.created_at ?? "")
+  );
+}
 
 function getStored<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -50,6 +73,115 @@ function setStored<T>(key: string, data: T): void {
 }
 
 export const SpaceGoStore = {
+  isRemoteEnabled: (): boolean => isSupabaseBackendEnabled(),
+
+  /**
+   * Load the Supabase copy into localStorage before the app renders. Empty
+   * remote tables are seeded from the current local demo state, so the first
+   * connection does not lose edits made in demo mode.
+   */
+  hydrate: async (): Promise<boolean> => {
+    if (!isSupabaseBackendEnabled()) return false;
+    if (hydratePromise) return hydratePromise;
+
+    hydratePromise = (async () => {
+      const [spaces, bookings, activations, demand, enquiries, notifications, favourites] =
+        await Promise.all([
+          fetchRows<Space>(REMOTE_TABLES.spaces),
+          fetchRows<Booking>(REMOTE_TABLES.bookings),
+          fetchRows<PropertyActivationRequest>(REMOTE_TABLES.activations),
+          fetchRows<DemandSearch>(REMOTE_TABLES.demandSearches),
+          fetchRows<WorkspaceEnquiry>(REMOTE_TABLES.enquiries),
+          fetchRows<NotificationItem>(REMOTE_TABLES.notifications),
+          fetchFavourites(),
+        ]);
+
+      if (spaces !== null) {
+        if (spaces.length === 0) {
+          const local = getStored<Space[]>(SPACES_KEY, INITIAL_SPACES);
+          setStored(SPACES_KEY, local);
+          void seedRows(REMOTE_TABLES.spaces, local);
+        } else {
+          setStored(SPACES_KEY, spaces);
+        }
+      }
+
+      if (bookings !== null) {
+        if (bookings.length === 0) {
+          const local = getStored<Booking[]>(BOOKINGS_KEY, INITIAL_BOOKINGS);
+          setStored(BOOKINGS_KEY, local);
+          void seedRows(REMOTE_TABLES.bookings, local);
+        } else {
+          setStored(BOOKINGS_KEY, newestFirst(bookings));
+        }
+      }
+
+      if (activations !== null) {
+        if (activations.length === 0) {
+          const local = getStored<PropertyActivationRequest[]>(
+            ACTIVATIONS_KEY,
+            INITIAL_ACTIVATION_REQUESTS
+          );
+          setStored(ACTIVATIONS_KEY, local);
+          void seedRows(REMOTE_TABLES.activations, local);
+        } else {
+          setStored(ACTIVATIONS_KEY, newestFirst(activations));
+        }
+      }
+
+      if (demand !== null) {
+        if (demand.length === 0) {
+          const local = getStored<DemandSearch[]>(DEMAND_KEY, INITIAL_DEMAND_SEARCHES);
+          setStored(DEMAND_KEY, local);
+          void seedRows(REMOTE_TABLES.demandSearches, local);
+        } else {
+          setStored(DEMAND_KEY, newestFirst(demand));
+        }
+      }
+
+      if (enquiries !== null) {
+        if (enquiries.length === 0) {
+          const local = getStored<WorkspaceEnquiry[]>(ENQUIRIES_KEY, INITIAL_ENQUIRIES);
+          setStored(ENQUIRIES_KEY, local);
+          void seedRows(REMOTE_TABLES.enquiries, local);
+        } else {
+          setStored(ENQUIRIES_KEY, newestFirst(enquiries));
+        }
+      }
+
+      if (notifications !== null) {
+        if (notifications.length === 0) {
+          const local = getStored<NotificationItem[]>(
+            NOTIFICATIONS_KEY,
+            INITIAL_NOTIFICATIONS
+          );
+          setStored(NOTIFICATIONS_KEY, local);
+          void seedRows(REMOTE_TABLES.notifications, local);
+        } else {
+          setStored(NOTIFICATIONS_KEY, newestFirst(notifications));
+        }
+      }
+
+      if (favourites !== null) {
+        const hasRows = Object.keys(favourites).length > 0;
+        const local = getStored<Record<string, string[]>>(
+          FAVOURITES_KEY,
+          DEFAULT_FAVOURITES
+        );
+        const next = hasRows ? favourites : local;
+        setStored(FAVOURITES_KEY, next);
+        if (!hasRows) void seedFavourites(next);
+      }
+
+      return true;
+    })().catch((error) => {
+      console.error("SpaceGo: Supabase hydration failed; using local demo data.", error);
+      return false;
+    });
+
+    return hydratePromise;
+  },
+
   // --- SPACES ---
   getSpaces: (): Space[] => {
     return getStored<Space[]>(SPACES_KEY, INITIAL_SPACES);
@@ -138,6 +270,7 @@ export const SpaceGoStore = {
 
     const updated = [space, ...spaces];
     setStored(SPACES_KEY, updated);
+    void saveRow(REMOTE_TABLES.spaces, space);
     return space;
   },
 
@@ -149,6 +282,7 @@ export const SpaceGoStore = {
     const updatedSpace = { ...spaces[index], ...updates };
     spaces[index] = updatedSpace;
     setStored(SPACES_KEY, spaces);
+    void saveRow(REMOTE_TABLES.spaces, updatedSpace);
     return updatedSpace;
   },
 
@@ -157,6 +291,7 @@ export const SpaceGoStore = {
     const filtered = spaces.filter((s) => s.id !== id);
     if (filtered.length === spaces.length) return false;
     setStored(SPACES_KEY, filtered);
+    void deleteRow(REMOTE_TABLES.spaces, id);
     return true;
   },
 
@@ -264,6 +399,7 @@ export const SpaceGoStore = {
 
     const bookings = SpaceGoStore.getBookings();
     setStored(BOOKINGS_KEY, [newBooking, ...bookings]);
+    void saveRow(REMOTE_TABLES.bookings, newBooking);
 
     // Send notifications to owner and user
     SpaceGoStore.addNotification({
@@ -297,6 +433,7 @@ export const SpaceGoStore = {
     booking.status = status;
     bookings[index] = booking;
     setStored(BOOKINGS_KEY, bookings);
+    void saveRow(REMOTE_TABLES.bookings, booking);
 
     // Notify seeker
     SpaceGoStore.addNotification({
@@ -369,6 +506,7 @@ export const SpaceGoStore = {
     };
 
     setStored(ACTIVATIONS_KEY, [newRequest, ...list]);
+    void saveRow(REMOTE_TABLES.activations, newRequest);
 
     // Notify user
     if (data.owner_id) {
@@ -406,6 +544,7 @@ export const SpaceGoStore = {
 
     list[index] = request;
     setStored(ACTIVATIONS_KEY, list);
+    void saveRow(REMOTE_TABLES.activations, request);
 
     if (request.owner_id) {
       SpaceGoStore.addNotification({
@@ -439,6 +578,7 @@ export const SpaceGoStore = {
     };
     // keep latest 100 searches
     setStored(DEMAND_KEY, [newEntry, ...searches].slice(0, 100));
+    void saveRow(REMOTE_TABLES.demandSearches, newEntry);
   },
 
   getEnquiries: (): WorkspaceEnquiry[] => {
@@ -454,6 +594,7 @@ export const SpaceGoStore = {
       created_at: new Date().toISOString(),
     };
     setStored(ENQUIRIES_KEY, [newEnquiry, ...list]);
+    void saveRow(REMOTE_TABLES.enquiries, newEnquiry);
     return newEnquiry;
   },
 
@@ -463,21 +604,24 @@ export const SpaceGoStore = {
     if (index !== -1) {
       list[index].status = status;
       setStored(ENQUIRIES_KEY, list);
+      void saveRow(REMOTE_TABLES.enquiries, list[index]);
     }
   },
 
   // --- FAVOURITES ---
   getUserFavourites: (userId: string): string[] => {
-    const allFavs = getStored<Record<string, string[]>>(FAVOURITES_KEY, {
-      "user-seeker-1": ["space-1", "space-3"],
-    });
+    const allFavs = getStored<Record<string, string[]>>(
+      FAVOURITES_KEY,
+      DEFAULT_FAVOURITES
+    );
     return allFavs[userId] || [];
   },
 
   toggleFavourite: (userId: string, spaceId: string): boolean => {
-    const allFavs = getStored<Record<string, string[]>>(FAVOURITES_KEY, {
-      "user-seeker-1": ["space-1", "space-3"],
-    });
+    const allFavs = getStored<Record<string, string[]>>(
+      FAVOURITES_KEY,
+      DEFAULT_FAVOURITES
+    );
     const currentList = allFavs[userId] || [];
     const isFav = currentList.includes(spaceId);
 
@@ -488,6 +632,7 @@ export const SpaceGoStore = {
     }
 
     setStored(FAVOURITES_KEY, allFavs);
+    void setFavouriteRow(userId, spaceId, !isFav);
     return !isFav;
   },
 
@@ -503,6 +648,7 @@ export const SpaceGoStore = {
     if (item) {
       item.read = true;
       setStored(NOTIFICATIONS_KEY, all);
+      void saveRow(REMOTE_TABLES.notifications, item);
     }
   },
 
@@ -515,5 +661,6 @@ export const SpaceGoStore = {
       created_at: new Date().toISOString(),
     };
     setStored(NOTIFICATIONS_KEY, [newNotif, ...all]);
+    void saveRow(REMOTE_TABLES.notifications, newNotif);
   },
 };

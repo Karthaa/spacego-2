@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { Settings, ShieldCheck, Database, Key, Server, CheckCircle2 } from "lucide-react";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 export default function AdminSettingsPage() {
   const { success } = useToast();
+  const supabaseConnected = isSupabaseConfigured();
 
   const [platformCommission, setPlatformCommission] = useState(15);
   const [minBookingBufferMinutes, setMinBookingBufferMinutes] = useState(15);
@@ -96,10 +98,30 @@ export default function AdminSettingsPage() {
             <div className="p-4 rounded-2xl bg-teal-50/60 border border-teal-200 space-y-2 text-xs">
               <div className="flex items-center gap-2 font-bold text-teal-950">
                 <CheckCircle2 className="w-4 h-4 text-teal-600" />
-                <span>Dual-Mode Storage Architecture Active</span>
+                <span>
+                  {supabaseConnected
+                    ? "Supabase Backend Configured"
+                    : "Local Demo Storage Active"}
+                </span>
               </div>
               <p className="text-teal-900 leading-relaxed">
-                The platform is configured with an active resilient datastore. To connect a remote PostgreSQL cluster, supply <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in <code>.env.local</code>. Migration SQL is prepared in <code>supabase/migrations/20261108_init.sql</code>.
+                {supabaseConnected ? (
+                  <>
+                    The app is configured to load its collections from the
+                    Supabase app-state tables and mirror writes back to
+                    Supabase. Apply{" "}
+                    <code>supabase/migrations/20261119_spacego_app_state.sql</code>{" "}
+                    before the first deploy.
+                  </>
+                ) : (
+                  <>
+                    The app is using the built-in localStorage demo data. To
+                    connect Supabase, apply{" "}
+                    <code>supabase/migrations/20261119_spacego_app_state.sql</code>{" "}
+                    and set <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+                    <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> for the build.
+                  </>
+                )}
               </p>
             </div>
           </div>

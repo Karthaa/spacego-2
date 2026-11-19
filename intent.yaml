@@ -165,6 +165,11 @@ components:
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       NEXT_TELEMETRY_DISABLED: "1"
+      # Supabase public browser credentials. These are build-time values, not
+      # Worker runtime secrets. Leave empty to keep the localStorage demo mode;
+      # fill both to switch the app to the Supabase app-state tables.
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
     # secretEnv:                          # OPTIONAL: required runtime secrets
     #   SOME_SECRET: "secret://ws_RF9QTVRZ/spacego-2/{{ .environment }}/SOME_SECRET"
     subscribe:
