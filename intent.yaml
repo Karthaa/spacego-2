@@ -165,11 +165,6 @@ components:
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       NEXT_TELEMETRY_DISABLED: "1"
-      # Supabase public browser credentials. These are build-time values, not
-      # Worker runtime secrets. Leave empty to keep the localStorage demo mode;
-      # fill both to switch the app to the Supabase app-state tables.
-      NEXT_PUBLIC_SUPABASE_URL: ""
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
     # secretEnv:                          # OPTIONAL: required runtime secrets
     #   SOME_SECRET: "secret://ws_RF9QTVRZ/spacego-2/{{ .environment }}/SOME_SECRET"
     subscribe:
@@ -179,6 +174,9 @@ components:
           env:
             # Build-time public values per environment (NEXT_PUBLIC_*, VITE_*, PUBLIC_*).
             NEXT_PUBLIC_SITE_URL: https://spacego-2-web-stage.orun-pool-9b971c2c.workers.dev
+            # Supabase project: SpaceGo-Staging. Public browser values.
+            NEXT_PUBLIC_SUPABASE_URL: https://itbpynkutqdrxspazaxr.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_fVPWLNkSFXgApcvHJXSfdw_I4r551XO
           profileRules:
             - profile: deploy
               when:
@@ -187,6 +185,10 @@ components:
           profile: verify
           env:
             NEXT_PUBLIC_SITE_URL: https://spacego-2-web-prod.orun-pool-9b971c2c.workers.dev
+            # Supabase project: spacego-dev (temporary prod backend until a
+            # dedicated production project exists). Public browser values.
+            NEXT_PUBLIC_SUPABASE_URL: https://hxsstsfsqlzqhtfizbcq.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_lA6nUJ9Hi1GFCSRkidfslg_FfId-h_m
           profileRules:
             - profile: deploy
               when:
