@@ -9,9 +9,10 @@ If either is missing, the app keeps using the localStorage demo data.
 
 ## 1. Apply the app-state migration
 
-Run `migrations/20261119_spacego_app_state.sql` in the Supabase SQL editor.
-It creates the `spacego_*` tables used by the client store and permissive demo
-RLS policies for the anon key.
+Run `migrations/20261119_spacego_app_state.sql` in the Supabase SQL editor for
+every project listed under "Current environment mapping". It creates the
+`spacego_*` tables used by the client store and permissive demo RLS policies
+for the anon key.
 
 The older `20261108_init.sql` is the UUID/Supabase-Auth production schema. It
 is intentionally separate and is not required for the demo backend.
@@ -20,9 +21,16 @@ is intentionally separate and is not required for the demo backend.
 
 Local development: copy `.env.example` to `.env.local` and fill both values.
 
-Stage/prod: fill both values in `intent.yaml` under the component `env` block.
-They are build-time values, not Worker runtime secrets, because Next inlines
-`NEXT_PUBLIC_*` during `next build`.
+Stage/prod: the values live in `intent.yaml` under each environment's `env`
+block, so the two deployments use separate databases. They are build-time
+values, not Worker runtime secrets, because Next inlines `NEXT_PUBLIC_*`
+during `next build`.
+
+## Current environment mapping
+
+- Orun **stage** → Supabase project `SpaceGo-Staging`
+- Orun **prod** → Supabase project `spacego-dev` (temporary until a dedicated
+  production project exists)
 
 ## 3. Deploy
 
