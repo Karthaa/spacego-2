@@ -484,7 +484,7 @@ function FilterPanel({
               aria-pressed={filters.duration === d}
               onClick={() => set("duration", d)}
               className={cn(
-                "h-11 rounded-md border text-sm font-medium capitalize transition-colors",
+                "h-11 rounded-md border text-sm font-medium transition-colors",
                 filters.duration === d
                   ? "border-accent bg-accent-soft text-accent-soft-ink"
                   : "border-line-strong bg-surface text-ink hover:bg-surface-muted"

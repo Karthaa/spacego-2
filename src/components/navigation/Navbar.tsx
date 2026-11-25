@@ -121,14 +121,14 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between gap-4">
           <Logo />
 
-          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 aria-current={link.active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                  "flex h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors",
                   link.active ? "text-ink" : "text-ink-muted hover:bg-surface-muted hover:text-ink"
                 )}
               >
@@ -299,7 +299,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-11 w-11 items-center justify-center rounded-md text-ink hover:bg-surface-muted md:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-ink hover:bg-surface-muted lg:hidden"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
@@ -311,7 +311,7 @@ export function Navbar() {
       </div>
 
       {mobileMenuOpen && (
-        <div id="mobile-menu" className="border-t border-line bg-surface md:hidden">
+        <div id="mobile-menu" className="border-t border-line bg-surface lg:hidden">
           <nav aria-label="Mobile" className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
             {navLinks.map((link) => (
               <Link

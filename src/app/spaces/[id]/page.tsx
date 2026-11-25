@@ -338,15 +338,21 @@ function Gallery({
     );
   }
 
-  const rest = images.slice(1, 5);
+  // Mosaic on md+: a large lead photo plus 4 tiles (2x2), or 1-2 tiles in a
+  // 3-column layout when there are fewer photos. Fixed height keeps rows even.
+  const rest = images.length >= 5 ? images.slice(1, 5) : images.slice(1, 3);
+  const cols = rest.length >= 4 ? "md:grid-cols-4" : rest.length > 0 ? "md:grid-cols-3" : "";
 
   return (
     <div className="relative mt-6">
-      <div className={cn("grid gap-2 overflow-hidden rounded-lg", rest.length > 0 ? "md:grid-cols-4 md:grid-rows-2" : "")}>
+      <div className={cn("grid gap-2 overflow-hidden rounded-lg md:h-[28rem] md:grid-rows-2", cols)}>
         <button
           type="button"
           onClick={() => onOpen(0)}
-          className={cn("block aspect-[4/3] bg-surface-muted md:aspect-auto", rest.length > 0 ? "md:col-span-2 md:row-span-2 md:h-[28rem]" : "md:h-[28rem]")}
+          className={cn(
+            "block aspect-[4/3] min-h-0 bg-surface-muted md:aspect-auto md:h-full md:row-span-2",
+            rest.length > 0 && "md:col-span-2"
+          )}
           aria-label="Open photo 1"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -357,7 +363,7 @@ function Gallery({
             key={`${img.url}-${idx}`}
             type="button"
             onClick={() => onOpen(idx + 1)}
-            className="hidden bg-surface-muted md:block"
+            className={cn("hidden min-h-0 bg-surface-muted md:block", rest.length === 1 && "md:row-span-2")}
             aria-label={`Open photo ${idx + 2}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
