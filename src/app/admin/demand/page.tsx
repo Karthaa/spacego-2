@@ -100,7 +100,7 @@ export default function AdminDemandPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             Platform Intelligence
           </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Real Demand Signals & Unmet Needs
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -159,7 +159,7 @@ export default function AdminDemandPage() {
             <span>Unfulfilled Demand Index</span>
           </div>
           <div className="space-y-1">
-            <span className="text-2xl font-black text-amber-600">{unfulfilledCount}</span>
+            <span className="text-2xl font-bold text-amber-600">{unfulfilledCount}</span>
             <p className="text-[11px] text-slate-500 leading-snug">
               Queries with zero matching spaces. Ideal targets for SpaceGo owner recruitment and activation campaigns!
             </p>

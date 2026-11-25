@@ -65,7 +65,7 @@ export default function SeekerBookingsPage() {
       {/* Header */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             My Workspace Bookings
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -122,7 +122,7 @@ export default function SeekerBookingsPage() {
                 />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                    <span className="font-mono text-xs font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                       {b.id}
                     </span>
                     <BookingStatusBadge status={b.status} />
@@ -142,7 +142,7 @@ export default function SeekerBookingsPage() {
               <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-100 gap-3">
                 <div className="text-left lg:text-right">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Paid</span>
-                  <span className="text-lg font-black text-slate-900">
+                  <span className="text-lg font-bold text-slate-900">
                     {formatCurrency(b.total_price, b.currency)}
                   </span>
                 </div>
@@ -207,7 +207,7 @@ export default function SeekerBookingsPage() {
                 <span className="text-[10px] uppercase font-bold text-teal-400 tracking-wider">
                   Check-in Code
                 </span>
-                <div className="text-2xl font-black font-mono tracking-widest text-white mt-1">
+                <div className="text-2xl font-bold font-mono tracking-widest text-white mt-1">
                   {selectedBooking.access_code}
                 </div>
               </div>

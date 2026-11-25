@@ -63,7 +63,7 @@ export default function OwnerBookingsPage() {
       {/* Header */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Booking Requests & Ledger
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -111,7 +111,7 @@ export default function OwnerBookingsPage() {
                 />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-black text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
+                    <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
                       {b.id}
                     </span>
                     <BookingStatusBadge status={b.status} />
@@ -136,7 +136,7 @@ export default function OwnerBookingsPage() {
               <div className="flex items-center gap-3 self-end lg:self-center">
                 <div className="text-right mr-2">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Value</span>
-                  <span className="text-base font-black text-slate-900">
+                  <span className="text-base font-bold text-slate-900">
                     {formatCurrency(b.total_price, b.currency)}
                   </span>
                 </div>

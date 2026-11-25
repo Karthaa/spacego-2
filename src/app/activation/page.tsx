@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest } from "@/types";
-import confetti from "canvas-confetti";
 import {
   Sparkles,
   Building2,
@@ -141,11 +140,6 @@ export default function PropertyActivationPage() {
       }
 
       setSubmittedRequest(result.data);
-      confetti({
-        particleCount: 90,
-        spread: 70,
-        origin: { y: 0.6 },
-      });
       success("Activation Request Registered!", `Reference Code: ${result.data.id}`);
     } finally {
       setIsSubmitting(false);
@@ -157,13 +151,13 @@ export default function PropertyActivationPage() {
       <Navbar />
 
       {/* Hero Header */}
-      <section className="bg-gradient-to-b from-[#0B132B] to-[#1C2541] text-white py-16 sm:py-24 relative overflow-hidden">
+      <section className="bg-slate-900 text-white py-16 sm:py-24 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5" />
             Demand-Backed Workspace Activation Program
           </div>
-          <h1 className="text-3xl sm:text-5xl font-black tracking-tight max-w-3xl mx-auto leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight max-w-3xl mx-auto leading-tight">
             Turn Underutilised Space Into High-Yield Workspace.
           </h1>
           <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
@@ -191,7 +185,7 @@ export default function PropertyActivationPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             The Activation Sequence
           </span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-1">
             From Dormant Floor to Bookable Workplace
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -266,7 +260,7 @@ export default function PropertyActivationPage() {
       <section className="py-12 bg-white border-y border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-10">
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Three Flexible Participation Models
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -322,7 +316,7 @@ export default function PropertyActivationPage() {
             <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
               Direct Owner Intake
             </span>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
               Submit Your Property for Activation
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -590,7 +584,7 @@ export default function PropertyActivationPage() {
             <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-950 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs uppercase font-bold text-teal-700">Tracking Reference</span>
-                <span className="text-base font-black font-mono tracking-wider">{submittedRequest.id}</span>
+                <span className="text-base font-bold font-mono tracking-wider">{submittedRequest.id}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-xs uppercase font-bold text-teal-700">Initial Pipeline Status</span>
@@ -610,7 +604,7 @@ export default function PropertyActivationPage() {
                     </h4>
                     <p className="text-[11px] text-slate-500">Based on initial floor specs & local market signals</p>
                   </div>
-                  <div className="text-2xl font-black text-teal-600">
+                  <div className="text-2xl font-bold text-teal-600">
                     {submittedRequest.activation_score.total}/100
                   </div>
                 </div>

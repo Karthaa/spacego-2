@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded-xl bg-slate-200/80", className)}
+      aria-hidden="true"
+      className={cn("animate-pulse rounded-md bg-surface-muted", className)}
       {...props}
     />
   );
@@ -14,19 +15,15 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 
 export function SpaceCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-      <Skeleton className="h-56 w-full rounded-none" />
-      <div className="p-5 space-y-3">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-12" />
+    <div className="overflow-hidden rounded-lg" role="status" aria-label="Loading workspace">
+      <Skeleton className="aspect-[4/3] w-full rounded-lg" />
+      <div className="space-y-2.5 pt-3">
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-5 w-10" />
         </div>
-        <Skeleton className="h-6 w-3/4" />
-        <Skeleton className="h-4 w-full" />
-        <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
-          <Skeleton className="h-6 w-20" />
-          <Skeleton className="h-8 w-24 rounded-lg" />
-        </div>
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-5 w-1/3" />
       </div>
     </div>
   );

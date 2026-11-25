@@ -26,7 +26,7 @@ export default function AdminSettingsPage() {
       
       {/* Header */}
       <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
           Platform Governance & System Settings
         </h1>
         <p className="text-xs text-slate-500 mt-1">

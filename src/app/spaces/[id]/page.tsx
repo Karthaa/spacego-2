@@ -3,47 +3,49 @@
 import React, { useState, useMemo, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Building2,
+  Check,
+  Clock,
+  Grid2x2,
+  Heart,
+  Info,
+  MapPin,
+  Share2,
+  Star,
+  Users,
+  Zap,
+} from "lucide-react";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
 import { VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { Booking } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import confetti from "canvas-confetti";
-import {
-  MapPin,
-  Users,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  Calendar,
-  Wifi,
-  Sparkles,
-  Heart,
-  Share2,
-  ChevronRight,
-  Info,
-  Building2,
-  Lock,
-  Layers,
-  Zap,
-  Check,
-  ArrowRight,
-} from "lucide-react";
+import { categoryNoun } from "@/lib/categories";
+import { Booking, Space } from "@/types";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
-export default function SpaceDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const unwrappedParams = use(params);
-  const spaceId = unwrappedParams.id;
+type DurationType = "hourly" | "daily" | "monthly";
+
+const DURATION_LABEL: Record<DurationType, { option: string; unit: string; units: string; max: number }> = {
+  hourly: { option: "By the hour", unit: "hour", units: "hours", max: 12 },
+  daily: { option: "By the day", unit: "day", units: "days", max: 30 },
+  monthly: { option: "By the month", unit: "month", units: "months", max: 36 },
+};
+
+function availableDurations(space: Space): DurationType[] {
+  return (["hourly", "daily", "monthly"] as const).filter((d) => Boolean(space.pricing[d]));
+}
+
+export default function SpaceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: spaceId } = use(params);
   const router = useRouter();
   const { user } = useAuth();
   const { success, error } = useToast();
@@ -54,8 +56,8 @@ export default function SpaceDetailPage({
     void dataVersion;
     return SpaceGoStore.getSpaceById(spaceId);
   }, [spaceId, dataVersion]);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [isSavingFavourite, setIsSavingFavourite] = useState(false);
 
   const isFavorited = useMemo(() => {
@@ -64,71 +66,37 @@ export default function SpaceDetailPage({
     return SpaceGoStore.getUserFavourites(user.id).includes(space.id);
   }, [user, space, dataVersion]);
 
-  // Booking Form State
-  const [bookingDate, setBookingDate] = useState(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
-  });
-  const [durationType, setDurationType] = useState<"hourly" | "daily" | "monthly">("daily");
-  const [durationUnits, setDurationUnits] = useState(1);
-  const [seats, setSeats] = useState(1);
-  const [specialRequests, setSpecialRequests] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Booking Confirmation Modal
-  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
-
   if (!space) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+      <div className="flex min-h-screen flex-col bg-canvas">
         <Navbar />
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <Building2 className="w-12 h-12 text-slate-300 mb-3" />
-          <h2 className="text-xl font-bold text-slate-900">Workspace Not Found</h2>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm">
-            The workspace you are looking for does not exist or may have been unlisted.
-          </p>
-          <Link href="/spaces" className="mt-4">
-            <Button variant="teal">Browse All Workspaces</Button>
-          </Link>
-        </div>
+        <main id="main" className="mx-auto flex w-full max-w-3xl flex-1 items-center px-4 py-16">
+          <EmptyState
+            className="w-full"
+            icon={<Building2 />}
+            title="This space isn't available"
+            description="It may have been unpublished by the host, or the link may be wrong."
+            action={
+              <Link href="/spaces" className={buttonClasses()}>
+                Browse spaces
+              </Link>
+            }
+          />
+        </main>
         <Footer />
       </div>
     );
   }
 
-  // Calculate pricing
-  const calculateTotal = () => {
-    let unitRate = 0;
-    if (durationType === "hourly") unitRate = space.pricing.hourly || 20;
-    else if (durationType === "daily") unitRate = space.pricing.daily || 100;
-    else if (durationType === "monthly") unitRate = space.pricing.monthly || 1200;
-
-    const baseCost = unitRate * durationUnits * (durationType === "daily" || durationType === "hourly" ? seats : 1);
-    const serviceFee = Math.round(baseCost * 0.1);
-    return {
-      unitRate,
-      baseCost,
-      serviceFee,
-      total: baseCost + serviceFee,
-    };
-  };
-
-  const pricingSummary = calculateTotal();
+  const images = space.images.length > 0 ? space.images : [];
+  const place = [space.location.address, space.location.city, space.location.country].filter(Boolean).join(", ");
 
   const handleFavoriteToggle = async () => {
     if (!user) {
-      error(
-        "Sign in required",
-        "Sign in to save this space to your favourites."
-      );
-      router.push(
-        `/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`
-      );
+      error("Sign in to save spaces", "Create an account or log in to keep a list of favourites.");
+      router.push(`/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`);
       return;
     }
-
     if (isSavingFavourite) return;
     setIsSavingFavourite(true);
     const result = await SpaceGoStore.toggleFavourite(user.id, space.id);
@@ -138,44 +106,371 @@ export default function SpaceDetailPage({
       error("Could not update favourites", result.error);
       return;
     }
-    if (result.data) {
-      success(
-        "Saved to Favourites",
-        "You can access this anytime from your dashboard."
-      );
+    success(result.data ? "Saved to your favourites" : "Removed from your favourites");
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard?.writeText(window.location.href);
+      success("Link copied");
+    } catch {
+      error("Could not copy the link", "Copy it from your browser's address bar instead.");
     }
   };
 
-  const handleBookingSubmit = async (e: React.FormEvent) => {
+  return (
+    <div className="flex min-h-screen flex-col bg-canvas">
+      <Navbar />
+
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <Link
+          href="/spaces"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          All spaces
+        </Link>
+
+        {/* Title */}
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{space.title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-muted">
+              {space.review_count > 0 ? (
+                <span className="flex items-center gap-1 text-ink">
+                  <Star className="h-4 w-4 fill-current" aria-hidden="true" />
+                  {space.rating.toFixed(1)}
+                  <span className="text-ink-muted">({space.review_count} reviews)</span>
+                </span>
+              ) : (
+                <span>No reviews yet</span>
+              )}
+              {place && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-4 w-4" aria-hidden="true" />
+                  {place}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={() => void handleShare()}>
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+              Share
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void handleFavoriteToggle()}
+              disabled={isSavingFavourite}
+              aria-pressed={isFavorited}
+            >
+              <Heart className={cn("h-4 w-4", isFavorited && "fill-rose-500 text-rose-500")} aria-hidden="true" />
+              {isFavorited ? "Saved" : "Save"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Gallery */}
+        <Gallery images={images} title={space.title} onOpen={setGalleryIndex} />
+
+        <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_24rem]">
+          <div className="min-w-0 space-y-10">
+            {/* Summary */}
+            <section className="border-b border-line pb-8">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg font-semibold text-ink">{categoryNoun(space.category)}</span>
+                {space.owner_name && <span className="text-lg text-ink-muted">hosted by {space.owner_name}</span>}
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-base text-ink-muted">
+                <li className="flex items-center gap-2">
+                  <Users className="h-5 w-5" aria-hidden="true" />
+                  Up to {space.capacity} {space.capacity === 1 ? "person" : "people"}
+                </li>
+                {space.square_feet > 0 && (
+                  <li className="flex items-center gap-2">
+                    <Grid2x2 className="h-5 w-5" aria-hidden="true" />
+                    {space.square_feet.toLocaleString()} sq ft
+                  </li>
+                )}
+                <li className="flex items-center gap-2">
+                  {space.instant_book ? (
+                    <>
+                      <Zap className="h-5 w-5" aria-hidden="true" />
+                      Instant Book
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-5 w-5" aria-hidden="true" />
+                      Host confirms each request
+                    </>
+                  )}
+                </li>
+              </ul>
+              <div className="mt-4">
+                <VerificationBadge level={space.verification_level} />
+              </div>
+            </section>
+
+            {(space.headline || space.description) && (
+              <section aria-labelledby="about-heading">
+                <h2 id="about-heading" className="text-xl font-semibold text-ink">About this space</h2>
+                {space.headline && <p className="mt-3 text-base font-medium text-ink">{space.headline}</p>}
+                {space.description && (
+                  <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-ink-muted">{space.description}</p>
+                )}
+              </section>
+            )}
+
+            {space.amenities.length > 0 && (
+              <section aria-labelledby="amenities-heading">
+                <h2 id="amenities-heading" className="text-xl font-semibold text-ink">What this space offers</h2>
+                <p className="mt-1 text-sm text-ink-subtle">As listed by the host.</p>
+                <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                  {space.amenities.map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-base text-ink">
+                      <Check className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <ReviewDetails space={space} />
+
+            <section aria-labelledby="hours-heading">
+              <h2 id="hours-heading" className="text-xl font-semibold text-ink">Opening hours and rules</h2>
+              {space.operating_hours.open && space.operating_hours.close ? (
+                <p className="mt-3 flex items-center gap-2 text-base text-ink">
+                  <Clock className="h-5 w-5 text-ink-subtle" aria-hidden="true" />
+                  {space.operating_hours.open}&ndash;{space.operating_hours.close}
+                  {space.operating_hours.days.length > 0 && (
+                    <span className="text-ink-muted">&middot; {space.operating_hours.days.join(", ")}</span>
+                  )}
+                </p>
+              ) : (
+                <p className="mt-3 text-base text-ink-muted">Ask the host about opening hours in your booking request.</p>
+              )}
+              {space.house_rules.length > 0 && (
+                <ul className="mt-4 list-disc space-y-1.5 pl-5 text-base text-ink-muted marker:text-ink-subtle">
+                  {space.house_rules.map((rule) => (
+                    <li key={rule}>{rule}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-labelledby="host-heading" className="flex items-center gap-4 rounded-lg border border-line bg-surface p-5">
+              {space.owner_avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={space.owner_avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-semibold text-accent-soft-ink"
+                >
+                  {(space.owner_name || "H").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <div>
+                <h2 id="host-heading" className="text-base font-semibold text-ink">
+                  Hosted by {space.owner_name || "a SpaceGo host"}
+                </h2>
+                <p className="text-sm text-ink-muted">You can add questions for the host to your booking request.</p>
+              </div>
+            </section>
+          </div>
+
+          <div>
+            <BookingPanel space={space} onSignInRequired={() => router.push(`/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`)} />
+          </div>
+        </div>
+      </main>
+
+      {/* Gallery lightbox */}
+      <Modal isOpen={galleryIndex !== null} onClose={() => setGalleryIndex(null)} title={space.title} maxWidth="4xl">
+        {galleryIndex !== null && images[galleryIndex] && (
+          <div className="space-y-4">
+            <div className="flex h-[60vh] items-center justify-center overflow-hidden rounded-md bg-black">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images[galleryIndex].url}
+                alt={images[galleryIndex].caption || `Photo ${galleryIndex + 1}`}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+            <p className="text-center text-sm text-ink-muted">
+              {images[galleryIndex].caption || `Photo ${galleryIndex + 1}`} &middot; {galleryIndex + 1} of {images.length}
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {images.map((img, idx) => (
+                <button
+                  key={`${img.url}-${idx}`}
+                  type="button"
+                  onClick={() => setGalleryIndex(idx)}
+                  aria-label={`Show photo ${idx + 1}`}
+                  aria-current={galleryIndex === idx}
+                  className={cn(
+                    "h-16 w-20 shrink-0 overflow-hidden rounded-sm border-2",
+                    galleryIndex === idx ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Footer />
+    </div>
+  );
+}
+
+function Gallery({
+  images,
+  title,
+  onOpen,
+}: {
+  images: Space["images"];
+  title: string;
+  onOpen: (index: number) => void;
+}) {
+  if (images.length === 0) {
+    return (
+      <div className="mt-6 flex aspect-[16/9] items-center justify-center rounded-lg bg-surface-muted text-ink-subtle sm:aspect-[21/9]">
+        <Building2 className="h-10 w-10" aria-hidden="true" />
+        <span className="sr-only">No photos yet</span>
+      </div>
+    );
+  }
+
+  const rest = images.slice(1, 5);
+
+  return (
+    <div className="relative mt-6">
+      <div className={cn("grid gap-2 overflow-hidden rounded-lg", rest.length > 0 ? "md:grid-cols-4 md:grid-rows-2" : "")}>
+        <button
+          type="button"
+          onClick={() => onOpen(0)}
+          className={cn("block aspect-[4/3] bg-surface-muted md:aspect-auto", rest.length > 0 ? "md:col-span-2 md:row-span-2 md:h-[28rem]" : "md:h-[28rem]")}
+          aria-label="Open photo 1"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={images[0].url} alt={images[0].caption || title} className="h-full w-full object-cover" />
+        </button>
+        {rest.map((img, idx) => (
+          <button
+            key={`${img.url}-${idx}`}
+            type="button"
+            onClick={() => onOpen(idx + 1)}
+            className="hidden bg-surface-muted md:block"
+            aria-label={`Open photo ${idx + 2}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={img.url} alt={img.caption || ""} className="h-full w-full object-cover" />
+          </button>
+        ))}
+      </div>
+      {images.length > 1 && (
+        <Button variant="outline" size="sm" className="absolute bottom-3 right-3" onClick={() => onOpen(0)}>
+          Show all {images.length} photos
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** Only shows facts an admin recorded during a SpaceGo review. */
+function ReviewDetails({ space }: { space: Space }) {
+  if (space.verification_level === "listed") return null;
+  const p = space.passport;
+  const facts = [
+    p.connectivity_tested_mbps > 0 && `Internet speed measured at ${p.connectivity_tested_mbps} Mbps`,
+    p.power_backup_tested && "Backup power available",
+    p.fire_safety_inspected && "Fire safety equipment checked",
+    p.permitted_use_confirmed && "Use as a workspace confirmed with the owner",
+    p.identity_verified && "Host identity checked",
+  ].filter(Boolean) as string[];
+
+  if (facts.length === 0) return null;
+
+  return (
+    <section aria-labelledby="review-heading">
+      <h2 id="review-heading" className="text-xl font-semibold text-ink">SpaceGo review</h2>
+      <p className="mt-1 text-sm text-ink-subtle">
+        Recorded by the SpaceGo team{p.inspected_at ? ` on ${formatDate(p.inspected_at)}` : ""}. Conditions can change; confirm anything important with the host.
+      </p>
+      <ul className="mt-4 space-y-2">
+        {facts.map((fact) => (
+          <li key={fact} className="flex items-start gap-3 text-base text-ink">
+            <Check className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
+            {fact}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequired: () => void }) {
+  const { user } = useAuth();
+  const { success, error } = useToast();
+  const durations = availableDurations(space);
+
+  const [bookingDate, setBookingDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  });
+  const [durationType, setDurationType] = useState<DurationType>(
+    durations.includes("daily") ? "daily" : durations[0] ?? "daily"
+  );
+  const [durationUnits, setDurationUnits] = useState(1);
+  const [seats, setSeats] = useState(1);
+  const [specialRequests, setSpecialRequests] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+
+  const unitRate = space.pricing[durationType] ?? 0;
+  const perSeat = durationType !== "monthly";
+  const baseCost = unitRate * durationUnits * (perSeat ? seats : 1);
+  const serviceFee = Math.round(baseCost * 0.1);
+  const total = baseCost + serviceFee;
+  const currency = space.pricing.currency;
+  const label = DURATION_LABEL[durationType];
+
+  if (durations.length === 0) {
+    return (
+      <aside className="rounded-lg border border-line bg-surface p-6 lg:sticky lg:top-24">
+        <p className="text-base text-ink">This host hasn&apos;t set prices yet.</p>
+        <p className="mt-1 text-sm text-ink-muted">Check back later or browse other spaces.</p>
+      </aside>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookingDate) {
-      error("Missing Date", "Please select a booking date.");
+      error("Choose a date", "Select the day your booking starts.");
       return;
     }
-
     if (!user) {
-      error("Sign in required", "Sign in to request a booking.");
-      router.push(
-        `/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`
-      );
+      error("Sign in to book", "Log in or create an account to send a booking request.");
+      onSignInRequired();
       return;
     }
 
     setIsSubmitting(true);
-
     try {
       const startIso = new Date(`${bookingDate}T09:00:00Z`).toISOString();
       // Must match the server's duration rule: hourly = N hours, daily = N
-      // days, monthly = N × 30 days (spacego_create_booking).
+      // days, monthly = N x 30 days (spacego_create_booking).
       const unitMs =
-        durationType === "hourly"
-          ? 3600 * 1000
-          : durationType === "daily"
-            ? 24 * 3600 * 1000
-            : 30 * 24 * 3600 * 1000;
-      const endIso = new Date(
-        new Date(startIso).getTime() + durationUnits * unitMs
-      ).toISOString();
+        durationType === "hourly" ? 3600 * 1000 : durationType === "daily" ? 24 * 3600 * 1000 : 30 * 24 * 3600 * 1000;
+      const endIso = new Date(new Date(startIso).getTime() + durationUnits * unitMs).toISOString();
 
       const result = await SpaceGoStore.createBooking({
         space,
@@ -185,7 +480,7 @@ export default function SpaceDetailPage({
         duration_type: durationType,
         duration_units: durationUnits,
         seats,
-        total_price: pricingSummary.total,
+        total_price: total,
         special_requests: specialRequests,
       });
 
@@ -194,18 +489,13 @@ export default function SpaceDetailPage({
         return;
       }
 
-      // Success — show what the server actually recorded.
+      // Show what the server actually recorded.
       setConfirmedBooking(result.data);
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.6 },
-      });
       success(
-        "Booking Request Submitted!",
+        result.data.status === "approved" ? "Booking confirmed" : "Request sent",
         result.data.status === "approved"
-          ? "Confirmed instantly! Your electronic pass is ready."
-          : `Sent to host ${space.owner_name || "the host"} for approval.`
+          ? "Your access code is ready in your bookings."
+          : `We'll let you know when ${space.owner_name || "the host"} responds.`
       );
     } finally {
       setIsSubmitting(false);
@@ -213,557 +503,152 @@ export default function SpaceDetailPage({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
-      <Navbar />
+    <>
+      <aside aria-labelledby="booking-heading" className="rounded-lg border border-line bg-surface p-6 shadow-sm lg:sticky lg:top-24">
+        <h2 id="booking-heading" className="sr-only">Book this space</h2>
+        <p className="text-ink">
+          <span className="text-2xl font-semibold">{formatCurrency(unitRate, currency)}</span>
+          <span className="text-base text-ink-muted"> / {label.unit}{perSeat ? " per person" : ""}</span>
+        </p>
 
-      {/* Breadcrumb Navigation */}
-      <div className="bg-white border-b border-slate-200/80 py-3">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-2 text-xs text-slate-500">
-          <Link href="/" className="hover:text-slate-900 transition-colors">
-            Home
-          </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          <Link href="/spaces" className="hover:text-slate-900 transition-colors">
-            Workspaces
-          </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-slate-900 font-semibold truncate max-w-[200px] sm:max-w-md">
-            {space.title}
-          </span>
-        </div>
-      </div>
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          {durations.length > 1 && (
+            <Select
+              label="Booking length"
+              value={durationType}
+              onChange={(e) => {
+                setDurationType(e.target.value as DurationType);
+                setDurationUnits(1);
+              }}
+            >
+              {durations.map((d) => (
+                <option key={d} value={d}>{DURATION_LABEL[d].option}</option>
+              ))}
+            </Select>
+          )}
 
-      {/* Main Detail Header (Airbnb Layout) */}
-      <div className="bg-white border-b border-slate-200/80 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <VerificationBadge level={space.verification_level} />
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase tracking-wider">
-                  {space.category.replace("_", " ")}
-                </span>
-                <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  ★ {space.rating} ({space.review_count} reviews)
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
-                {space.title}
-              </h1>
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
-                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>{space.location.address}, {space.location.city}, {space.location.country}</span>
-                {space.location.landmark && (
-                  <span className="text-slate-400 hidden sm:inline">• Near {space.location.landmark}</span>
-                )}
-              </div>
-            </div>
+          <Input
+            label="Start date"
+            type="date"
+            required
+            value={bookingDate}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={(e) => setBookingDate(e.target.value)}
+          />
 
-            {/* Favorite & Share Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleFavoriteToggle}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <Heart className={`w-4 h-4 ${isFavorited ? "fill-rose-500 text-rose-500" : "text-slate-500"}`} />
-                <span>{isFavorited ? "Saved" : "Save"}</span>
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard?.writeText(window.location.href);
-                  success("Link Copied", "Workspace link copied to clipboard.");
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <Share2 className="w-4 h-4 text-slate-500" />
-                <span>Share</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Image Gallery Bento Grid (Airbnb 5-Photo Hero) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 h-80 sm:h-[420px] rounded-3xl overflow-hidden shadow-xs border border-slate-200">
-          
-          {/* Main Cover Image */}
-          <div
-            className="md:col-span-2 h-full relative cursor-pointer group bg-slate-100 overflow-hidden"
-            onClick={() => {
-              setActiveImageIndex(0);
-              setIsGalleryOpen(true);
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={space.images[0]?.url}
-              alt={space.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label={label.units.charAt(0).toUpperCase() + label.units.slice(1)}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={label.max}
+              value={durationUnits}
+              onChange={(e) => setDurationUnits(Math.min(label.max, Math.max(1, Number(e.target.value) || 1)))}
             />
-            <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-              Click to enlarge photo
-            </div>
+            <Input
+              label="People"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={space.capacity || undefined}
+              value={seats}
+              onChange={(e) => setSeats(Math.max(1, Number(e.target.value) || 1))}
+              error={space.capacity && seats > space.capacity ? `Up to ${space.capacity}` : undefined}
+            />
           </div>
 
-          {/* Right Secondary Images */}
-          <div className="hidden md:grid md:col-span-2 grid-cols-2 gap-3 h-full">
-            {space.images.slice(1, 5).map((img, idx) => (
-              <div
-                key={idx}
-                className="relative h-[202px] cursor-pointer group bg-slate-100 overflow-hidden"
-                onClick={() => {
-                  setActiveImageIndex(idx + 1);
-                  setIsGalleryOpen(true);
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.url}
-                  alt={img.caption || `Photo ${idx + 2}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            ))}
-          </div>
+          <Textarea
+            label="Message to the host (optional)"
+            rows={3}
+            placeholder="Anything the host should know"
+            value={specialRequests}
+            onChange={(e) => setSpecialRequests(e.target.value)}
+          />
 
-        </div>
-      </div>
-
-      {/* Content & Booking Panel Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Column: Details & Space Passport */}
-          <div className="lg:col-span-7 space-y-8">
-            
-            {/* Quick Specs Bar */}
-            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs text-center">
-              <div>
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Capacity</span>
-                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
-                  <Users className="w-4 h-4 text-teal-600" /> Up to {space.capacity}
-                </span>
-              </div>
-              <div>
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Floor Area</span>
-                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
-                  <Layers className="w-4 h-4 text-teal-600" /> {space.square_feet.toLocaleString()} sq.ft.
-                </span>
-              </div>
-              <div>
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">Confirmation</span>
-                <span className="text-base font-black text-slate-950 mt-0.5 inline-flex items-center gap-1">
-                  <Sparkles className="w-4 h-4 text-teal-600" /> {space.instant_book ? "Instant Book" : "Host Approval"}
-                </span>
-              </div>
+          <dl className="space-y-2 border-t border-line pt-4 text-base">
+            <div className="flex justify-between gap-4 text-ink-muted">
+              <dt>
+                {formatCurrency(unitRate, currency)} &times; {durationUnits} {durationUnits === 1 ? label.unit : label.units}
+                {perSeat && <> &times; {seats} {seats === 1 ? "person" : "people"}</>}
+              </dt>
+              <dd className="text-ink">{formatCurrency(baseCost, currency)}</dd>
             </div>
-
-            {/* Description */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-3">
-              <h2 className="text-base font-bold text-slate-950">About This Workspace</h2>
-              <p className="text-sm text-slate-600 leading-relaxed font-normal">
-                {space.description}
-              </p>
+            <div className="flex justify-between gap-4 text-ink-muted">
+              <dt className="flex items-center gap-1">
+                Service fee (10%)
+              </dt>
+              <dd className="text-ink">{formatCurrency(serviceFee, currency)}</dd>
             </div>
-
-            {/* Space Passport™ Verification Breakdown */}
-            <div className="bg-gradient-to-br from-teal-50/60 via-white to-slate-50 rounded-2xl border border-teal-200/90 p-6 shadow-xs space-y-5">
-              <div className="flex items-center justify-between border-b border-teal-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-950">
-                      SpaceGo Space Passport™ Audit Record
-                    </h3>
-                    <p className="text-[11px] text-teal-800">
-                      {space.passport.inspected_at
-                      ? <>Inspected on {formatDate(space.passport.inspected_at)} • Official Safety Certification</>
-                      : "Inspection pending"}
-                    </p>
-                  </div>
-                </div>
-                <VerificationBadge level={space.verification_level} />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
-                  <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-950">Authority & Permitted Use</span>
-                    <p className="text-[11px] text-slate-500">Commercial zoning and legal operating authority verified.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
-                  <Wifi className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-950">Tested Connectivity</span>
-                    <p className="text-[11px] text-slate-500">
-                      Field-measured: <span className="font-bold text-teal-700">{space.passport.connectivity_tested_mbps} Mbps</span> redundant fiber.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
-                  <Zap className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-950">Power Redundancy</span>
-                    <p className="text-[11px] text-slate-500">
-                      {space.passport.power_backup_tested ? "UPS & Standby generator backup tested." : "Standard utility grid."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-teal-100/80">
-                  <Lock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-xs font-bold text-slate-950">Fire & Life Safety</span>
-                    <p className="text-[11px] text-slate-500">
-                      {space.passport.fire_safety_inspected ? "Emergency exits, extinguishers & alarms inspected." : "Checks pending."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {(space.passport.inspected_by || space.passport.renewal_date) && (
-                <div className="p-3 rounded-xl bg-teal-100/40 text-[11px] text-teal-950 font-medium">
-                  {space.passport.inspected_by && <>Audited by: {space.passport.inspected_by} • </>}
-                  {space.passport.renewal_date
-                    ? <>Next renewal scheduled for {formatDate(space.passport.renewal_date)}</>
-                    : "Renewal date pending"}
-                </div>
-              )}
+            <div className="flex justify-between gap-4 border-t border-line pt-2 font-semibold text-ink">
+              <dt>Estimated total</dt>
+              <dd>{formatCurrency(total, currency)}</dd>
             </div>
+          </dl>
 
-            {/* Amenities & Equipment */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-              <h2 className="text-base font-bold text-slate-950">Amenities & Facilities</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {space.amenities.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
-                    <div className="w-5 h-5 rounded-md bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
-                      <Check className="w-3.5 h-3.5" />
-                    </div>
-                    <span>{item}</span>
-                  </div>
-                ))}
+          <Button type="submit" size="lg" className="w-full" isLoading={isSubmitting}>
+            {space.instant_book ? "Book now" : "Request to book"}
+          </Button>
+
+          <p className="flex items-start gap-2 text-sm text-ink-muted">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {space.instant_book
+              ? "Instant Book: confirmed as soon as SpaceGo checks the dates are free."
+              : "The host reviews your request before it's confirmed. The final price is calculated by SpaceGo when you book."}
+          </p>
+        </form>
+      </aside>
+
+      <Modal
+        isOpen={Boolean(confirmedBooking)}
+        onClose={() => setConfirmedBooking(null)}
+        title={confirmedBooking?.status === "approved" ? "Booking confirmed" : "Request sent"}
+        description={
+          confirmedBooking?.status === "approved"
+            ? "Your booking is confirmed."
+            : "The host will review your request. You'll get a notification when they respond."
+        }
+        maxWidth="md"
+      >
+        {confirmedBooking && (
+          <div className="space-y-5">
+            <dl className="space-y-3 text-base">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-ink-muted">Reference</dt>
+                <dd className="font-mono text-ink">{confirmedBooking.id}</dd>
               </div>
-            </div>
-
-            {/* Operating Hours & House Rules */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-4">
-              <h2 className="text-base font-bold text-slate-950">Operating Hours & House Rules</h2>
-              
-              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                <Clock className="w-5 h-5 text-teal-600 shrink-0" />
-                <div>
-                  <span className="font-bold text-slate-950">
-                    {space.operating_hours.open} – {space.operating_hours.close}
-                  </span>
-                  <span className="text-slate-500 ml-2">
-                    Open {space.operating_hours.days.join(", ")}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Rules & Guidelines</span>
-                <ul className="space-y-1.5 text-xs text-slate-600">
-                  {space.house_rules.map((rule, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-teal-600 font-bold">•</span>
-                      <span>{rule}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            {/* Host Profile Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
-              {space.owner_avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={space.owner_avatar}
-                  alt={space.owner_name}
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-200"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-xl border border-slate-200 bg-teal-50 text-teal-700 flex items-center justify-center text-base font-black">
-                  {(space.owner_name || "S").charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="flex-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hosted by</span>
-                <h3 className="text-sm font-bold text-slate-950">{space.owner_name || "SpaceGo Partner Host"}</h3>
-                <p className="text-xs text-slate-500">SpaceGo Partner Host • Fast response rate (under 1 hour)</p>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right Column: Interactive Booking Panel (Airbnb / Uber friction-free) */}
-          <div className="lg:col-span-5 sticky top-24">
-            <div className="bg-white rounded-3xl border border-slate-200/90 p-6 shadow-xl space-y-6">
-              
-              {/* Pricing Header */}
-              <div className="flex items-baseline justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <span className="text-2xl font-black text-slate-950">
-                    {formatCurrency(pricingSummary.unitRate, space.pricing.currency)}
-                  </span>
-                  <span className="text-xs font-medium text-slate-500 ml-1">
-                    / {durationType}
-                  </span>
-                </div>
-                <div className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
-                  {space.instant_book ? "⚡ Instant Reservation" : "⏳ Host Approval Required"}
-                </div>
-              </div>
-
-              <form onSubmit={handleBookingSubmit} className="space-y-4">
-                
-                {/* Duration Type Tabs */}
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                    Duration Model
-                  </label>
-                  <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
-                    {(["hourly", "daily", "monthly"] as const).map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => {
-                          setDurationType(type);
-                          setDurationUnits(1);
-                        }}
-                        className={`text-xs py-2 rounded-lg font-semibold capitalize transition-all cursor-pointer ${
-                          durationType === type
-                            ? "bg-white text-slate-950 shadow-xs"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Booking Date */}
-                <div>
-                  <Input
-                    label="Date *"
-                    type="date"
-                    required
-                    value={bookingDate}
-                    min={new Date().toISOString().split("T")[0]}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    leftIcon={<Calendar className="w-4 h-4 text-slate-400" />}
-                  />
-                </div>
-
-                {/* Units & Capacity */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      {durationType === "hourly" ? "Hours" : durationType === "daily" ? "Days" : "Months"}
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={durationType === "hourly" ? 12 : 30}
-                      value={durationUnits}
-                      onChange={(e) => setDurationUnits(Math.max(1, Number(e.target.value)))}
-                      leftIcon={<Clock className="w-4 h-4 text-slate-400" />}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                      Guests / Seats
-                    </label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={space.capacity}
-                      value={seats}
-                      onChange={(e) => setSeats(Math.max(1, Number(e.target.value)))}
-                      leftIcon={<Users className="w-4 h-4 text-slate-400" />}
-                    />
-                  </div>
-                </div>
-
-                {/* Special Requests */}
-                <div>
-                  <Textarea
-                    label="Special Notes or Requirements"
-                    rows={2}
-                    placeholder="e.g. Quiet focus desk, dual monitors, client guest passes..."
-                    value={specialRequests}
-                    onChange={(e) => setSpecialRequests(e.target.value)}
-                  />
-                </div>
-
-                {/* Price Breakdown Calculation */}
-                <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>
-                      {formatCurrency(pricingSummary.unitRate, space.pricing.currency)} × {durationUnits}{" "}
-                      {durationType === "hourly" ? "hrs" : durationType === "daily" ? "days" : "mo"}
-                      {durationType !== "monthly" && ` × ${seats} seats`}
-                    </span>
-                    <span className="font-semibold text-slate-950">
-                      {formatCurrency(pricingSummary.baseCost, space.pricing.currency)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-slate-600">
-                    <span className="flex items-center gap-1">
-                      Platform service & security fee (10%)
-                      <Info className="w-3 h-3 text-slate-400" />
-                    </span>
-                    <span className="font-semibold text-slate-950">
-                      {formatCurrency(pricingSummary.serviceFee, space.pricing.currency)}
-                    </span>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                    <span className="text-sm font-bold text-slate-950">Total Price</span>
-                    <span className="text-xl font-black text-slate-950">
-                      {formatCurrency(pricingSummary.total, space.pricing.currency)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Submit Booking Request Button */}
-                <Button
-                  type="submit"
-                  variant="teal"
-                  size="lg"
-                  className="w-full font-bold shadow-md shadow-teal-700/20 rounded-full"
-                  isLoading={isSubmitting}
-                >
-                  <span>{space.instant_book ? "Confirm & Book Now" : "Request to Book"}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-
-                <p className="text-[11px] text-center text-slate-400">
-                  {space.instant_book
-                    ? "Instant confirmation once availability is verified by SpaceGo."
-                    : "You will not be billed until the host confirms availability."}
-                </p>
-              </form>
-
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Confirmation Modal */}
-      {confirmedBooking && (
-        <Modal
-          isOpen={Boolean(confirmedBooking)}
-          onClose={() => setConfirmedBooking(null)}
-          title="Booking Request Confirmed!"
-          description="Your workspace reservation is registered in the SpaceGo network."
-          maxWidth="md"
-        >
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-950 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs uppercase font-bold text-teal-700">Reference Code</span>
-                <span className="text-sm font-black font-mono tracking-wider">{confirmedBooking.id}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs uppercase font-bold text-teal-700">Status</span>
-                <BookingStatusBadge status={confirmedBooking.status} />
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-ink-muted">Status</dt>
+                <dd><BookingStatusBadge status={confirmedBooking.status} /></dd>
               </div>
               {confirmedBooking.access_code && (
-                <div className="flex justify-between items-center pt-2 border-t border-teal-200/60">
-                  <span className="text-xs uppercase font-bold text-teal-700">Electronic Access Pass</span>
-                  <span className="text-xs font-mono font-bold bg-white px-2 py-0.5 rounded border border-teal-300">
-                    {confirmedBooking.access_code}
-                  </span>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-ink-muted">Access code</dt>
+                  <dd className="font-mono font-semibold text-ink">{confirmedBooking.access_code}</dd>
                 </div>
               )}
-            </div>
-
-            <div className="space-y-2 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span>Workspace:</span>
-                <span className="font-semibold text-slate-900">{confirmedBooking.space_title}</span>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-ink-muted">Starts</dt>
+                <dd className="text-ink">{formatDate(confirmedBooking.start_date)}</dd>
               </div>
-              <div className="flex justify-between">
-                <span>Scheduled Date:</span>
-                <span className="font-semibold text-slate-900">{formatDate(confirmedBooking.start_date)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Amount:</span>
-                <span className="font-semibold text-slate-900">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-ink-muted">Total</dt>
+                <dd className="font-semibold text-ink">
                   {formatCurrency(confirmedBooking.total_price, confirmedBooking.currency)}
-                </span>
+                </dd>
               </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfirmedBooking(null)}
-              >
+            </dl>
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setConfirmedBooking(null)}>
                 Close
               </Button>
-              <Link href="/dashboard/bookings">
-                <Button variant="teal" size="sm">
-                  View in My Bookings
-                </Button>
+              <Link href="/dashboard/bookings" className={buttonClasses()}>
+                View my bookings
               </Link>
             </div>
           </div>
-        </Modal>
-      )}
-
-      {/* Gallery Lightbox Modal */}
-      <Modal
-        isOpen={isGalleryOpen}
-        onClose={() => setIsGalleryOpen(false)}
-        maxWidth="4xl"
-      >
-        <div className="space-y-4">
-          <div className="relative h-96 sm:h-[480px] bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={space.images[activeImageIndex]?.url}
-              alt={space.images[activeImageIndex]?.caption || "Gallery"}
-              className="max-h-full max-w-full object-contain"
-            />
-          </div>
-          <div className="text-xs text-slate-500 text-center font-medium">
-            {space.images[activeImageIndex]?.caption || `Photo ${activeImageIndex + 1} of ${space.images.length}`}
-          </div>
-          <div className="flex items-center justify-center gap-2 overflow-x-auto py-2">
-            {space.images.map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveImageIndex(idx)}
-                className={`relative w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
-                  activeImageIndex === idx ? "border-teal-500 scale-105" : "border-transparent opacity-60 hover:opacity-100"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img.url} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        </div>
+        )}
       </Modal>
-
-      <Footer />
-    </div>
+    </>
   );
 }

@@ -40,7 +40,7 @@ export default function OwnerActivationProjectsPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             Demand-Backed Workspace Activation
           </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             My Property Activation Projects
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -73,7 +73,7 @@ export default function OwnerActivationProjectsPage() {
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  <span className="font-mono text-xs font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                     {req.id}
                   </span>
                   <ActivationStatusBadge status={req.status} />

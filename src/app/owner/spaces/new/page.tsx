@@ -9,7 +9,6 @@ import { WorkspaceCategory } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
-import confetti from "canvas-confetti";
 import {
   Building2,
   MapPin,
@@ -170,7 +169,6 @@ export default function NewWorkspaceListingPage() {
         return;
       }
 
-      confetti({ particleCount: 70, spread: 60 });
       success("Workspace Created & Published!", `Listing is now live on SpaceGo: ${result.data.title}`);
       router.push("/owner/properties");
     } finally {
@@ -188,7 +186,7 @@ export default function NewWorkspaceListingPage() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Create New Workspace Listing
             </h1>
             <p className="text-xs text-slate-500">

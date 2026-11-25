@@ -34,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       type = "info",
       title,
       message,
-      duration = 4500,
+      duration,
     }: {
       type?: ToastType;
       title: string;
@@ -42,12 +42,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       duration?: number;
     }) => {
       const id = `toast-${Date.now()}-${Math.random()}`;
-      setToasts((prev) => [...prev, { id, type, title, message }]);
+      setToasts((prev) => [...prev.slice(-3), { id, type, title, message }]);
 
-      if (duration > 0) {
-        setTimeout(() => {
-          removeToast(id);
-        }, duration);
+      // Errors stay longer so they can be read.
+      const timeout = duration ?? (type === "error" ? 8000 : 4500);
+      if (timeout > 0) {
+        setTimeout(() => removeToast(id), timeout);
       }
     },
     [removeToast]
@@ -60,32 +60,41 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast, success, error, info }}>
       {children}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-md w-full px-4">
+      <div
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 p-4 sm:inset-x-auto sm:right-0 sm:items-end"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={cn(
-              "pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg transition-all animate-in slide-in-from-bottom-3 duration-200 bg-white",
-              t.type === "success" && "border-teal-200 bg-teal-50/90 text-teal-950",
-              t.type === "error" && "border-rose-200 bg-rose-50/90 text-rose-950",
-              t.type === "info" && "border-slate-200 bg-white/95 text-slate-900"
-            )}
+            role={t.type === "error" ? "alert" : "status"}
+            className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-lg border border-line bg-surface p-4 text-ink shadow-md"
           >
-            <div className="shrink-0 mt-0.5">
-              {t.type === "success" && <CheckCircle2 className="w-5 h-5 text-teal-600" />}
-              {t.type === "error" && <AlertCircle className="w-5 h-5 text-rose-600" />}
-              {t.type === "info" && <Info className="w-5 h-5 text-sky-600" />}
-            </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold leading-tight">{t.title}</h4>
-              {t.message && <p className="text-xs text-slate-600 mt-1 leading-relaxed">{t.message}</p>}
+            <span
+              aria-hidden="true"
+              className={cn(
+                "mt-0.5 shrink-0",
+                t.type === "success" && "text-success",
+                t.type === "error" && "text-danger",
+                t.type === "info" && "text-accent"
+              )}
+            >
+              {t.type === "success" && <CheckCircle2 className="h-5 w-5" />}
+              {t.type === "error" && <AlertCircle className="h-5 w-5" />}
+              {t.type === "info" && <Info className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold leading-snug">{t.title}</p>
+              {t.message && <p className="mt-1 text-sm text-ink-muted">{t.message}</p>}
             </div>
             <button
+              type="button"
               onClick={() => removeToast(t.id)}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors"
-              aria-label="Dismiss"
+              className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink-subtle transition-colors hover:bg-surface-muted hover:text-ink"
+              aria-label="Dismiss notification"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         ))}

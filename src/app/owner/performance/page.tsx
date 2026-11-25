@@ -45,7 +45,7 @@ export default function OwnerPerformancePage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             PropTech Financial Discipline
           </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Property Unit Economics & Yield
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -55,7 +55,7 @@ export default function OwnerPerformancePage() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-            Current CapEx Payback: <span className="text-teal-700 font-black">{paybackMonths} Months</span>
+            Current CapEx Payback: <span className="text-teal-700 font-bold">{paybackMonths} Months</span>
           </span>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function OwnerPerformancePage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <span className="text-xs font-semibold text-slate-500 block">Monthly Gross Value</span>
-          <span className="text-2xl font-black text-slate-900 mt-1 block">
+          <span className="text-2xl font-bold text-slate-900 mt-1 block">
             {formatCurrency(monthlyGrossRevenue)}
           </span>
           <span className="text-[11px] text-teal-700 font-medium">{occupiedDeskDays} desk-days occupied</span>
@@ -72,7 +72,7 @@ export default function OwnerPerformancePage() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <span className="text-xs font-semibold text-slate-500 block">Platform Commission ({commissionRate}%)</span>
-          <span className="text-2xl font-black text-slate-700 mt-1 block">
+          <span className="text-2xl font-bold text-slate-700 mt-1 block">
             {formatCurrency(platformFee)}
           </span>
           <span className="text-[11px] text-slate-400">Marketing & booking tools</span>
@@ -80,7 +80,7 @@ export default function OwnerPerformancePage() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <span className="text-xs font-semibold text-slate-500 block">Net Monthly Remittance</span>
-          <span className="text-2xl font-black text-teal-600 mt-1 block">
+          <span className="text-2xl font-bold text-teal-600 mt-1 block">
             {formatCurrency(netOwnerRemittance)}
           </span>
           <span className="text-[11px] text-emerald-700 font-semibold">Pre-operating expense</span>
@@ -88,7 +88,7 @@ export default function OwnerPerformancePage() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
           <span className="text-xs font-semibold text-slate-500 block">Annualized Run Rate</span>
-          <span className="text-2xl font-black text-slate-900 mt-1 block">
+          <span className="text-2xl font-bold text-slate-900 mt-1 block">
             {formatCurrency(annualNetRemittance)}
           </span>
           <span className="text-[11px] text-teal-700 font-medium">Based on {occupancyRate}% occupancy</span>
@@ -207,7 +207,7 @@ export default function OwnerPerformancePage() {
 
             <div className="flex justify-between p-4 rounded-2xl bg-teal-600 text-white font-bold text-sm shadow-md">
               <span>Net Remittance to Owner:</span>
-              <span className="text-base font-black">{formatCurrency(netOwnerRemittance)}</span>
+              <span className="text-base font-bold">{formatCurrency(netOwnerRemittance)}</span>
             </div>
           </div>
 

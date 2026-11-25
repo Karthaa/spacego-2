@@ -32,7 +32,7 @@ export default function SeekerEnquiriesPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             Demand-Backed Signals
           </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Custom Workspace Requests
           </h1>
           <p className="text-xs text-slate-500 mt-1">

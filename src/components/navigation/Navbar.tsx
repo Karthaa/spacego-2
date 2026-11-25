@@ -4,25 +4,43 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Building2,
   Menu,
   X,
-  Sparkles,
-  ArrowRight,
   LogOut,
   Bell,
   LayoutDashboard,
   ChevronDown,
-  Plus,
-  Compass,
   Settings,
+  CalendarDays,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { NotificationItem, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./ThemeToggle";
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  seeker: "Member",
+  owner: "Host",
+  admin: "Administrator",
+};
+
+export function Logo() {
+  return (
+    <Link href="/" className="flex items-center gap-2 rounded-md" aria-label="SpaceGo home">
+      <span
+        aria-hidden="true"
+        className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-ink"
+      >
+        <Building2 className="h-4.5 w-4.5" />
+      </span>
+      <span className="text-lg font-semibold tracking-tight text-ink">SpaceGo</span>
+    </Link>
+  );
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -44,28 +62,34 @@ export function Navbar() {
     return SpaceGoStore.getUserNotifications(user.id);
   }, [user, dataVersion]);
 
-  // Close dropdowns on outside click
+  // Close menus on outside click or Escape.
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setProfileDropdownOpen(false);
         setNotifDropdownOpen(false);
       }
     }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileDropdownOpen(false);
+        setNotifDropdownOpen(false);
+        setMobileMenuOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const getDashboardLink = () => {
-    if (role === "admin") return "/admin";
-    if (role === "owner") return "/owner";
-    return "/dashboard";
-  };
+  const dashboardHref = role === "admin" ? "/admin" : role === "owner" ? "/owner" : "/dashboard";
+  const settingsHref =
+    role === "admin" ? "/admin/settings" : role === "owner" ? "/owner/settings" : "/dashboard/profile";
 
   const listSpaceHref =
     role === "owner"
@@ -74,172 +98,125 @@ export function Navbar() {
         ? "/activation"
         : "/auth/register";
 
-  const roleLabelMap: Record<UserRole, { label: string; color: string }> = {
-    seeker: {
-      label: "Space Seeker",
-      color: "text-teal-600 bg-teal-50 border-teal-200",
-    },
-    owner: {
-      label: "Property Host",
-      color: "text-sky-600 bg-sky-50 border-sky-200",
-    },
-    admin: {
-      label: "Administrator",
-      color: "text-indigo-600 bg-indigo-50 border-indigo-200",
-    },
-  };
-
   const handleSignOut = async () => {
     setProfileDropdownOpen(false);
+    setMobileMenuOpen(false);
     await signOut();
     router.push("/");
     router.refresh();
   };
 
-  return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-18">
-          {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0B132B] via-[#1C2541] to-[#3A506B] flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform duration-200">
-              <Building2 className="w-4.5 h-4.5 text-teal-400" />
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xl font-black tracking-tight text-slate-950">
-                  Space<span className="text-teal-600">Go</span>
-                </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-              </div>
-              <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 -mt-1 hidden sm:block">
-                Workspace Marketplace & PropTech
-              </span>
-            </div>
-          </Link>
+  const navLinks = [
+    { href: "/spaces", label: "Find a space", active: pathname.startsWith("/spaces") },
+    { href: "/#how-it-works", label: "How it works", active: false },
+    { href: "/activation", label: "For property owners", active: pathname.startsWith("/activation") },
+  ];
 
-          {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
-            <Link
-              href="/spaces"
-              className={cn(
-                "px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all",
-                pathname.startsWith("/spaces")
-                  ? "bg-slate-100 text-slate-950 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              )}
-            >
-              Explore Spaces
-            </Link>
-            <Link
-              href="/activation"
-              className={cn(
-                "px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center gap-1.5",
-                pathname === "/activation"
-                  ? "bg-teal-50 text-teal-900 border border-teal-200/60 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              )}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-              <span>Activate Property</span>
-            </Link>
-            <Link
-              href="/activation/track"
-              className={cn(
-                "px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all",
-                pathname === "/activation/track"
-                  ? "bg-slate-100 text-slate-950 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-              )}
-            >
-              Track Status
-            </Link>
-            <Link
-              href="/#how-it-works"
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold tracking-wide text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
-            >
-              How It Works
-            </Link>
+  const menuItemClass =
+    "flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink hover:bg-surface-muted";
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b border-line bg-surface">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <Logo />
+
+          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={link.active ? "page" : undefined}
+                className={cn(
+                  "flex h-11 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                  link.active ? "text-ink" : "text-ink-muted hover:bg-surface-muted hover:text-ink"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
-          {/* Right Header Actions */}
-          <div className="flex items-center gap-2 sm:gap-3" ref={dropdownRef}>
-            {/* List Your Space */}
+          <div className="flex items-center gap-1" ref={dropdownRef}>
             <Link
               href={listSpaceHref}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+              className="hidden h-11 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-surface-muted lg:flex"
             >
-              <Plus className="w-3.5 h-3.5 text-teal-600" />
-              <span>List Your Space</span>
+              List your space
             </Link>
 
-            {/* Notification Bell */}
+            <ThemeToggle />
+
             {isAuthenticated && (
               <div className="relative">
                 <button
+                  type="button"
                   onClick={() => {
                     setNotifDropdownOpen(!notifDropdownOpen);
                     setProfileDropdownOpen(false);
                   }}
-                  className="relative p-2 rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-                  aria-label="Notifications"
+                  aria-expanded={notifDropdownOpen}
+                  aria-haspopup="true"
+                  className="relative flex h-11 w-11 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+                  aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
                 >
-                  <Bell className="w-4.5 h-4.5" />
+                  <Bell className="h-5 w-5" aria-hidden="true" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-danger-solid ring-2 ring-surface"
+                    />
                   )}
                 </button>
 
                 {notifDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl z-50 animate-in fade-in zoom-in-95">
-                    <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-900">
-                        Notifications
-                      </span>
+                  <div className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-2 shadow-md">
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-sm font-semibold text-ink">Notifications</span>
                       {unreadCount > 0 && (
-                        <span className="text-[10px] text-teal-700 font-semibold px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200">
-                          {unreadCount} new
-                        </span>
+                        <span className="text-sm text-ink-muted">{unreadCount} unread</span>
                       )}
                     </div>
-                    <div className="mt-2 divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    <div className="max-h-80 overflow-y-auto">
                       {notifications.length === 0 ? (
-                        <div className="p-4 text-center text-xs text-slate-400">
-                          No notifications yet.
-                        </div>
+                        <p className="px-3 py-6 text-center text-sm text-ink-muted">
+                          You have no notifications yet.
+                        </p>
                       ) : (
-                        notifications.slice(0, 5).map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              if (!n.read) {
-                                void SpaceGoStore.markNotificationRead(n.id).then((result) => {
-                                  if (!result.ok) {
-                                    console.error("SpaceGo: could not mark notification read:", result.error);
+                        <ul className="space-y-0.5">
+                          {notifications.slice(0, 6).map((n) => (
+                            <li key={n.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!n.read) {
+                                    void SpaceGoStore.markNotificationRead(n.id).then((result) => {
+                                      if (!result.ok) {
+                                        console.error("SpaceGo: could not mark notification read:", result.error);
+                                      }
+                                    });
                                   }
-                                });
-                              }
-                              setNotifDropdownOpen(false);
-                              if (n.link) router.push(n.link);
-                            }}
-                            className={cn(
-                              "p-2.5 text-xs hover:bg-slate-50 rounded-xl cursor-pointer transition-colors",
-                              !n.read && "bg-teal-50/40"
-                            )}
-                          >
-                            <div className="flex items-center justify-between">
-                              <p className="font-semibold text-slate-900">
-                                {n.title}
-                              </p>
-                              {!n.read && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-teal-600" />
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                              {n.message}
-                            </p>
-                          </div>
-                        ))
+                                  setNotifDropdownOpen(false);
+                                  if (n.link) router.push(n.link);
+                                }}
+                                className={cn(
+                                  "w-full rounded-md px-3 py-2.5 text-left transition-colors hover:bg-surface-muted",
+                                  !n.read && "bg-accent-soft"
+                                )}
+                              >
+                                <span className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-semibold text-ink">{n.title}</span>
+                                  {!n.read && (
+                                    <span className="h-2 w-2 shrink-0 rounded-full bg-accent" aria-label="Unread" />
+                                  )}
+                                </span>
+                                <span className="mt-0.5 line-clamp-2 block text-sm text-ink-muted">
+                                  {n.message}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   </div>
@@ -247,215 +224,177 @@ export function Navbar() {
               </div>
             )}
 
-            {/* Profile Menu or Log In */}
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative hidden md:block">
                 <button
+                  type="button"
                   onClick={() => {
                     setProfileDropdownOpen(!profileDropdownOpen);
                     setNotifDropdownOpen(false);
                   }}
-                  className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full border border-slate-200/80 hover:border-slate-300 hover:shadow-xs transition-all bg-white cursor-pointer"
+                  aria-expanded={profileDropdownOpen}
+                  aria-haspopup="true"
+                  className="flex h-11 items-center gap-2 rounded-md px-2 transition-colors hover:bg-surface-muted"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={
-                      user?.avatar_url ||
-                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-                    }
-                    alt={user?.full_name || "Profile"}
-                    className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-slate-200"
-                  />
-                  <span className="text-xs font-semibold text-slate-800 hidden sm:inline max-w-[100px] truncate">
+                  <Avatar name={user?.full_name} url={user?.avatar_url} />
+                  <span className="max-w-[8rem] truncate text-sm font-medium text-ink">
                     {user?.full_name?.split(" ")[0]}
                   </span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <ChevronDown className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
                 </button>
 
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl z-50 animate-in fade-in zoom-in-95">
-                    <div className="p-3 border-b border-slate-100">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        {user?.full_name}
-                      </p>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {user?.email}
-                      </p>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span
-                          className={cn(
-                            "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border",
-                            roleLabelMap[role].color
-                          )}
-                        >
-                          {roleLabelMap[role].label}
-                        </span>
-                      </div>
+                  <div className="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-line bg-surface p-2 shadow-md">
+                    <div className="border-b border-line px-3 pb-3 pt-2">
+                      <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
+                      <p className="truncate text-sm text-ink-muted">{user?.email}</p>
+                      <p className="mt-1 text-xs font-medium text-ink-subtle">{ROLE_LABEL[role]}</p>
                     </div>
-
                     <div className="py-1">
-                      <Link
-                        href={getDashboardLink()}
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-teal-600" />
-                        <span>
-                          Go to{" "}
-                          {role === "admin"
-                            ? "Admin"
-                            : role === "owner"
-                              ? "Host"
-                              : "Seeker"}{" "}
-                          Portal
-                        </span>
+                      <Link href={dashboardHref} onClick={() => setProfileDropdownOpen(false)} className={menuItemClass}>
+                        <LayoutDashboard className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
+                        Dashboard
                       </Link>
-
                       {role === "seeker" && (
-                        <Link
-                          href="/dashboard/bookings"
-                          onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                        >
-                          <Compass className="w-4 h-4 text-slate-400" />
-                          <span>My Bookings</span>
+                        <Link href="/dashboard/bookings" onClick={() => setProfileDropdownOpen(false)} className={menuItemClass}>
+                          <CalendarDays className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
+                          My bookings
                         </Link>
                       )}
-
                       {role === "owner" && (
-                        <Link
-                          href="/owner/properties"
-                          onClick={() => setProfileDropdownOpen(false)}
-                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                        >
-                          <Building2 className="w-4 h-4 text-slate-400" />
-                          <span>My Listings</span>
+                        <Link href="/owner/properties" onClick={() => setProfileDropdownOpen(false)} className={menuItemClass}>
+                          <Building2 className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
+                          My listings
                         </Link>
                       )}
-
-                      <Link
-                        href={
-                          role === "admin"
-                            ? "/admin/settings"
-                            : role === "owner"
-                              ? "/owner/settings"
-                              : "/dashboard/profile"
-                        }
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                      >
-                        <Settings className="w-4 h-4 text-slate-400" />
-                        <span>Account Settings</span>
+                      <Link href={settingsHref} onClick={() => setProfileDropdownOpen(false)} className={menuItemClass}>
+                        <Settings className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
+                        Account settings
                       </Link>
                     </div>
-
-                    <div className="pt-1 border-t border-slate-100">
+                    <div className="border-t border-line pt-1">
                       <button
+                        type="button"
                         onClick={() => void handleSignOut()}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                        className={cn(menuItemClass, "w-full text-left text-danger hover:bg-danger-soft")}
                       >
-                        <LogOut className="w-4 h-4" />
-                        <span>Sign out</span>
+                        <LogOut className="h-4 w-4" aria-hidden="true" />
+                        Sign out
                       </button>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Link href="/auth/login">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="font-semibold text-xs"
-                  >
-                    Log in
-                  </Button>
+              <div className="hidden items-center gap-1 md:flex">
+                <Link href="/auth/login" className={buttonClasses({ variant: "ghost", size: "md" })}>
+                  Log in
                 </Link>
-                <Link href="/auth/register">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="font-semibold text-xs rounded-full px-4"
-                  >
-                    Get Started
-                  </Button>
+                <Link href="/auth/register" className={buttonClasses({ variant: "primary", size: "md" })}>
+                  Sign up
                 </Link>
               </div>
             )}
 
-            {/* Mobile Menu Toggle Button */}
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100 md:hidden cursor-pointer"
-              aria-label="Toggle Navigation Menu"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-ink hover:bg-surface-muted md:hidden"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-menu"
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
+              {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 bg-white/98 backdrop-blur-md p-4 space-y-4 animate-in slide-in-from-top-2">
-          <nav className="flex flex-col space-y-1">
+        <div id="mobile-menu" className="border-t border-line bg-surface md:hidden">
+          <nav aria-label="Mobile" className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                aria-current={link.active ? "page" : undefined}
+                className="flex min-h-12 items-center rounded-md px-3 text-base font-medium text-ink hover:bg-surface-muted"
+              >
+                {link.label}
+              </Link>
+            ))}
             <Link
-              href="/spaces"
+              href={listSpaceHref}
               onClick={() => setMobileMenuOpen(false)}
-              className="px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-100"
+              className="flex min-h-12 items-center rounded-md px-3 text-base font-medium text-ink hover:bg-surface-muted"
             >
-              Explore Spaces
-            </Link>
-            <Link
-              href="/activation"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-100 flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-teal-600" />
-              <span>Activate Your Property</span>
-            </Link>
-            <Link
-              href="/activation/track"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-100"
-            >
-              Track Activation Status
+              List your space
             </Link>
 
-            {isAuthenticated ? (
-              <Link
-                href={getDashboardLink()}
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3.5 py-2.5 rounded-xl text-sm font-semibold text-teal-900 bg-teal-50 flex items-center justify-between mt-2"
-              >
-                <span>Go to {role.toUpperCase()} Portal</span>
-                <ArrowRight className="w-4 h-4 text-teal-600" />
-              </Link>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Link href="/auth/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="w-full text-xs">
+            <div className="mt-2 border-t border-line pt-3">
+              {isAuthenticated ? (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3 px-3 pb-2">
+                    <Avatar name={user?.full_name} url={user?.avatar_url} />
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-medium text-ink">{user?.full_name}</p>
+                      <p className="text-sm text-ink-muted">{ROLE_LABEL[role]}</p>
+                    </div>
+                  </div>
+                  <Link href={dashboardHref} onClick={() => setMobileMenuOpen(false)} className={cn(menuItemClass, "min-h-12 text-base")}>
+                    Dashboard
+                  </Link>
+                  <Link href={settingsHref} onClick={() => setMobileMenuOpen(false)} className={cn(menuItemClass, "min-h-12 text-base")}>
+                    Account settings
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleSignOut()}
+                    className={cn(menuItemClass, "min-h-12 w-full text-left text-base text-danger hover:bg-danger-soft")}
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/auth/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={buttonClasses({ variant: "outline", size: "lg", className: "w-full" })}
+                  >
                     Log in
-                  </Button>
-                </Link>
-                <Link
-                  href="/auth/register"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Button variant="teal" size="sm" className="w-full text-xs">
-                    Get Started
-                  </Button>
-                </Link>
-              </div>
-            )}
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={buttonClasses({ variant: "primary", size: "lg", className: "w-full" })}
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       )}
     </header>
+  );
+}
+
+function Avatar({ name, url }: { name?: string; url?: string }) {
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent-soft-ink"
+    >
+      {(name || "?").charAt(0).toUpperCase()}
+    </span>
   );
 }

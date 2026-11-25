@@ -92,14 +92,14 @@ function LoginContent() {
     <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
         <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-[#0B132B] flex items-center justify-center text-teal-400 shadow-md">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-teal-400 shadow-md">
             <Building2 className="w-5 h-5" />
           </div>
-          <span className="text-2xl font-black text-slate-900 tracking-tight">
+          <span className="text-2xl font-bold text-slate-900 tracking-tight">
             Space<span className="text-teal-600">Go</span>
           </span>
         </Link>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
           Sign In to Your Account
         </h2>
         <p className="text-xs text-slate-500">

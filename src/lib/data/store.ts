@@ -168,6 +168,17 @@ let remoteState: RemoteState = emptyRemoteState();
 let viewer: StoreViewer | null = null;
 let hydrateKey: string | null = null;
 let hydratePromise: Promise<StoreResult<null>> | null = null;
+let loadsInFlight = 0;
+
+/** Track an in-flight remote load so screens can show loading states. */
+function trackLoad(promise: Promise<StoreResult<null>>): Promise<StoreResult<null>> {
+  loadsInFlight += 1;
+  notify();
+  return promise.finally(() => {
+    loadsInFlight -= 1;
+    notify();
+  });
+}
 
 function remoteMode(): boolean {
   return isSupabaseBackendEnabled();
@@ -533,9 +544,12 @@ export const SpaceGoStore = {
     viewer = next;
     hydrateKey = key;
     clearLegacyLocalCopies();
-    hydratePromise = loadRemote(next);
+    hydratePromise = trackLoad(loadRemote(next));
     return hydratePromise;
   },
+
+  /** True while remote data is being (re)loaded. */
+  isLoading: (): boolean => loadsInFlight > 0,
 
   /** Re-fetch everything for the current viewer. */
   refresh: (): Promise<StoreResult<null>> => {
@@ -543,7 +557,7 @@ export const SpaceGoStore = {
       notify();
       return Promise.resolve({ ok: true, data: null });
     }
-    hydratePromise = loadRemote(viewer);
+    hydratePromise = trackLoad(loadRemote(viewer));
     return hydratePromise;
   },
 

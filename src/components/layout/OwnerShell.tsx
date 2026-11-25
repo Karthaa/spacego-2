@@ -108,7 +108,7 @@ export function OwnerShell({
               })}
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#0B132B] text-white shadow-md space-y-2">
+            <div className="p-4 rounded-2xl bg-slate-900 text-white shadow-md space-y-2">
               <div className="flex items-center gap-1.5 text-teal-400 text-xs font-bold">
                 <Sparkles className="w-4 h-4" />
                 <span>Demand Activation</span>

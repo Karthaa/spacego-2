@@ -122,7 +122,7 @@ function TrackActivationContent() {
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-teal-700">
                 <Sparkles className="w-4 h-4" /> Pipeline Transparency
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-1">
                 Track Property Activation Status
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -179,7 +179,7 @@ function TrackActivationContent() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-slate-900">{req.id}</span>
+                      <span className="font-mono text-xs font-bold text-slate-900">{req.id}</span>
                       <ActivationStatusBadge status={req.status} />
                     </div>
                     <p className="text-xs font-bold text-slate-800 mt-1.5 truncate">{req.property_address}</p>
@@ -210,12 +210,12 @@ function TrackActivationContent() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-black text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded border border-teal-200">
+                        <span className="font-mono text-sm font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded border border-teal-200">
                           {selectedRequest.id}
                         </span>
                         <ActivationStatusBadge status={selectedRequest.status} />
                       </div>
-                      <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-2">
+                      <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-2">
                         {selectedRequest.property_address}
                       </h2>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
@@ -233,7 +233,7 @@ function TrackActivationContent() {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
                           Activation Score
                         </span>
-                        <span className="text-3xl font-black text-teal-600">
+                        <span className="text-3xl font-bold text-teal-600">
                           {selectedRequest.activation_score.total}
                           <span className="text-sm text-slate-400 font-normal">/100</span>
                         </span>

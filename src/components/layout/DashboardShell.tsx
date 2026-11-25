@@ -96,7 +96,7 @@ export function DashboardShell({
               })}
             </div>
 
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-700 to-[#0B132B] text-white shadow-md space-y-2">
+            <div className="p-4 rounded-2xl bg-teal-700 text-white shadow-md space-y-2">
               <h4 className="text-xs font-bold">Find New Workspace</h4>
               <p className="text-[11px] text-teal-100 leading-snug">
                 Browse on-demand desks, private suites, and meeting rooms.

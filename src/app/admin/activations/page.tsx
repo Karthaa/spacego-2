@@ -103,7 +103,7 @@ export default function AdminActivationsPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
             Demand-Backed Workspace Pipeline
           </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Property Activation Assessments
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -140,7 +140,7 @@ export default function AdminActivationsPage() {
           >
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                <span className="font-mono text-xs font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                   {req.id}
                 </span>
                 <ActivationStatusBadge status={req.status} />
@@ -171,7 +171,7 @@ export default function AdminActivationsPage() {
               {req.activation_score && (
                 <div className="text-right">
                   <span className="text-[10px] uppercase font-bold text-slate-400 block">Score</span>
-                  <span className="text-xl font-black text-teal-600">
+                  <span className="text-xl font-bold text-teal-600">
                     {req.activation_score.total}/100
                   </span>
                 </div>
@@ -227,7 +227,7 @@ export default function AdminActivationsPage() {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
                   100-Point Activation Scoring Matrix
                 </span>
-                <span className="text-sm font-black text-teal-700">
+                <span className="text-sm font-bold text-teal-700">
                   Total: {demandScore + econScore + readinessScore + locationScore + opScore} / 100
                 </span>
               </div>
