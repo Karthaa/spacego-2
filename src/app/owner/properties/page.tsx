@@ -14,7 +14,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { categoryNoun } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
-import { Building2, Eye, MapPin, Plus, Trash2, Users } from "lucide-react";
+import { Building2, Eye, MapPin, Pencil, Plus, Trash2, Users } from "lucide-react";
 
 function SpaceStatusBadge({ status }: { status: Space["status"] }) {
   switch (status) {
@@ -163,6 +163,14 @@ export default function OwnerPropertiesPage() {
                     >
                       <Eye className="h-4 w-4" aria-hidden="true" />
                       Preview
+                    </Link>
+                    <Link
+                      href={`/owner/spaces/${space.id}/edit`}
+                      className={buttonClasses({ variant: "outline", size: "sm" })}
+                      aria-label={`Edit ${space.title}`}
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                      Edit
                     </Link>
                     <Button
                       variant="outline"

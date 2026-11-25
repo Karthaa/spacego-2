@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/components/ui/Button";
+import { SafeImage } from "@/components/ui/SafeImage";
 
 const OWNER_IMAGE =
   "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1400&q=80";
@@ -28,11 +29,13 @@ export function OwnerCallout() {
           </div>
         </div>
         <div className="relative min-h-56 lg:min-h-full">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <SafeImage
+            fill
             src={OWNER_IMAGE}
             alt="An empty, bright office floor"
-            className="absolute inset-0 h-full w-full object-cover"
+            width={1400}
+            height={933}
+            sizes="(min-width: 1024px) 40rem, 100vw"
             loading="lazy"
           />
         </div>

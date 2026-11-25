@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { categoryNoun } from "@/lib/categories";
+import { SafeImage } from "@/components/ui/SafeImage";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80";
@@ -84,16 +85,22 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
     <article
       className={cn(
         "group relative",
-        layout === "list" && "grid grid-cols-1 gap-4 rounded-lg border border-line bg-surface p-3 sm:grid-cols-[16rem_1fr]"
+        layout === "list" &&
+          "grid grid-cols-1 gap-4 rounded-lg border border-line bg-surface p-3 transition-colors duration-150 hover:border-line-strong sm:grid-cols-[16rem_1fr]"
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-surface-muted">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <SafeImage
+          fill
           src={images[imageIndex]?.url || FALLBACK_IMAGE}
           alt={images[imageIndex]?.caption || space.title}
-          className="h-full w-full object-cover"
-          loading="lazy"
+          width={800}
+          height={600}
+          sizes={
+            layout === "list"
+              ? "(min-width: 640px) 16rem, 100vw"
+              : "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+          }
         />
 
         {images.length > 1 && (
@@ -101,7 +108,7 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
             <button
               type="button"
               onClick={step(-1)}
-              className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-900 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
+              className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
               aria-label="Previous photo"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -109,7 +116,7 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
             <button
               type="button"
               onClick={step(1)}
-              className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white text-slate-900 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
+              className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:hidden"
               aria-label="Next photo"
             >
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -123,9 +130,9 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
           disabled={isSaving}
           aria-pressed={favorited}
           aria-label={favorited ? `Remove ${space.title} from saved spaces` : `Save ${space.title}`}
-          className="absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-full"
+          className="group/fav absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-full"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 transition-colors duration-150 group-hover/fav:bg-black/60">
             <Heart
               aria-hidden="true"
               className={cn("h-4 w-4", favorited ? "fill-rose-500 text-rose-500" : "text-photo-ink")}
@@ -146,7 +153,15 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
             yet, and stored rating values are demo data. */}
         <h3 className="min-w-0 text-base font-semibold text-ink">
           {/* The title link covers the whole card for a large click target. */}
-          <Link href={href} className="line-clamp-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+          <Link
+            href={href}
+            className={cn(
+              "line-clamp-1 decoration-1 underline-offset-2 group-hover:underline",
+              "after:absolute after:inset-0 after:rounded-lg after:content-['']",
+              // The visible focus ring goes on the overlay, i.e. around the whole card.
+              "focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring"
+            )}
+          >
             {space.title}
           </Link>
         </h3>

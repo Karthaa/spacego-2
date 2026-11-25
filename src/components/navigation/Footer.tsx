@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+import { Logo } from "@/components/brand/Logo";
 
 const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -39,14 +39,8 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-3 lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2 rounded-md" aria-label="SpaceGo home">
-              <span
-                aria-hidden="true"
-                className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-ink"
-              >
-                <Building2 className="h-4.5 w-4.5" />
-              </span>
-              <span className="text-lg font-semibold tracking-tight text-ink">SpaceGo</span>
+            <Link href="/" className="inline-flex items-center rounded-md" aria-label="SpaceGo home">
+              <Logo size="md" />
             </Link>
             <p className="max-w-sm text-base text-ink-muted">
               Find the right space for focused work, meetings and events, and book it directly with the host.

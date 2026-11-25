@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/lib/categories";
 import type { Space, WorkspaceCategory } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { fieldClasses } from "@/components/ui/Input";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { cn } from "@/lib/utils";
 
 const HERO_IMAGE =
@@ -53,20 +54,25 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
   const fieldLabel = "mb-1 block text-sm font-medium text-ink";
 
   return (
-    <section className="relative isolate overflow-hidden bg-black">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+    <section aria-labelledby="hero-heading" className="relative isolate overflow-hidden bg-black">
+      {/* Decorative background photo: the LCP element, so load it first. */}
+      <SafeImage
+        fill
         src={HERO_IMAGE}
         alt=""
-        className="absolute inset-0 -z-10 h-full w-full object-cover"
+        width={2000}
+        height={1333}
+        sizes="100vw"
+        loading="eager"
         fetchPriority="high"
+        wrapperClassName="-z-10"
       />
       {/* Flat scrim for legible text on the photo (no gradient). */}
       <div className="absolute inset-0 -z-10 bg-black/55" aria-hidden="true" />
 
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28 lg:px-8">
         <div className="max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-photo-ink sm:text-5xl">
+          <h1 id="hero-heading" className="text-4xl font-semibold tracking-tight text-photo-ink sm:text-5xl">
             Find the right space to work, meet and create
           </h1>
           <p className="mt-4 max-w-xl text-lg text-photo-ink/90">

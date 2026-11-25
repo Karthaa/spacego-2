@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "build:worker": "npm run wire:fixture && npm run build && opennextjs-cloudflare build --skipBuild",
     "preview:worker": "npm run wire:fixture && opennextjs-cloudflare preview",
     "wire:fixture": "node tooling/wire/render.mjs --template wrangler.template.jsonc --out wrangler.jsonc --map wiring.fixture.json --env \"${ORUN_ENVIRONMENT:-stage}\""
@@ -24,8 +25,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@opennextjs/cloudflare": "^1.20.16",
-    "wrangler": "^4.148.0",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
@@ -34,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.148.0"
   }
 }

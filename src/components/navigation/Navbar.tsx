@@ -20,6 +20,7 @@ import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { NotificationItem, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
+import { Logo as BrandLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -30,14 +31,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 rounded-md" aria-label="SpaceGo home">
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-ink"
-      >
-        <Building2 className="h-4.5 w-4.5" />
-      </span>
-      <span className="text-lg font-semibold tracking-tight text-ink">SpaceGo</span>
+    <Link href="/" className="flex items-center rounded-md" aria-label="SpaceGo home">
+      <BrandLogo size="md" />
     </Link>
   );
 }

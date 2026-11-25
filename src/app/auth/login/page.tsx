@@ -17,9 +17,10 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
-          Loading…
-        </div>
+        <main id="main" className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
+          <h1 className="sr-only">Sign in to SpaceGo</h1>
+          <p role="status">Loading…</p>
+        </main>
       }
     >
       <LoginContent />
@@ -84,7 +85,7 @@ function LoginContent() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex justify-center">
           <Logo />

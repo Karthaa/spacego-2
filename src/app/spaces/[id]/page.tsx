@@ -22,7 +22,7 @@ import { VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
@@ -70,17 +70,24 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       <div className="flex min-h-screen flex-col bg-canvas">
         <Navbar />
         <main id="main" className="mx-auto flex w-full max-w-3xl flex-1 items-center px-4 py-16">
-          <EmptyState
-            className="w-full"
-            icon={<Building2 />}
-            title="This space isn't available"
-            description="It may have been unpublished by the host, or the link may be wrong."
-            action={
+          {/* Same look as <EmptyState>, but the title is this page's h1. */}
+          <div className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-line-strong bg-surface px-6 py-12 text-center sm:px-12">
+            <span
+              aria-hidden="true"
+              className="mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-surface-muted text-ink-subtle"
+            >
+              <Building2 className="h-6 w-6" />
+            </span>
+            <h1 className="text-lg font-semibold text-ink">This space isn&apos;t available</h1>
+            <p className="mt-1.5 max-w-md text-base text-ink-muted">
+              It may have been unpublished by the host, or the link may be wrong.
+            </p>
+            <div className="mt-6">
               <Link href="/spaces" className={buttonClasses()}>
                 Browse spaces
               </Link>
-            }
-          />
+            </div>
+          </div>
         </main>
         <Footer />
       </div>
@@ -124,7 +131,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <Link
           href="/spaces"
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink"
+          className="inline-flex min-h-11 items-center gap-2 rounded-sm text-sm font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           All spaces
@@ -215,7 +222,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
             {space.amenities.length > 0 && (
               <section aria-labelledby="amenities-heading">
                 <h2 id="amenities-heading" className="text-xl font-semibold text-ink">What this space offers</h2>
-                <p className="mt-1 text-sm text-ink-subtle">As listed by the host.</p>
+                <p className="mt-1 text-sm text-ink-muted">As listed by the host.</p>
                 <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                   {space.amenities.map((item) => (
                     <li key={item} className="flex items-start gap-3 text-base text-ink">
@@ -253,8 +260,13 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
 
             <section aria-labelledby="host-heading" className="flex items-center gap-4 rounded-lg border border-line bg-surface p-5">
               {space.owner_avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={space.owner_avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+                <SafeImage
+                  src={space.owner_avatar}
+                  alt=""
+                  width={48}
+                  height={48}
+                  wrapperClassName="h-12 w-12 shrink-0 rounded-full"
+                />
               ) : (
                 <span
                   aria-hidden="true"
@@ -282,12 +294,14 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       <Modal isOpen={galleryIndex !== null} onClose={() => setGalleryIndex(null)} title={space.title} maxWidth="4xl">
         {galleryIndex !== null && images[galleryIndex] && (
           <div className="space-y-4">
-            <div className="flex h-[60vh] items-center justify-center overflow-hidden rounded-md bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div className="relative h-[60vh] overflow-hidden rounded-md bg-surface-muted">
+              <SafeImage
+                fill
                 src={images[galleryIndex].url}
                 alt={images[galleryIndex].caption || `Photo ${galleryIndex + 1}`}
-                className="max-h-full max-w-full object-contain"
+                sizes="(min-width: 896px) 54rem, 100vw"
+                loading="eager"
+                className="object-contain"
               />
             </div>
             <p className="text-center text-sm text-ink-muted">
@@ -302,12 +316,13 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
                   aria-label={`Show photo ${idx + 1}`}
                   aria-current={galleryIndex === idx}
                   className={cn(
-                    "h-16 w-20 shrink-0 overflow-hidden rounded-sm border-2",
-                    galleryIndex === idx ? "border-accent" : "border-transparent opacity-70 hover:opacity-100"
+                    "relative h-16 w-20 shrink-0 overflow-hidden rounded-sm border-2 transition-[opacity,border-color] duration-150",
+                    galleryIndex === idx
+                      ? "border-accent"
+                      : "border-transparent opacity-70 hover:opacity-100 focus-visible:opacity-100"
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  <SafeImage fill src={img.url} alt="" sizes="80px" />
                 </button>
               ))}
             </div>
@@ -342,6 +357,9 @@ function Gallery({
   // 3-column layout when there are fewer photos. Fixed height keeps rows even.
   const rest = images.length >= 5 ? images.slice(1, 5) : images.slice(1, 3);
   const cols = rest.length >= 4 ? "md:grid-cols-4" : rest.length > 0 ? "md:grid-cols-3" : "";
+  // Hover dims the photo slightly; focus gets an inset ring (the grid clips outer outlines).
+  const tile =
+    "relative min-h-0 overflow-hidden bg-surface-muted transition-opacity duration-150 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
   return (
     <div className="relative mt-6">
@@ -350,24 +368,31 @@ function Gallery({
           type="button"
           onClick={() => onOpen(0)}
           className={cn(
-            "block aspect-[4/3] min-h-0 bg-surface-muted md:aspect-auto md:h-full md:row-span-2",
+            tile,
+            "block aspect-[4/3] md:aspect-auto md:h-full md:row-span-2",
             rest.length > 0 && "md:col-span-2"
           )}
-          aria-label="Open photo 1"
+          aria-label={`Open photo 1 of ${images.length}: ${images[0].caption || title}`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={images[0].url} alt={images[0].caption || title} className="h-full w-full object-cover" />
+          {/* The lead photo is above the fold: load it straight away. */}
+          <SafeImage
+            fill
+            src={images[0].url}
+            alt=""
+            sizes={rest.length > 0 ? "(min-width: 768px) 50vw, 100vw" : "100vw"}
+            loading="eager"
+            fetchPriority="high"
+          />
         </button>
         {rest.map((img, idx) => (
           <button
             key={`${img.url}-${idx}`}
             type="button"
             onClick={() => onOpen(idx + 1)}
-            className={cn("hidden min-h-0 bg-surface-muted md:block", rest.length === 1 && "md:row-span-2")}
-            aria-label={`Open photo ${idx + 2}`}
+            className={cn(tile, "hidden md:block", rest.length === 1 && "md:row-span-2")}
+            aria-label={`Open photo ${idx + 2} of ${images.length}${img.caption ? `: ${img.caption}` : ""}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.url} alt={img.caption || ""} className="h-full w-full object-cover" />
+            <SafeImage fill src={img.url} alt="" sizes="25vw" />
           </button>
         ))}
       </div>
@@ -397,7 +422,7 @@ function ReviewDetails({ space }: { space: Space }) {
   return (
     <section aria-labelledby="review-heading">
       <h2 id="review-heading" className="text-xl font-semibold text-ink">SpaceGo review</h2>
-      <p className="mt-1 text-sm text-ink-subtle">
+      <p className="mt-1 text-sm text-ink-muted">
         Recorded by the SpaceGo team{p.inspected_at ? ` on ${formatDate(p.inspected_at)}` : ""}. Conditions can change; confirm anything important with the host.
       </p>
       <ul className="mt-4 space-y-2">

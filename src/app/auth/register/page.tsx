@@ -97,7 +97,7 @@ export default function RegisterPage() {
 
   if (confirmationEmail) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
         <div className="w-full max-w-md">
           <div className="flex justify-center">
             <Logo />
@@ -118,7 +118,7 @@ export default function RegisterPage() {
               <strong className="font-semibold text-ink">{confirmationEmail}</strong>.
               Open it to activate your account, then sign in.
             </p>
-            <p className="mt-3 text-sm text-ink-subtle">
+            <p className="mt-3 text-sm text-ink-muted">
               You are not signed in yet. If the message does not arrive, check
               your spam folder or try registering again.
             </p>
@@ -135,7 +135,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex justify-center">
           <Logo />

@@ -16,12 +16,49 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_NAME = "SpaceGo";
+const SITE_TITLE = "SpaceGo · Find and book flexible workspaces";
+const SITE_DESCRIPTION =
+  "Find the right space. Search coworking desks, private offices, meeting rooms and studios, request a booking, and get confirmed by the host.";
+
+/** Absolute site origin for metadata URLs; falls back to the local dev server. */
+function resolveSiteUrl(): URL {
+  const fallback = "http://localhost:3000";
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!raw) return new URL(fallback);
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : new URL(fallback);
+  } catch {
+    return new URL(fallback);
+  }
+}
+
+// Icons and the default share image come from the app/favicon.ico,
+// app/icon.svg, app/apple-icon.tsx and app/opengraph-image.tsx file
+// conventions, so they are not repeated here.
 export const metadata: Metadata = {
-  title: "SpaceGo | Find and book flexible workspaces",
-  description:
-    "Find the right space. Search coworking desks, private offices, meeting rooms and studios, request a booking, and get confirmed by the host.",
-  icons: {
-    icon: "/favicon.ico",
+  metadataBase: resolveSiteUrl(),
+  title: {
+    template: "%s · SpaceGo",
+    default: SITE_TITLE,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "en_US",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
 };
 
@@ -53,6 +90,12 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full flex flex-col bg-canvas text-ink selection:bg-accent selection:text-accent-ink">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:border-line-strong focus:bg-surface focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-ink focus:shadow-md"
+        >
+          Skip to content
+        </a>
         <AuthProvider>
           <SpaceGoDataProvider>
             <ToastProvider>

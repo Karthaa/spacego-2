@@ -37,9 +37,19 @@ export default function SeekerOverviewPage() {
   }, [dataVersion, bookings.length]);
 
   const upcomingBooking = bookings.find((b) => b.status === "approved" || b.status === "pending");
-  const totalSpend = bookings
+  // Totals are kept per currency; amounts in different currencies are never added together.
+  const spendByCurrency = bookings
     .filter((b) => b.status === "approved" || b.status === "completed")
-    .reduce((sum, b) => sum + b.total_price, 0);
+    .reduce<Record<string, number>>((totals, b) => {
+      const currency = b.currency || "USD";
+      totals[currency] = (totals[currency] ?? 0) + b.total_price;
+      return totals;
+    }, {});
+  const spendEntries = Object.entries(spendByCurrency);
+  const totalSpendLabel =
+    spendEntries.length === 0
+      ? "—"
+      : spendEntries.map(([currency, amount]) => formatCurrency(amount, currency)).join(" · ");
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
 
   const firstName = user?.full_name?.split(" ")[0];
@@ -68,7 +78,7 @@ export default function SeekerOverviewPage() {
             <StatCard label="Saved spaces" value={savedSpaces.length} hint="Spaces you've marked with the heart" />
             <StatCard
               label="Confirmed spend"
-              value={formatCurrency(totalSpend)}
+              value={totalSpendLabel}
               hint="Total of confirmed and completed bookings"
             />
           </>

@@ -8,6 +8,7 @@ import { Footer } from "@/components/navigation/Footer";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input, Textarea, Select } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { ActivationStatusBadge } from "@/components/ui/Badge";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
@@ -222,11 +223,15 @@ export default function PropertyActivationPage() {
               </div>
             </div>
             <div className="relative hidden aspect-[4/3] overflow-hidden rounded-lg border border-line lg:block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {/* Lazy on purpose: the box is display:none below lg, so phones never fetch it. */}
+              <SafeImage
+                fill
                 src={HERO_IMAGE}
                 alt="An empty, open-plan office floor"
-                className="absolute inset-0 h-full w-full object-cover"
+                width={1400}
+                height={1050}
+                sizes="(min-width: 1024px) 40rem, 1px"
+                loading="lazy"
               />
             </div>
           </div>
@@ -478,12 +483,18 @@ export default function PropertyActivationPage() {
                       aria-pressed={selected}
                       onClick={() => setSelectedPhoto(photo.url)}
                       className={cn(
-                        "relative overflow-hidden rounded-md border-2 bg-surface text-left transition-colors",
+                        "relative overflow-hidden rounded-md border-2 bg-surface text-left transition-colors duration-150",
                         selected ? "border-accent" : "border-line hover:border-line-strong"
                       )}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photo.url} alt="" className="h-24 w-full object-cover" />
+                      <SafeImage
+                        src={photo.url}
+                        alt=""
+                        width={400}
+                        height={240}
+                        sizes="(min-width: 640px) 10rem, 50vw"
+                        wrapperClassName="h-24 w-full"
+                      />
                       <span className="flex items-center gap-1.5 px-2.5 py-2 text-sm font-medium text-ink">
                         {selected && (
                           <CheckCircle2 className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />

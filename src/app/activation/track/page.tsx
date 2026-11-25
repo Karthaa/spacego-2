@@ -51,9 +51,10 @@ export default function TrackActivationPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
-          Loading…
-        </div>
+        <main id="main" className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
+          <h1 className="sr-only">Track an activation request</h1>
+          <p role="status">Loading…</p>
+        </main>
       }
     >
       <TrackActivationContent />
@@ -164,6 +165,7 @@ function TrackActivationContent() {
             <form
               onSubmit={handleSearch}
               role="search"
+              aria-label="Find a request by reference"
               className="flex w-full items-end gap-2 lg:w-auto"
             >
               <div className="min-w-0 flex-1 lg:w-72">
@@ -183,29 +185,33 @@ function TrackActivationContent() {
 
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           {allRequests.length === 0 && !errorMessage ? (
-            <EmptyState
-              icon={<FileText />}
-              title="No activation requests to show"
-              description={
-                user
-                  ? "Requests you submit will appear here with their current status."
-                  : "Sign in with the account you used to submit a property to see its requests."
-              }
-              action={
-                user ? (
-                  <Link href="/activation" className={buttonClasses({ variant: "outline" })}>
-                    Submit a property
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/auth/login?redirect=${encodeURIComponent("/activation/track")}`}
-                    className={buttonClasses({ variant: "outline" })}
-                  >
-                    Sign in
-                  </Link>
-                )
-              }
-            />
+            <section aria-labelledby="requests-heading">
+              {/* Keeps the outline h1 > h2 > h3 (EmptyState's title is an h3). */}
+              <h2 id="requests-heading" className="sr-only">Requests</h2>
+              <EmptyState
+                icon={<FileText />}
+                title="No activation requests to show"
+                description={
+                  user
+                    ? "Requests you submit will appear here with their current status."
+                    : "Sign in with the account you used to submit a property to see its requests."
+                }
+                action={
+                  user ? (
+                    <Link href="/activation" className={buttonClasses({ variant: "outline" })}>
+                      Submit a property
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/auth/login?redirect=${encodeURIComponent("/activation/track")}`}
+                      className={buttonClasses({ variant: "outline" })}
+                    >
+                      Sign in
+                    </Link>
+                  )
+                }
+              />
+            </section>
           ) : (
             <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
               {/* Request list */}
@@ -325,7 +331,7 @@ function TrackActivationContent() {
                                         "flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold",
                                         isCurrent
                                           ? "bg-accent text-accent-ink"
-                                          : "bg-surface-muted text-ink-subtle"
+                                          : "bg-surface-muted text-ink-muted"
                                       )}
                                     >
                                       {idx + 1}
@@ -382,22 +388,22 @@ function TrackActivationContent() {
 
                         <dl className="space-y-4">
                           {scoreRows.map((row) => (
-                            <div key={row.label}>
-                              <div className="flex justify-between gap-4 text-sm">
-                                <dt className="text-ink">{row.label}</dt>
-                                <dd className="font-medium text-ink">
-                                  {row.value} of {row.max}
-                                </dd>
-                              </div>
-                              <div
+                            // dl > div > (dt, dd, dd) keeps the list valid; the
+                            // second dd is the purely visual bar.
+                            <div key={row.label} className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-sm">
+                              <dt className="text-ink">{row.label}</dt>
+                              <dd className="font-medium text-ink">
+                                {row.value} of {row.max}
+                              </dd>
+                              <dd
                                 aria-hidden="true"
-                                className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-muted"
+                                className="col-span-2 h-2 w-full overflow-hidden rounded-full bg-surface-muted"
                               >
                                 <div
                                   className="h-full rounded-full bg-accent"
                                   style={{ width: `${Math.min(100, (row.value / row.max) * 100)}%` }}
                                 />
-                              </div>
+                              </dd>
                             </div>
                           ))}
                         </dl>

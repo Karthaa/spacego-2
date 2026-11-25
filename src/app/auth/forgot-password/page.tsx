@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex justify-center">
           <Logo />
@@ -70,7 +70,7 @@ export default function ForgotPasswordPage() {
               a password reset link is on its way. Open it to choose a new
               password.
             </p>
-            <p className="mt-3 text-sm text-ink-subtle">
+            <p className="mt-3 text-sm text-ink-muted">
               The link expires after a short time. If it does not arrive, check
               your spam folder and try again.
             </p>
