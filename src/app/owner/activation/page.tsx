@@ -1,120 +1,97 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest } from "@/types";
 import { ActivationStatusBadge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { buttonClasses } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { formatDate } from "@/lib/utils";
-import {
-  Sparkles,
-  MapPin,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  TrendingUp,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, Building2, MapPin, Plus } from "lucide-react";
+
+const PROPERTY_TYPE_LABEL: Record<PropertyActivationRequest["property_type"], string> = {
+  vacant_floor: "Vacant floor",
+  excess_office: "Unused office space",
+  retail_commercial: "Retail or commercial unit",
+  hotel_space: "Hotel space",
+  independent_building: "Standalone building",
+  studio_hall: "Studio or hall",
+};
 
 export default function OwnerActivationProjectsPage() {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<PropertyActivationRequest[]>([]);
+  const dataVersion = useSpaceGoVersion();
 
-  useEffect(() => {
-    if (user) {
-      const all = SpaceGoStore.getActivationRequests();
-      setRequests(all);
-    }
-  }, [user]);
+  // Remote mode loads this from spacego_owner_activations, which already
+  // limits rows to auth.uid(); filtering by owner keeps admins/demo correct.
+  const requests = useMemo<PropertyActivationRequest[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getActivationRequestsByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
-            Demand-Backed Workspace Activation
-          </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            My Property Activation Projects
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Track underutilized floors submitted for architectural layout planning, 100-point scoring, and market onboarding.
-          </p>
-        </div>
-
-        <Link href="/activation">
-          <Button variant="teal" size="sm" className="font-bold gap-1.5">
-            <Plus className="w-4 h-4" />
-            <span>Submit New Property</span>
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Property activation"
+        description="Properties you've submitted for SpaceGo to review as possible workspaces, and where each one stands."
+        actions={
+          <Link href="/activation" className={buttonClasses()}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Submit a property
+          </Link>
+        }
+      />
 
       {requests.length === 0 ? (
         <EmptyState
-          icon={<Sparkles className="w-8 h-8 text-teal-600" />}
-          title="No properties in activation pipeline"
-          description="Have vacant floors or underutilized commercial space? Submit your property for demand-backed activation."
-          actionLabel="Submit Property"
-          onAction={() => (window.location.href = "/activation")}
+          icon={<Building2 />}
+          title="No properties submitted"
+          description="Have an empty floor or unused commercial space? Submit it and the SpaceGo team will review whether it could work as a bookable workspace."
+          action={
+            <Link href="/activation" className={buttonClasses()}>
+              Submit a property
+            </Link>
+          }
         />
       ) : (
-        <div className="space-y-4">
+        <ul className="space-y-4">
           {requests.map((req) => (
-            <div
-              key={req.id}
-              className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-5"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                    {req.id}
-                  </span>
-                  <ActivationStatusBadge status={req.status} />
-                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded capitalize">
-                    {req.property_type.replace("_", " ")}
-                  </span>
-                </div>
-
-                <h3 className="text-base font-bold text-slate-900">{req.property_address}</h3>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" /> {req.city}
-                  </span>
-                  <span>•</span>
-                  <span>{req.approx_square_feet.toLocaleString()} sq.ft.</span>
-                  <span>•</span>
-                  <span>Submitted {formatDate(req.created_at)}</span>
-                </div>
-
-                {req.activation_score && (
-                  <div className="pt-1 flex items-center gap-3 text-xs text-teal-800 font-semibold">
-                    <span>Activation Score: <strong className="text-teal-900">{req.activation_score.total}/100</strong></span>
-                    <span>•</span>
-                    <span className="text-slate-500 font-normal">Model: {req.preferred_model.replace("_", " ")}</span>
+            <li key={req.id}>
+              <Card padding="sm" className="flex flex-col gap-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ActivationStatusBadge status={req.status} />
+                    <span className="font-mono text-sm text-ink-subtle">{req.id}</span>
                   </div>
-                )}
-              </div>
+                  <h2 className="text-base font-medium text-ink">{req.property_address}</h2>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+                    <span>{PROPERTY_TYPE_LABEL[req.property_type] ?? req.property_type.replace(/_/g, " ")}</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+                      {req.city}
+                    </span>
+                    <span>{req.approx_square_feet.toLocaleString()} sq ft</span>
+                    <span>Submitted {formatDate(req.created_at)}</span>
+                  </div>
+                </div>
 
-              {/* Action Button */}
-              <div className="flex items-center gap-2 self-end lg:self-center">
-                <Link href={`/activation/track?ref=${req.id}`}>
-                  <Button variant="outline" size="sm" className="gap-1 font-semibold">
-                    <span>Track Pipeline & Matrix</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Button>
+                <Link
+                  href={`/activation/track?ref=${req.id}`}
+                  className={buttonClasses({ variant: "outline", size: "sm", className: "self-start lg:self-center" })}
+                >
+                  View progress
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
-              </div>
-            </div>
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-
     </div>
   );
 }

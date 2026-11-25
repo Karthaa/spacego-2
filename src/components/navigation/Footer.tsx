@@ -1,155 +1,80 @@
-"use client";
-
 import React from "react";
 import Link from "next/link";
-import { Building2, ShieldCheck, Mail, MapPin, Sparkles, ArrowRight } from "lucide-react";
+import { Building2 } from "lucide-react";
+
+const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
+  {
+    title: "Find a space",
+    links: [
+      { href: "/spaces?category=coworking", label: "Coworking desks" },
+      { href: "/spaces?category=private_office", label: "Private offices" },
+      { href: "/spaces?category=meeting_room", label: "Meeting rooms" },
+      { href: "/spaces?category=training_room", label: "Training rooms" },
+      { href: "/spaces?category=studio", label: "Studios" },
+      { href: "/spaces?category=event_space", label: "Event spaces" },
+    ],
+  },
+  {
+    title: "For owners",
+    links: [
+      { href: "/owner/spaces/new", label: "List a ready space" },
+      { href: "/activation", label: "Activate an empty property" },
+      { href: "/activation/track", label: "Track an activation request" },
+      { href: "/owner", label: "Host dashboard" },
+    ],
+  },
+  {
+    title: "SpaceGo",
+    links: [
+      { href: "/#how-it-works", label: "How booking works" },
+      { href: "/dashboard", label: "Your bookings" },
+      { href: "/auth/register", label: "Create an account" },
+    ],
+  },
+];
 
 export function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-[#0B132B] text-slate-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 pb-12 border-b border-slate-800">
-          
-          {/* Brand Info */}
-          <div className="lg:col-span-2 space-y-4">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <span className="text-2xl font-black tracking-tight text-white">
-                Space<span className="text-teal-400">Go</span>
+    <footer className="mt-auto border-t border-line bg-surface">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="space-y-3 lg:col-span-2">
+            <Link href="/" className="inline-flex items-center gap-2 rounded-md" aria-label="SpaceGo home">
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-ink"
+              >
+                <Building2 className="h-4.5 w-4.5" />
               </span>
+              <span className="text-lg font-semibold tracking-tight text-ink">SpaceGo</span>
             </Link>
-            <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
-              Find the right space. Make every space work. A demand-led platform connecting flexible workspace discovery, property activation, verification, and operations.
+            <p className="max-w-sm text-base text-ink-muted">
+              Find the right space for focused work, meetings and events, and book it directly with the host.
             </p>
-            <div className="pt-2 flex items-center gap-3 text-xs text-slate-400">
-              <span className="inline-flex items-center gap-1 text-teal-400 font-medium">
-                <ShieldCheck className="w-4 h-4" /> Space Passport™ Certified
-              </span>
-              <span>•</span>
-              <span>Demand-Backed Activation</span>
-            </div>
           </div>
 
-          {/* Column: For Customers */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              Explore Workspaces
-            </h4>
-            <ul className="space-y-2 text-sm text-slate-400">
-              <li>
-                <Link href="/spaces?category=coworking" className="hover:text-teal-400 transition-colors">
-                  Coworking Desks
-                </Link>
-              </li>
-              <li>
-                <Link href="/spaces?category=private_office" className="hover:text-teal-400 transition-colors">
-                  Private Office Suites
-                </Link>
-              </li>
-              <li>
-                <Link href="/spaces?category=meeting_room" className="hover:text-teal-400 transition-colors">
-                  Executive Boardrooms
-                </Link>
-              </li>
-              <li>
-                <Link href="/spaces?category=training_room" className="hover:text-teal-400 transition-colors">
-                  Training & Workshop Halls
-                </Link>
-              </li>
-              <li>
-                <Link href="/spaces?category=studio" className="hover:text-teal-400 transition-colors">
-                  Podcast & Media Studios
-                </Link>
-              </li>
-              <li>
-                <Link href="/spaces?category=event_space" className="hover:text-teal-400 transition-colors">
-                  Demo & Event Spaces
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column: For Property Owners */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              For Property Owners
-            </h4>
-            <ul className="space-y-2 text-sm text-slate-400">
-              <li>
-                <Link href="/owner" className="hover:text-teal-400 transition-colors">
-                  Host Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/activation" className="hover:text-teal-400 transition-colors flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                  Space Activation Program
-                </Link>
-              </li>
-              <li>
-                <Link href="/activation/track" className="hover:text-teal-400 transition-colors">
-                  Track Activation Status
-                </Link>
-              </li>
-              <li>
-                <Link href="/owner/performance" className="hover:text-teal-400 transition-colors">
-                  Owner Economics Model
-                </Link>
-              </li>
-              <li>
-                <Link href="/owner/spaces/new" className="hover:text-teal-400 transition-colors">
-                  List Ready Space
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column: Platform & Trust */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-              Trust & Platform
-            </h4>
-            <ul className="space-y-2 text-sm text-slate-400">
-              <li>
-                <Link href="/#passport" className="hover:text-teal-400 transition-colors">
-                  Space Passport™ Standards
-                </Link>
-              </li>
-              <li>
-                <Link href="/#how-it-works" className="hover:text-teal-400 transition-colors">
-                  How Verification Works
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin" className="hover:text-teal-400 transition-colors">
-                  Admin Console
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin/demand" className="hover:text-teal-400 transition-colors">
-                  Demand Intelligence
-                </Link>
-              </li>
-              <li>
-                <Link href="/#faq" className="hover:text-teal-400 transition-colors">
-                  Frequently Asked Questions
-                </Link>
-              </li>
-            </ul>
-          </div>
-
+          {COLUMNS.map((column) => (
+            <nav key={column.title} aria-label={column.title} className="space-y-3">
+              <h2 className="text-sm font-semibold text-ink">{column.title}</h2>
+              <ul className="space-y-1">
+                {column.links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="inline-flex min-h-9 items-center text-sm text-ink-muted transition-colors hover:text-ink pointer-coarse:min-h-11"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
 
-        {/* Bottom Legal & Copyright */}
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} SpaceGo Technologies, Inc. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <span>Operating Principle: Verified Authority & Clear Responsibilities</span>
-            <span>Privacy Policy</span>
-            <span>Terms of Service</span>
-          </div>
+        <div className="mt-10 flex flex-col gap-2 border-t border-line pt-6 text-sm text-ink-subtle sm:flex-row sm:items-center sm:justify-between">
+          <p>&copy; {new Date().getFullYear()} SpaceGo. All rights reserved.</p>
+          <p>Prices are set by hosts. Bookings are confirmed by the host unless marked Instant Book.</p>
         </div>
       </div>
     </footer>

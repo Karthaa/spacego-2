@@ -1,192 +1,205 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
-import { Space, Booking, PropertyActivationRequest, DemandSearch } from "@/types";
-import { BookingStatusBadge, ActivationStatusBadge, VerificationBadge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Space, Booking, PropertyActivationRequest } from "@/types";
+import { BookingStatusBadge, ActivationStatusBadge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader, StatCard } from "@/components/ui/PageHeader";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  CalendarCheck,
-  Sparkles,
-  TrendingUp,
-  BarChart3,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle2,
-} from "lucide-react";
+import { ArrowRight, Building2, CalendarCheck, Receipt, Sparkles } from "lucide-react";
 
 export default function AdminOverviewPage() {
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activations, setActivations] = useState<PropertyActivationRequest[]>([]);
-  const [demandSearches, setDemandSearches] = useState<DemandSearch[]>([]);
+  const dataVersion = useSpaceGoVersion();
+  const { spaces, bookings, activations } = useMemo<{
+    spaces: Space[];
+    bookings: Booking[];
+    activations: PropertyActivationRequest[];
+  }>(() => {
+    void dataVersion;
+    return {
+      spaces: SpaceGoStore.getSpaces(),
+      bookings: SpaceGoStore.getBookings(),
+      activations: SpaceGoStore.getActivationRequests(),
+    };
+  }, [dataVersion]);
 
-  useEffect(() => {
-    setSpaces(SpaceGoStore.getSpaces());
-    setBookings(SpaceGoStore.getBookings());
-    setActivations(SpaceGoStore.getActivationRequests());
-    setDemandSearches(SpaceGoStore.getDemandSearches());
-  }, []);
+  const confirmedBookings = bookings.filter((b) => b.status === "approved" || b.status === "completed");
+  const confirmedValue = confirmedBookings.reduce((sum, b) => sum + b.total_price, 0);
 
-  const totalGMV = bookings
-    .filter((b) => b.status === "approved" || b.status === "completed")
-    .reduce((sum, b) => sum + b.total_price, 0);
-
-  const platformNetCommission = Math.round(totalGMV * 0.15);
+  // Booking totals already include the 10% service fee (fee = base × 10%),
+  // so the fee share of a total is total × 10/110.
+  const estimatedServiceFees = Math.round((confirmedValue * 10) / 110);
   const pendingActivations = activations.filter((a) => a.status === "submitted" || a.status === "under_review");
 
   return (
-    <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
-            SpaceGo Global Operations
-          </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Executive Operations Console
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time platform ledger, property activation pipeline, and demand intelligence.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/admin/activations">
-            <Button variant="teal" size="sm" className="font-bold gap-1.5">
-              <Sparkles className="w-4 h-4" />
-              <span>Review Activations ({pendingActivations.length})</span>
-            </Button>
+    <div className="space-y-8">
+      <PageHeader
+        title="Overview"
+        description="Bookings, listings and activation requests across SpaceGo."
+        actions={
+          <Link href="/admin/activations" className={buttonClasses({ variant: "primary", size: "sm" })}>
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            Review activations ({pendingActivations.length})
           </Link>
-        </div>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Confirmed booking value"
+          value={formatCurrency(confirmedValue)}
+          hint={`${confirmedBookings.length} confirmed or completed bookings, fees included`}
+          icon={<CalendarCheck />}
+        />
+        <StatCard
+          label="Service fees in those bookings"
+          value={formatCurrency(estimatedServiceFees)}
+          hint="Approximate: total × 10/110 (10% fee is included in totals)"
+          icon={<Receipt />}
+        />
+        <StatCard
+          label="Spaces"
+          value={spaces.length}
+          hint={`${spaces.filter((s) => s.status === "published").length} published`}
+          icon={<Building2 />}
+        />
+        <StatCard
+          label="Activation requests waiting"
+          value={pendingActivations.length}
+          hint="Submitted or under review"
+          icon={<Sparkles />}
+        />
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-          <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center font-bold mb-3">
-            <TrendingUp className="w-5 h-5" />
+      <Card padding="none">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Activation requests</h2>
+            <p className="text-sm text-ink-muted">{activations.length} in total, newest first</p>
           </div>
-          <span className="text-2xl font-black text-slate-900 block">{formatCurrency(totalGMV)}</span>
-          <span className="text-xs font-semibold text-slate-500">Gross Marketplace Volume</span>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold mb-3">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-black text-emerald-700 block">{formatCurrency(platformNetCommission)}</span>
-          <span className="text-xs font-semibold text-slate-500">Platform Commission (15%)</span>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-          <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center font-bold mb-3">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-black text-slate-900 block">{spaces.length}</span>
-          <span className="text-xs font-semibold text-slate-500">Listed Workspaces</span>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
-          <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold mb-3">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-black text-amber-700 block">{pendingActivations.length}</span>
-          <span className="text-xs font-semibold text-slate-500">Activation Queue</span>
-        </div>
-      </div>
-
-      {/* Property Activation Backlog Queue */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-teal-600" />
-            <h3 className="text-base font-bold text-slate-900">
-              Demand-Backed Activation Pipeline ({activations.length})
-            </h3>
-          </div>
-          <Link href="/admin/activations" className="text-xs font-bold text-teal-700 hover:text-teal-800">
-            Manage Pipeline →
+          <Link
+            href="/admin/activations"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-hover"
+          >
+            View all
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
 
-        <div className="divide-y divide-slate-100">
-          {activations.slice(0, 3).map((act) => (
-            <div key={act.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-black text-slate-900">{act.id}</span>
-                  <ActivationStatusBadge status={act.status} />
-                  <span className="text-xs font-semibold text-slate-700">{act.owner_name}</span>
+        {activations.length === 0 ? (
+          <div className="p-5 sm:p-6">
+            <EmptyState
+              icon={<Sparkles />}
+              title="No activation requests yet"
+              description="When an owner submits a property for activation, it will appear here for review."
+            />
+          </div>
+        ) : (
+          <ul className="divide-y divide-line">
+            {activations.slice(0, 3).map((act) => (
+              <li
+                key={act.id}
+                className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+              >
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ActivationStatusBadge status={act.status} />
+                    <span className="font-mono text-xs text-ink-subtle">{act.id}</span>
+                  </div>
+                  <p className="truncate text-base font-medium text-ink">
+                    {act.property_address}, {act.city}
+                  </p>
+                  <p className="text-sm text-ink-muted">
+                    {act.owner_name} · {act.approx_square_feet.toLocaleString()} sq ft ·{" "}
+                    {act.current_condition.replace(/_/g, " ")}
+                  </p>
                 </div>
-                <h4 className="text-xs font-bold text-slate-900 mt-0.5">{act.property_address}, {act.city}</h4>
-                <p className="text-[11px] text-slate-500">
-                  {act.approx_square_feet.toLocaleString()} sq.ft. • Condition: {act.current_condition.replace("_", " ")}
-                </p>
-              </div>
 
-              <div className="flex items-center gap-3">
-                {act.activation_score && (
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-900 border border-teal-200">
-                    Score: {act.activation_score.total}/100
-                  </span>
-                )}
-                <Link href={`/admin/activations`}>
-                  <Button variant="outline" size="sm" className="text-xs font-semibold">
+                <div className="flex shrink-0 items-center gap-3">
+                  {act.activation_score && (
+                    <span className="text-sm text-ink-muted">
+                      Score <span className="font-semibold text-ink">{act.activation_score.total}</span>/100
+                    </span>
+                  )}
+                  <Link href="/admin/activations" className={buttonClasses({ variant: "outline", size: "sm" })}>
                     Review
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
-      {/* Recent Booking Ledger Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-base font-bold text-slate-900">Recent Global Bookings</h3>
-          <Link href="/admin/bookings" className="text-xs font-bold text-teal-700 hover:text-teal-800">
-            View All ({bookings.length})
+      <Card padding="none">
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">Recent bookings</h2>
+            <p className="text-sm text-ink-muted">Latest 5 of {bookings.length}</p>
+          </div>
+          <Link
+            href="/admin/bookings"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:text-accent-hover"
+          >
+            All bookings
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-100">
-              <tr>
-                <th className="p-3">Reference</th>
-                <th className="p-3">Workspace</th>
-                <th className="p-3">Customer</th>
-                <th className="p-3">Date</th>
-                <th className="p-3">Total Amount</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
+        {bookings.length === 0 ? (
+          <div className="p-5 sm:p-6">
+            <EmptyState
+              icon={<CalendarCheck />}
+              title="No bookings yet"
+              description="Bookings made by guests will show up here."
+            />
+          </div>
+        ) : (
+          <div role="table" aria-label="Recent bookings">
+            <div
+              role="row"
+              className="hidden border-b border-line bg-surface-muted px-6 py-2.5 text-sm font-medium text-ink-muted md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_9rem] md:gap-4"
+            >
+              <span role="columnheader">Space</span>
+              <span role="columnheader">Guest</span>
+              <span role="columnheader">Date</span>
+              <span role="columnheader" className="text-right">Total</span>
+              <span role="columnheader">Status</span>
+            </div>
+            <div role="rowgroup" className="divide-y divide-line">
               {bookings.slice(0, 5).map((b) => (
-                <tr key={b.id} className="hover:bg-slate-50/50">
-                  <td className="p-3 font-mono font-bold text-slate-900">{b.id}</td>
-                  <td className="p-3 font-bold text-slate-900 max-w-[180px] truncate">{b.space_title}</td>
-                  <td className="p-3 text-slate-700">{b.user_name}</td>
-                  <td className="p-3 text-slate-500">{formatDate(b.start_date)}</td>
-                  <td className="p-3 font-bold text-slate-900">{formatCurrency(b.total_price, b.currency)}</td>
-                  <td className="p-3">
+                <div
+                  key={b.id}
+                  role="row"
+                  className="flex flex-col gap-1.5 px-5 py-4 sm:px-6 md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_9rem] md:items-center md:gap-4 md:py-3"
+                >
+                  <div role="cell" className="min-w-0">
+                    <p className="truncate text-base font-medium text-ink">{b.space_title}</p>
+                    <p className="font-mono text-xs text-ink-subtle">{b.id}</p>
+                  </div>
+                  <div role="cell" className="min-w-0 truncate text-sm text-ink-muted">
+                    {b.user_name}
+                  </div>
+                  <div role="cell" className="text-sm text-ink-muted">
+                    {formatDate(b.start_date)}
+                  </div>
+                  <div role="cell" className="text-sm font-medium text-ink md:text-right">
+                    {formatCurrency(b.total_price, b.currency)}
+                  </div>
+                  <div role="cell">
                     <BookingStatusBadge status={b.status} />
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

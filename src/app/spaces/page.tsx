@@ -1,591 +1,606 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import React, { useMemo, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { LayoutGrid, List, MapPin, Search, SlidersHorizontal, X, Building2 } from "lucide-react";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
-import { SpaceCard } from "@/components/common/SpaceCard";
+import { SpaceCard, headlinePrice } from "@/components/common/SpaceCard";
 import { DemandRequestModal } from "@/components/common/DemandRequestModal";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import { SpaceCardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { fieldClasses } from "@/components/ui/Input";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
+import { CATEGORIES } from "@/lib/categories";
+import { cn } from "@/lib/utils";
 import { Space, WorkspaceCategory, VerificationLevel } from "@/types";
-import {
-  Search,
-  Filter,
-  SlidersHorizontal,
-  MapPin,
-  Building2,
-  Users,
-  DollarSign,
-  Sparkles,
-  ShieldCheck,
-  Grid,
-  List,
-  Map as MapIcon,
-  X,
-  RotateCcw,
-  ChevronDown,
-  Navigation,
-} from "lucide-react";
+
+type SortKey = "recommended" | "price_asc" | "price_desc" | "capacity";
+type Duration = "all" | "hourly" | "daily" | "monthly";
+
+interface Filters {
+  category: WorkspaceCategory | "all";
+  duration: Duration;
+  minPrice: string;
+  maxPrice: string;
+  minSeats: string;
+  verification: VerificationLevel | "all";
+  amenities: string[];
+  instantOnly: boolean;
+}
+
+const EMPTY_FILTERS: Filters = {
+  category: "all",
+  duration: "all",
+  minPrice: "",
+  maxPrice: "",
+  minSeats: "",
+  verification: "all",
+  amenities: [],
+  instantOnly: false,
+};
 
 export default function SpacesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-sm font-semibold text-slate-500">Loading workspaces...</div>}>
+    <Suspense fallback={<SpacesFallback />}>
       <SpacesContent />
     </Suspense>
   );
 }
 
-function SpacesContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Filter States
-  const [query, setQuery] = useState(searchParams.get("location") || "");
-  const [category, setCategory] = useState<WorkspaceCategory | "all">(
-    (searchParams.get("category") as WorkspaceCategory) || "all"
+function SpacesFallback() {
+  return (
+    <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-3 lg:px-8">
+      {[1, 2, 3].map((n) => (
+        <SpaceCardSkeleton key={n} />
+      ))}
+    </div>
   );
-  const [durationFilter, setDurationFilter] = useState<"all" | "hourly" | "daily" | "monthly">("all");
-  const [minPrice, setMinPrice] = useState<number | "">("");
-  const [maxPrice, setMaxPrice] = useState<number | "">("");
-  const [minSeats, setMinSeats] = useState<number | "">("");
-  const [selectedVerification, setSelectedVerification] = useState<VerificationLevel | "all">("all");
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  
-  // Sort State
-  const [sortBy, setSortBy] = useState<"recommended" | "price_asc" | "price_desc" | "rating" | "capacity">("recommended");
+}
 
-  // View mode
+function filtersFromParams(params: URLSearchParams): Filters {
+  const cat = params.get("category");
+  const seats = params.get("seats");
+  return {
+    ...EMPTY_FILTERS,
+    category: CATEGORIES.some((c) => c.id === cat) ? (cat as WorkspaceCategory) : "all",
+    minSeats: seats && Number(seats) > 0 ? seats : "",
+  };
+}
+
+function SpacesContent() {
+  const searchParams = useSearchParams();
+  const dataVersion = useSpaceGoVersion();
+
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getPublishedSpaces();
+  }, [dataVersion]);
+  const isLoading = useMemo(() => {
+    void dataVersion;
+    return SpaceGoStore.isLoading() && spaces.length === 0;
+  }, [dataVersion, spaces.length]);
+
+  const [query, setQuery] = useState(searchParams.get("location") || "");
+  const [filters, setFilters] = useState<Filters>(() => filtersFromParams(searchParams));
+  const [sortBy, setSortBy] = useState<SortKey>("recommended");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [showMap, setShowMap] = useState(false);
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-
-  // Demand Request Modal
+  const [showLocations, setShowLocations] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
 
-  // Load spaces from store
-  useEffect(() => {
-    setIsLoading(true);
-    const data = SpaceGoStore.getSpaces();
-    setSpaces(data);
-    setIsLoading(false);
-  }, []);
+  // Sync from the URL when it changes (adjusting state during render rather
+  // than in an effect avoids a cascading re-render).
+  const paramsKey = searchParams.toString();
+  const [syncedParamsKey, setSyncedParamsKey] = useState(paramsKey);
+  if (paramsKey !== syncedParamsKey) {
+    setSyncedParamsKey(paramsKey);
+    setQuery(searchParams.get("location") || "");
+    setFilters(filtersFromParams(searchParams));
+  }
 
-  // Update query when searchParams change
-  useEffect(() => {
-    const loc = searchParams.get("location");
-    if (loc) setQuery(loc);
-    const cat = searchParams.get("category") as WorkspaceCategory;
-    if (cat) setCategory(cat);
-  }, [searchParams]);
+  // Amenity filter options come from the real listings, most common first.
+  const amenityOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    spaces.forEach((s) => s.amenities.forEach((a) => counts.set(a, (counts.get(a) ?? 0) + 1)));
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 12)
+      .map(([name]) => name);
+  }, [spaces]);
 
-  const allAmenitiesList = [
-    "Ultra-Fast 500 Mbps Fiber",
-    "Herman Miller Aeron Chairs",
-    "Specialty Espresso Bar",
-    "Soundproof Phone Pods",
-    "Dual 4K Monitor Desks",
-    "24/7 Biometric Access",
-    "4K Dual Display Conference System",
-    "Private 4-Person Internal Meeting Room",
-    "Dual 4K Laser Projectors & Dropdown Screens",
-    "Line-Array Audio PA System",
-  ];
+  const results = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    const priceOf = (s: Space) => headlinePrice(s)?.amount ?? 0;
 
-  const handleAmenityToggle = (amenity: string) => {
-    if (selectedAmenities.includes(amenity)) {
-      setSelectedAmenities(selectedAmenities.filter((a) => a !== amenity));
-    } else {
-      setSelectedAmenities([...selectedAmenities, amenity]);
-    }
-  };
+    return spaces
+      .filter((space) => {
+        if (q) {
+          const haystack = [
+            space.location.city,
+            space.location.address,
+            space.location.country,
+            space.location.landmark ?? "",
+            space.title,
+            space.headline,
+          ].join(" ").toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        if (filters.category !== "all" && space.category !== filters.category) return false;
+        if (filters.verification !== "all" && space.verification_level !== filters.verification) return false;
+        if (filters.minSeats !== "" && space.capacity < Number(filters.minSeats)) return false;
+        if (filters.instantOnly && !space.instant_book) return false;
 
-  const handleResetFilters = () => {
+        const price = priceOf(space);
+        if (filters.minPrice !== "" && price < Number(filters.minPrice)) return false;
+        if (filters.maxPrice !== "" && price > Number(filters.maxPrice)) return false;
+
+        if (filters.duration === "hourly" && !space.pricing.hourly) return false;
+        if (filters.duration === "daily" && !space.pricing.daily) return false;
+        if (filters.duration === "monthly" && !space.pricing.monthly) return false;
+
+        if (filters.amenities.length > 0 && !filters.amenities.every((a) => space.amenities.includes(a))) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case "price_asc":
+            return priceOf(a) - priceOf(b);
+          case "price_desc":
+            return priceOf(b) - priceOf(a);
+          case "capacity":
+            return b.capacity - a.capacity;
+          default:
+            return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+        }
+      });
+  }, [spaces, query, filters, sortBy]);
+
+  const activeFilterCount =
+    (filters.category !== "all" ? 1 : 0) +
+    (filters.duration !== "all" ? 1 : 0) +
+    (filters.minPrice !== "" || filters.maxPrice !== "" ? 1 : 0) +
+    (filters.minSeats !== "" ? 1 : 0) +
+    (filters.verification !== "all" ? 1 : 0) +
+    (filters.instantOnly ? 1 : 0) +
+    filters.amenities.length;
+
+  const locations = useMemo(() => {
+    const byCity = new Map<string, number>();
+    results.forEach((s) => {
+      const key = [s.location.city, s.location.country].filter(Boolean).join(", ") || "Unknown location";
+      byCity.set(key, (byCity.get(key) ?? 0) + 1);
+    });
+    return Array.from(byCity.entries()).sort((a, b) => b[1] - a[1]);
+  }, [results]);
+
+  const resetAll = () => {
     setQuery("");
-    setCategory("all");
-    setDurationFilter("all");
-    setMinPrice("");
-    setMaxPrice("");
-    setMinSeats("");
-    setSelectedVerification("all");
-    setSelectedAmenities([]);
+    setFilters(EMPTY_FILTERS);
     setSortBy("recommended");
   };
 
-  // Filter & Sort Pipeline
-  const filteredSpaces = useMemo(() => {
-    return spaces.filter((space) => {
-      // 1. Location or Title query
-      if (query.trim()) {
-        const q = query.toLowerCase().trim();
-        const matchesLoc =
-          space.location.city.toLowerCase().includes(q) ||
-          space.location.address.toLowerCase().includes(q) ||
-          space.location.country.toLowerCase().includes(q) ||
-          (space.location.landmark && space.location.landmark.toLowerCase().includes(q));
-        const matchesTitle = space.title.toLowerCase().includes(q) || space.headline.toLowerCase().includes(q);
-        if (!matchesLoc && !matchesTitle) return false;
-      }
-
-      // 2. Category
-      if (category !== "all" && space.category !== category) return false;
-
-      // 3. Verification level
-      if (selectedVerification !== "all" && space.verification_level !== selectedVerification) {
-        return false;
-      }
-
-      // 4. Seats / Capacity
-      if (minSeats !== "" && space.capacity < Number(minSeats)) return false;
-
-      // 5. Pricing
-      const basePrice = space.pricing.daily || space.pricing.hourly || space.pricing.monthly || 0;
-      if (minPrice !== "" && basePrice < Number(minPrice)) return false;
-      if (maxPrice !== "" && basePrice > Number(maxPrice)) return false;
-
-      // 6. Duration
-      if (durationFilter === "hourly" && !space.pricing.hourly) return false;
-      if (durationFilter === "daily" && !space.pricing.daily) return false;
-      if (durationFilter === "monthly" && !space.pricing.monthly) return false;
-
-      // 7. Amenities
-      if (selectedAmenities.length > 0) {
-        const hasAll = selectedAmenities.every((amenity) =>
-          space.amenities.some((a) => a.toLowerCase().includes(amenity.toLowerCase()))
-        );
-        if (!hasAll) return false;
-      }
-
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === "price_asc") {
-        const priceA = a.pricing.daily || a.pricing.hourly || a.pricing.monthly || 0;
-        const priceB = b.pricing.daily || b.pricing.hourly || b.pricing.monthly || 0;
-        return priceA - priceB;
-      }
-      if (sortBy === "price_desc") {
-        const priceA = a.pricing.daily || a.pricing.hourly || a.pricing.monthly || 0;
-        const priceB = b.pricing.daily || b.pricing.hourly || b.pricing.monthly || 0;
-        return priceB - priceA;
-      }
-      if (sortBy === "rating") {
-        return b.rating - a.rating;
-      }
-      if (sortBy === "capacity") {
-        return b.capacity - a.capacity;
-      }
-      // Recommended default: pro level first, then rating
-      if (a.verification_level === "pro" && b.verification_level !== "pro") return -1;
-      if (b.verification_level === "pro" && a.verification_level !== "pro") return 1;
-      return b.rating - a.rating;
-    });
-  }, [
-    spaces,
-    query,
-    category,
-    durationFilter,
-    minPrice,
-    maxPrice,
-    minSeats,
-    selectedVerification,
-    selectedAmenities,
-    sortBy,
-  ]);
-
-  const activeFilterCount =
-    (category !== "all" ? 1 : 0) +
-    (durationFilter !== "all" ? 1 : 0) +
-    (minPrice !== "" || maxPrice !== "" ? 1 : 0) +
-    (minSeats !== "" ? 1 : 0) +
-    (selectedVerification !== "all" ? 1 : 0) +
-    selectedAmenities.length;
-
-  const quickCategories = [
-    { id: "all", label: "All Spaces" },
-    { id: "coworking", label: "Coworking" },
-    { id: "private_office", label: "Private Office" },
-    { id: "meeting_room", label: "Meeting Rooms" },
-    { id: "training_room", label: "Training" },
-    { id: "studio", label: "Studios" },
-    { id: "event_space", label: "Events" },
-  ];
+  const filterPanel = (
+    <FilterPanel filters={filters} onChange={setFilters} amenityOptions={amenityOptions} />
+  );
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <Navbar />
 
-      {/* Header Bar with Uber-inspired Location Bar & Category Pills */}
-      <div className="bg-white border-b border-slate-200/80 sticky top-16 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            
-            {/* Location & Keyword Search Input */}
-            <div className="w-full md:w-96 relative">
-              <Input
-                placeholder="Search city, neighborhood, or landmark..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                leftIcon={<Search className="w-4 h-4 text-slate-400" />}
-                rightIcon={
-                  query ? (
-                    <button onClick={() => setQuery("")} className="cursor-pointer">
-                      <X className="w-4 h-4 text-slate-400 hover:text-slate-600" />
-                    </button>
-                  ) : undefined
-                }
-                className="rounded-full text-xs py-2 bg-slate-50 border-slate-200"
-              />
-            </div>
-
-            {/* Category Quick Pills (Airbnb/Uber style horizontal scroller) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar">
-              {quickCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setCategory(cat.id as any)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    category === cat.id
-                      ? "bg-slate-950 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Map Toggle & Mobile Filter Button */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setShowMap(!showMap)}
-                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                  showMap
-                    ? "bg-teal-50 text-teal-800 border-teal-300 shadow-xs"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                }`}
+      <main id="main" className="flex-1">
+        {/* Search bar */}
+        <div className="border-b border-line bg-surface">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <h1 className="sr-only">Find a workspace</h1>
+            <div className="flex gap-2">
+              <form
+                role="search"
+                onSubmit={(e) => e.preventDefault()}
+                className="relative flex-1"
               >
-                <MapIcon className="w-3.5 h-3.5 text-teal-600" />
-                <span>{showMap ? "Hide Map" : "Show Map"}</span>
-              </button>
-
-              <button
-                onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-                className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer"
+                <label htmlFor="spaces-search" className="sr-only">Search by city, address or name</label>
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />
+                <input
+                  id="spaces-search"
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by city, address or name"
+                  className={cn(fieldClasses, "h-12 pl-10 pr-11")}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </form>
+              <Button
+                variant="outline"
+                size="lg"
+                className="lg:hidden"
+                onClick={() => setFiltersOpen(true)}
+                aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters"}
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-teal-600" />
-                <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
-              </button>
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="rounded-sm bg-accent px-1.5 text-xs font-semibold text-accent-ink">{activeFilterCount}</span>
+                )}
+              </Button>
             </div>
 
+            {/* Category chips */}
+            <div className="-mx-4 mt-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+              <ul className="flex gap-2 pb-1" aria-label="Type of space">
+                {[{ id: "all" as const, label: "All spaces" }, ...CATEGORIES].map((c) => {
+                  const active = filters.category === c.id;
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setFilters((f) => ({ ...f, category: c.id }))}
+                        className={cn(
+                          "flex h-10 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors pointer-coarse:h-11",
+                          active
+                            ? "border-ink bg-ink text-surface"
+                            : "border-line-strong bg-surface text-ink hover:bg-surface-muted"
+                        )}
+                      >
+                        {c.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content Layout */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          
-          {/* Desktop Filter Sidebar (Linear clean refinement) */}
-          <aside className="hidden lg:block lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-6 sticky top-36">
-              
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-teal-600" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-900">Filters</span>
-                  {activeFilterCount > 0 && (
-                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </div>
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[17rem_1fr] lg:px-8">
+          {/* Desktop filters */}
+          <aside aria-label="Filters" className="hidden lg:block">
+            <div className="sticky top-24 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-semibold text-ink">Filters</h2>
                 {activeFilterCount > 0 && (
                   <button
-                    onClick={handleResetFilters}
-                    className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium cursor-pointer"
+                    type="button"
+                    onClick={() => setFilters(EMPTY_FILTERS)}
+                    className="text-sm font-medium text-accent hover:underline"
                   >
-                    <RotateCcw className="w-3 h-3" /> Reset
+                    Clear all
                   </button>
                 )}
               </div>
-
-              {/* Workspace Category */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Workspace Type
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                >
-                  <option value="all">All Categories</option>
-                  <option value="coworking">Coworking Desks</option>
-                  <option value="private_office">Private Office</option>
-                  <option value="meeting_room">Meeting Room</option>
-                  <option value="training_room">Training Hall</option>
-                  <option value="studio">Production Studio</option>
-                  <option value="event_space">Event Space</option>
-                </select>
-              </div>
-
-              {/* Booking Duration Model */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Rate Duration
-                </label>
-                <div className="grid grid-cols-3 gap-1">
-                  {(["all", "hourly", "daily"] as const).map((dur) => (
-                    <button
-                      key={dur}
-                      onClick={() => setDurationFilter(dur)}
-                      className={`text-xs py-1.5 px-2 rounded-lg font-medium capitalize transition-colors cursor-pointer ${
-                        durationFilter === dur
-                          ? "bg-teal-50 text-teal-900 border border-teal-300 font-bold"
-                          : "bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {dur}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Capacity Filter */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Minimum Capacity
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 4 seats"
-                  value={minSeats}
-                  onChange={(e) => setMinSeats(e.target.value ? Number(e.target.value) : "")}
-                  leftIcon={<Users className="w-4 h-4 text-slate-400" />}
-                />
-              </div>
-
-              {/* Space Passport Tier */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Space Passport™ Standard
-                </label>
-                <select
-                  value={selectedVerification}
-                  onChange={(e) => setSelectedVerification(e.target.value as any)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                >
-                  <option value="all">Any Verification Tier</option>
-                  <option value="pro">SpaceGo Pro (Highest Tier)</option>
-                  <option value="ready">SpaceGo Ready (Audit Passed)</option>
-                  <option value="checked">Checked (Identity Verified)</option>
-                </select>
-              </div>
-
-              {/* Amenities Checklist */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Key Amenities
-                </label>
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                  {allAmenitiesList.map((amenity) => (
-                    <label
-                      key={amenity}
-                      className="flex items-center gap-2 text-xs text-slate-700 hover:text-slate-900 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedAmenities.includes(amenity)}
-                        onChange={() => handleAmenityToggle(amenity)}
-                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                      />
-                      <span className="truncate">{amenity}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Unlisted Demand Box (Uber/Airbnb demand engine) */}
-              <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-teal-900">
-                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                  <span>Looking for unlisted space?</span>
-                </div>
-                <p className="text-[11px] text-teal-800 leading-snug">
-                  Tell us where you need desks. We use qualified demand to activate dormant commercial buildings.
-                </p>
-                <button
-                  onClick={() => setIsDemandModalOpen(true)}
-                  className="w-full mt-2 py-1.5 px-3 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold shadow-xs cursor-pointer"
-                >
-                  Request Custom Space
-                </button>
-              </div>
-
+              {filterPanel}
             </div>
           </aside>
 
-          {/* Results Grid / List Area */}
-          <main className="lg:col-span-3 space-y-6">
-            
-            {/* Interactive Simulated Map Banner (Uber-inspired Location Pin Map) */}
-            {showMap && (
-              <div className="rounded-3xl border border-slate-200 bg-slate-900 text-white p-6 relative overflow-hidden shadow-lg animate-in fade-in duration-300">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Navigation className="w-4 h-4 text-teal-400" />
-                    <span className="text-xs font-bold tracking-wider uppercase text-teal-400">Interactive Location Map</span>
-                  </div>
-                  <span className="text-xs text-slate-400">{filteredSpaces.length} locations mapped</span>
-                </div>
+          <section aria-labelledby="results-heading" className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="results-heading" className="text-base text-ink-muted" aria-live="polite">
+                {isLoading ? "Loading spaces…" : (
+                  <>
+                    <span className="font-semibold text-ink">{results.length}</span>{" "}
+                    {results.length === 1 ? "space" : "spaces"}
+                    {query.trim() && <> matching &ldquo;{query.trim()}&rdquo;</>}
+                  </>
+                )}
+              </h2>
 
-                <div className="h-64 sm:h-72 rounded-2xl bg-slate-800/80 border border-slate-700 relative flex items-center justify-center overflow-hidden">
-                  {/* Stylized geometric grid map */}
-                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px]" />
-                  
-                  {/* Space pins */}
-                  <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 w-full">
-                    {filteredSpaces.slice(0, 6).map((space, idx) => (
-                      <div
-                        key={space.id}
-                        onClick={() => router.push(`/spaces/${space.id}`)}
-                        className="p-2.5 rounded-xl bg-slate-900/95 border border-teal-500/40 hover:border-teal-400 hover:scale-105 transition-all shadow-md cursor-pointer"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
-                          <span className="text-xs font-bold text-white truncate">{space.location.city}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{space.title}</p>
-                        <div className="mt-1 text-xs font-black text-teal-300">
-                          ${space.pricing.daily || space.pricing.hourly}/
-                          {space.pricing.daily ? "day" : "hr"}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+              <div className="flex items-center gap-2">
+                <label htmlFor="sort" className="sr-only">Sort by</label>
+                <select
+                  id="sort"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortKey)}
+                  className={cn(fieldClasses, "h-11 w-auto cursor-pointer text-sm")}
+                >
+                  <option value="recommended">Newest</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="capacity">Largest capacity</option>
+                </select>
 
-            {/* Controls Bar: Sort & View Toggle */}
-            <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-              
-              {/* Result Summary */}
-              <div className="text-xs text-slate-600 font-medium">
-                Showing <span className="font-bold text-slate-950">{filteredSpaces.length}</span> verified spaces
-              </div>
-
-              {/* Sort Dropdown & View Mode */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-slate-400 hidden sm:block">Sort:</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                  >
-                    <option value="recommended">Recommended & Verified</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                    <option value="rating">Highest Rating</option>
-                    <option value="capacity">Largest Capacity</option>
-                  </select>
-                </div>
-
-                {/* View Mode Switcher */}
-                <div className="flex items-center border border-slate-200 rounded-xl p-0.5 bg-slate-50">
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`p-1.5 rounded-lg text-slate-600 transition-colors cursor-pointer ${
-                      viewMode === "grid" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
-                    }`}
-                    aria-label="Grid View"
-                  >
-                    <Grid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`p-1.5 rounded-lg text-slate-600 transition-colors cursor-pointer ${
-                      viewMode === "list" ? "bg-white text-slate-900 shadow-xs" : "hover:text-slate-900"
-                    }`}
-                    aria-label="List View"
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
+                <div className="flex rounded-md border border-line-strong bg-surface p-0.5" role="group" aria-label="Layout">
+                  <ViewButton active={viewMode === "grid"} onClick={() => setViewMode("grid")} label="Grid view">
+                    <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                  </ViewButton>
+                  <ViewButton active={viewMode === "list"} onClick={() => setViewMode("list")} label="List view">
+                    <List className="h-4 w-4" aria-hidden="true" />
+                  </ViewButton>
+                  <ViewButton active={showLocations} onClick={() => setShowLocations((v) => !v)} label="Show locations">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                  </ViewButton>
                 </div>
               </div>
             </div>
 
-            {/* Results Display */}
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <SpaceCardSkeleton key={n} />
-                ))}
-              </div>
-            ) : filteredSpaces.length === 0 ? (
-              <div className="space-y-6">
-                <EmptyState
-                  icon={<Building2 className="w-8 h-8" />}
-                  title="No workspaces found"
-                  description="We couldn't find workspaces matching your specific filters. Try expanding your search terms or submit an unlisted workspace request."
-                  actionLabel="Reset All Filters"
-                  onAction={handleResetFilters}
-                />
-
-                {/* Demand capture banner */}
-                <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-sm font-bold text-teal-950">
-                      Need a workspace in this area?
-                    </h4>
-                    <p className="text-xs text-teal-800 mt-1 max-w-md">
-                      SpaceGo operates a Demand-Backed Activation engine. When you request a workspace, we identify dormant properties in that location and work with landlords to activate it.
-                    </p>
-                  </div>
-                  <Button
-                    variant="teal"
-                    size="sm"
-                    onClick={() => setIsDemandModalOpen(true)}
-                  >
-                    Submit Workspace Request
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "space-y-4"
-                }
-              >
-                {filteredSpaces.map((space) => (
-                  <SpaceCard key={space.id} space={space} />
-                ))}
+            {showLocations && !isLoading && (
+              <div className="mt-6 rounded-lg border border-line bg-surface p-5">
+                <h3 className="text-base font-semibold text-ink">Locations</h3>
+                {locations.length === 0 ? (
+                  <p className="mt-2 text-sm text-ink-muted">No locations match the current filters.</p>
+                ) : (
+                  <ul className="mt-3 flex flex-wrap gap-2">
+                    {locations.map(([place, count]) => (
+                      <li key={place}>
+                        <button
+                          type="button"
+                          onClick={() => setQuery(place.split(",")[0])}
+                          className="flex h-10 items-center gap-2 rounded-full border border-line-strong px-4 text-sm text-ink hover:bg-surface-muted pointer-coarse:h-11"
+                        >
+                          <MapPin className="h-4 w-4 text-accent" aria-hidden="true" />
+                          {place}
+                          <span className="text-ink-subtle">{count}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
-          </main>
-        </div>
-      </div>
+            <div className="mt-6">
+              {isLoading ? (
+                <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <SpaceCardSkeleton key={n} />
+                  ))}
+                </div>
+              ) : results.length === 0 ? (
+                <EmptyState
+                  icon={<Building2 />}
+                  title="No spaces match your search"
+                  description="Try a different location or remove some filters. If nothing nearby fits, tell us what you need and we'll look for it."
+                  action={
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button variant="outline" onClick={resetAll}>Clear search and filters</Button>
+                      <Button onClick={() => setIsDemandModalOpen(true)}>Request a space</Button>
+                    </div>
+                  }
+                />
+              ) : (
+                <ul
+                  className={cn(
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3"
+                      : "space-y-4"
+                  )}
+                >
+                  {results.map((space) => (
+                    <li key={space.id}>
+                      <SpaceCard space={space} layout={viewMode} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-      {/* Demand Request Modal */}
+            {!isLoading && results.length > 0 && (
+              <div className="mt-12 flex flex-col items-start justify-between gap-4 rounded-lg border border-line bg-surface p-6 sm:flex-row sm:items-center">
+                <div>
+                  <h3 className="text-base font-semibold text-ink">Can&apos;t find what you need?</h3>
+                  <p className="mt-1 text-sm text-ink-muted">Tell us the area and size and we&apos;ll look for a matching space.</p>
+                </div>
+                <Button variant="outline" onClick={() => setIsDemandModalOpen(true)}>Request a space</Button>
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+
+      {/* Mobile / tablet filter sheet */}
+      <Modal isOpen={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filters" maxWidth="md">
+        <div className="space-y-6">
+          {filterPanel}
+          <div className="sticky bottom-0 -mx-5 flex gap-2 border-t border-line bg-surface px-5 pt-4 sm:-mx-6 sm:px-6">
+            <Button variant="outline" className="flex-1" onClick={() => setFilters(EMPTY_FILTERS)}>
+              Clear all
+            </Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+              Show {results.length} {results.length === 1 ? "space" : "spaces"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <DemandRequestModal
         isOpen={isDemandModalOpen}
         onClose={() => setIsDemandModalOpen(false)}
         defaultLocation={query}
-        defaultCategory={category}
+        defaultCategory={filters.category}
       />
 
       <Footer />
+    </div>
+  );
+}
+
+function ViewButton({
+  active,
+  onClick,
+  label,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "flex h-10 w-10 items-center justify-center rounded-sm transition-colors",
+        active ? "bg-surface-muted text-ink" : "text-ink-subtle hover:text-ink"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FilterPanel({
+  filters,
+  onChange,
+  amenityOptions,
+}: {
+  filters: Filters;
+  onChange: React.Dispatch<React.SetStateAction<Filters>>;
+  amenityOptions: string[];
+}) {
+  const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
+    onChange((f) => ({ ...f, [key]: value }));
+
+  const legend = "mb-2 text-sm font-semibold text-ink";
+
+  return (
+    <div className="space-y-6">
+      <fieldset>
+        <legend className={legend}>Booking length</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {(["all", "hourly", "daily", "monthly"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={filters.duration === d}
+              onClick={() => set("duration", d)}
+              className={cn(
+                "h-11 rounded-md border text-sm font-medium capitalize transition-colors",
+                filters.duration === d
+                  ? "border-accent bg-accent-soft text-accent-soft-ink"
+                  : "border-line-strong bg-surface text-ink hover:bg-surface-muted"
+              )}
+            >
+              {d === "all" ? "Any" : d === "hourly" ? "By the hour" : d === "daily" ? "By the day" : "By the month"}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className={legend}>Price</legend>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="min-price" className="mb-1 block text-sm text-ink-muted">Min</label>
+            <input
+              id="min-price"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={filters.minPrice}
+              onChange={(e) => set("minPrice", e.target.value)}
+              placeholder="0"
+              className={cn(fieldClasses, "h-11")}
+            />
+          </div>
+          <div>
+            <label htmlFor="max-price" className="mb-1 block text-sm text-ink-muted">Max</label>
+            <input
+              id="max-price"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={filters.maxPrice}
+              onChange={(e) => set("maxPrice", e.target.value)}
+              placeholder="Any"
+              className={cn(fieldClasses, "h-11")}
+            />
+          </div>
+        </div>
+        <p className="mt-1.5 text-sm text-ink-subtle">Compared against the daily rate, or hourly/monthly if no daily rate.</p>
+      </fieldset>
+
+      <div>
+        <label htmlFor="min-seats" className={cn(legend, "block")}>People</label>
+        <input
+          id="min-seats"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          value={filters.minSeats}
+          onChange={(e) => set("minSeats", e.target.value)}
+          placeholder="Any number"
+          className={cn(fieldClasses, "h-11")}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="verification" className={cn(legend, "block")}>SpaceGo review</label>
+        <select
+          id="verification"
+          value={filters.verification}
+          onChange={(e) => set("verification", e.target.value as VerificationLevel | "all")}
+          className={cn(fieldClasses, "h-11 cursor-pointer")}
+        >
+          <option value="all">Any</option>
+          <option value="pro">SpaceGo Pro</option>
+          <option value="ready">SpaceGo Ready</option>
+          <option value="checked">Reviewed by SpaceGo</option>
+          <option value="listed">New listings</option>
+        </select>
+      </div>
+
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-base text-ink">
+        <input
+          type="checkbox"
+          checked={filters.instantOnly}
+          onChange={(e) => set("instantOnly", e.target.checked)}
+          className="h-5 w-5 rounded-sm border-line-strong accent-accent"
+        />
+        Instant Book only
+      </label>
+
+      {amenityOptions.length > 0 && (
+        <fieldset>
+          <legend className={legend}>Amenities</legend>
+          <div className="space-y-1">
+            {amenityOptions.map((amenity) => (
+              <label key={amenity} className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={filters.amenities.includes(amenity)}
+                  onChange={() =>
+                    onChange((f) => ({
+                      ...f,
+                      amenities: f.amenities.includes(amenity)
+                        ? f.amenities.filter((a) => a !== amenity)
+                        : [...f.amenities, amenity],
+                    }))
+                  }
+                  className="h-5 w-5 shrink-0 rounded-sm border-line-strong accent-accent"
+                />
+                <span>{amenity}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      <p className="text-sm text-ink-subtle">
+        Looking to list a space instead?{" "}
+        <Link href="/owner/spaces/new" className="font-medium text-accent hover:underline">
+          Become a host
+        </Link>
+      </p>
     </div>
   );
 }

@@ -1,18 +1,27 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
-import { UserRole } from "@/types";
-import { Building2, Mail, Lock, ArrowRight, ShieldCheck, Sparkles, User } from "lucide-react";
+import { Logo } from "@/components/navigation/Navbar";
+import { authErrorMessage } from "@/lib/auth/messages";
+import { homeForRole, safeNextPath } from "@/lib/auth/redirects";
+import { Mail, Lock, AlertTriangle, LogOut } from "lucide-react";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center">Loading login...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
+          Loading…
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );
@@ -21,178 +30,163 @@ export default function LoginPage() {
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
-  const { success, error } = useToast();
+  const { signIn, signOut, user, hasSession, isLoading: authLoading } =
+    useAuth();
+  const { success, error: toastError } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const redirectUrl = searchParams.get("redirect");
+  const queryError = searchParams.get("error");
+  const profileMissing =
+    searchParams.get("reason") === "profile_missing" ||
+    (hasSession && !user && !authLoading);
+  const requestedRedirect = safeNextPath(searchParams.get("redirect"));
+  const redirectTarget =
+    requestedRedirect && !requestedRedirect.startsWith("/auth/")
+      ? requestedRedirect
+      : null;
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    router.replace(redirectTarget ?? homeForRole(user.role));
+    router.refresh();
+  }, [authLoading, user, redirectTarget, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      error("Missing Email", "Please enter your email address.");
+    setFormError(null);
+
+    if (!email.trim() || !password) {
+      setFormError("Enter your email and password.");
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
-      const ok = await login(email);
-      if (ok) {
-        success("Signed in successfully", `Welcome back!`);
-        if (redirectUrl) {
-          router.push(redirectUrl);
-        } else if (email.includes("admin")) {
-          router.push("/admin");
-        } else if (email.includes("owner")) {
-          router.push("/owner");
-        } else {
-          router.push("/dashboard");
-        }
-      }
-    } catch (e: any) {
-      error("Sign In Failed", e?.message || "Please check credentials.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const result = await signIn(email, password);
 
-  const handleQuickDemoLogin = async (demoEmail: string, targetPath: string) => {
-    setIsLoading(true);
-    try {
-      await login(demoEmail);
-      success("Logged in as Demo Persona", demoEmail);
-      router.push(targetPath);
+      if (result.error || !result.profile) {
+        const message = result.error ?? "Unable to sign in.";
+        setFormError(message);
+        toastError("Sign In Failed", message);
+        return;
+      }
+
+      success("Signed in successfully", "Welcome back to SpaceGo.");
+      router.replace(redirectTarget ?? homeForRole(result.profile.role));
+      router.refresh();
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-      
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-[#0B132B] flex items-center justify-center text-teal-400 shadow-md">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-black text-slate-900 tracking-tight">
-            Space<span className="text-teal-600">Go</span>
-          </span>
-        </Link>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-          Sign In to Your Account
-        </h2>
-        <p className="text-xs text-slate-500">
-          Enter your email to access your bookings, listings, or management console.
+    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center">
+          <Logo />
+        </div>
+        <h1 className="mt-8 text-center text-2xl font-semibold tracking-tight text-ink">
+          Sign in to SpaceGo
+        </h1>
+        <p className="mt-2 text-center text-base text-ink-muted">
+          Manage your bookings, listings and requests.
         </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-          
-          <form onSubmit={handleLogin} className="space-y-4">
+        <Card elevation="raised" padding="lg" className="mt-8 space-y-6">
+          {profileMissing && (
+            <div className="flex items-start gap-3 rounded-md bg-warning-soft p-4">
+              <AlertTriangle
+                className="mt-0.5 h-5 w-5 shrink-0 text-warning"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 space-y-2">
+                <p className="text-sm font-semibold text-ink">
+                  Your SpaceGo profile is missing
+                </p>
+                <p className="text-sm text-ink-muted">
+                  You are signed in, but this account has no profile record.
+                  Apply the profiles migration or contact support, or sign out
+                  and try another account.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void signOut()}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Sign out
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {(formError || queryError) && (
+            <div
+              role="alert"
+              className="rounded-md bg-danger-soft p-3 text-sm font-medium text-danger"
+            >
+              {formError ?? authErrorMessage(queryError)}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-5" noValidate>
             <Input
-              label="Email Address"
+              label="Email"
               type="email"
               required
-              placeholder="you@domain.com"
+              autoComplete="email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              leftIcon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail aria-hidden="true" />}
             />
 
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              leftIcon={<Lock className="w-4 h-4" />}
-            />
-
-            <div className="flex items-center justify-between text-xs">
-              <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
-                <span>Remember me</span>
-              </label>
-              <Link href="#" className="font-semibold text-teal-700 hover:text-teal-800">
-                Forgot password?
-              </Link>
+            <div className="space-y-2">
+              <Input
+                label="Password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                leftIcon={<Lock aria-hidden="true" />}
+              />
+              <div className="flex justify-end">
+                <Link
+                  href="/auth/forgot-password"
+                  className="rounded-sm text-sm font-medium text-accent hover:text-accent-hover"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <Button
               type="submit"
-              variant="teal"
               size="lg"
-              className="w-full font-bold shadow-md shadow-teal-700/20"
-              isLoading={isLoading}
+              className="w-full"
+              isLoading={isSubmitting}
             >
-              <span>Sign In</span>
-              <ArrowRight className="w-4 h-4" />
+              Sign in
             </Button>
           </form>
+        </Card>
 
-          {/* Quick Demo Logins Section */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                1-Click Demo Evaluation Accounts
-              </span>
-              <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin("alex.seeker@spacego.io", "/dashboard")}
-                className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 text-left transition-all text-xs"
-              >
-                <div>
-                  <span className="font-bold text-slate-900 block">Space Seeker (Customer)</span>
-                  <span className="text-[10px] text-slate-500">alex.seeker@spacego.io</span>
-                </div>
-                <span className="text-teal-700 font-semibold text-xs">Login →</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin("elena.owner@spacego.io", "/owner")}
-                className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 text-left transition-all text-xs"
-              >
-                <div>
-                  <span className="font-bold text-slate-900 block">Property Owner (Host)</span>
-                  <span className="text-[10px] text-slate-500">elena.owner@spacego.io</span>
-                </div>
-                <span className="text-teal-700 font-semibold text-xs">Login →</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin("admin@spacego.io", "/admin")}
-                className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:border-teal-400 hover:bg-teal-50/40 text-left transition-all text-xs"
-              >
-                <div>
-                  <span className="font-bold text-slate-900 block">Administrator (Ops & Demand)</span>
-                  <span className="text-[10px] text-slate-500">admin@spacego.io</span>
-                </div>
-                <span className="text-teal-700 font-semibold text-xs">Login →</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-2 text-center text-xs text-slate-500">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/register" className="font-bold text-teal-700 hover:text-teal-800">
-              Create an account
-            </Link>
-          </div>
-
-        </div>
+        <p className="mt-6 text-center text-sm text-ink-muted">
+          New to SpaceGo?{" "}
+          <Link
+            href="/auth/register"
+            className="rounded-sm font-medium text-accent hover:text-accent-hover"
+          >
+            Create an account
+          </Link>
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

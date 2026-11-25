@@ -4,184 +4,279 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
-import { UserRole } from "@/types";
-import { Building2, Mail, Lock, ArrowRight, User, Phone, CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/navigation/Navbar";
+import { homeForRole } from "@/lib/auth/redirects";
+import { cn } from "@/lib/utils";
+import { Mail, Lock, User, Phone, Building2 } from "lucide-react";
+
+type PublicRole = "seeker" | "owner";
+
+const ROLE_OPTIONS: { value: PublicRole; title: string; description: string }[] = [
+  {
+    value: "seeker",
+    title: "Book workspace",
+    description: "Find and book desks, offices and rooms.",
+  },
+  {
+    value: "owner",
+    title: "Host a space",
+    description: "List a space or submit one for review.",
+  },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
-  const { success, error } = useToast();
+  const { signUp } = useAuth();
+  const { success, error: toastError } = useToast();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [role, setRole] = useState<UserRole>("seeker");
-  const [isLoading, setIsLoading] = useState(false);
+  const [role, setRole] = useState<PublicRole>("seeker");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(
+    null
+  );
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email) {
-      error("Missing Fields", "Please complete all required fields.");
+    setFormError(null);
+
+    if (!fullName.trim() || !email.trim() || !password) {
+      setFormError("Please complete your name, email, and password.");
       return;
     }
 
-    setIsLoading(true);
+    if (password.length < 8) {
+      setFormError("Choose a password with at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFormError("The passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      const ok = await register({
+      const result = await signUp({
         full_name: fullName,
         email,
+        password,
         role,
         phone,
         company_name: companyName,
       });
 
-      if (ok) {
-        success("Account Created!", "Welcome to the SpaceGo platform.");
-        if (role === "owner") {
-          router.push("/owner");
-        } else {
-          router.push("/dashboard");
-        }
+      if (result.error) {
+        setFormError(result.error);
+        toastError("Registration Error", result.error);
+        return;
       }
-    } catch (e: any) {
-      error("Registration Error", e?.message || "Failed to create account.");
+
+      if (result.requiresEmailConfirmation) {
+        setConfirmationEmail(email.trim());
+        return;
+      }
+
+      success("Account Created!", "Welcome to the SpaceGo platform.");
+      router.replace(homeForRole(role));
+      router.refresh();
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-      
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-[#0B132B] flex items-center justify-center text-teal-400 shadow-md">
-            <Building2 className="w-5 h-5" />
+  if (confirmationEmail) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center">
+            <Logo />
           </div>
-          <span className="text-2xl font-black text-slate-900 tracking-tight">
-            Space<span className="text-teal-600">Go</span>
-          </span>
-        </Link>
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-          Create Your SpaceGo Account
-        </h2>
-        <p className="text-xs text-slate-500">
-          Book flexible workspaces or list and activate your properties.
+
+          <Card elevation="raised" padding="lg" className="mt-8 text-center">
+            <span
+              aria-hidden="true"
+              className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-accent-soft text-accent-soft-ink"
+            >
+              <Mail className="h-6 w-6" />
+            </span>
+            <h1 className="mt-4 text-xl font-semibold tracking-tight text-ink">
+              Check your email
+            </h1>
+            <p className="mt-2 text-base text-ink-muted">
+              We sent a confirmation link to{" "}
+              <strong className="font-semibold text-ink">{confirmationEmail}</strong>.
+              Open it to activate your account, then sign in.
+            </p>
+            <p className="mt-3 text-sm text-ink-subtle">
+              You are not signed in yet. If the message does not arrive, check
+              your spam folder or try registering again.
+            </p>
+            <Link
+              href="/auth/login"
+              className={buttonClasses({ size: "lg", className: "mt-6 w-full" })}
+            >
+              Back to sign in
+            </Link>
+          </Card>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center">
+          <Logo />
+        </div>
+        <h1 className="mt-8 text-center text-2xl font-semibold tracking-tight text-ink">
+          Create your account
+        </h1>
+        <p className="mt-2 text-center text-base text-ink-muted">
+          Book flexible workspace, or host your own space.
         </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-          
-          <form onSubmit={handleRegister} className="space-y-4">
-            
-            {/* Account Role Selector */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                I want to:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole("seeker")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    role === "seeker"
-                      ? "border-teal-500 bg-teal-50/70 shadow-xs"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-slate-900">Find Workspaces</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Freelancer / Team Seeker</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRole("owner")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    role === "owner"
-                      ? "border-teal-500 bg-teal-50/70 shadow-xs"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-slate-900">List or Activate Space</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Property Owner / Host</span>
-                </button>
+        <Card elevation="raised" padding="lg" className="mt-8">
+          <form onSubmit={handleRegister} className="space-y-5" noValidate>
+            <fieldset>
+              <legend className="text-sm font-medium text-ink">
+                How will you use SpaceGo?
+              </legend>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const selected = role === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        "flex min-h-11 cursor-pointer flex-col rounded-md border p-3 transition-colors",
+                        "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
+                        selected
+                          ? "border-accent bg-accent-soft"
+                          : "border-line-strong bg-surface hover:bg-surface-muted"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={option.value}
+                        checked={selected}
+                        onChange={() => setRole(option.value)}
+                        className="sr-only"
+                      />
+                      <span className="text-sm font-semibold text-ink">
+                        {option.title}
+                      </span>
+                      <span className="mt-0.5 text-sm text-ink-muted">
+                        {option.description}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            </div>
+            </fieldset>
+
+            {formError && (
+              <div
+                role="alert"
+                className="rounded-md bg-danger-soft p-3 text-sm font-medium text-danger"
+              >
+                {formError}
+              </div>
+            )}
 
             <Input
-              label="Full Name *"
+              label="Full name"
               required
-              placeholder="e.g. Alex Vance"
+              autoComplete="name"
+              placeholder="Your full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              leftIcon={<User className="w-4 h-4" />}
+              leftIcon={<User aria-hidden="true" />}
             />
 
             <Input
-              label="Work Email *"
+              label="Email"
               type="email"
               required
-              placeholder="you@company.com"
+              autoComplete="email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              leftIcon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail aria-hidden="true" />}
             />
 
             <Input
-              label="Password *"
+              label="Password"
               type="password"
               required
-              placeholder="••••••••"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              leftIcon={<Lock className="w-4 h-4" />}
+              helperText="At least 8 characters."
+              leftIcon={<Lock aria-hidden="true" />}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Confirm password"
+              type="password"
+              required
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              leftIcon={<Lock aria-hidden="true" />}
+            />
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-3">
               <Input
-                label="Phone Number"
-                placeholder="+1 (555) 000-0000"
+                label="Phone (optional)"
+                type="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                leftIcon={<Phone className="w-4 h-4" />}
+                leftIcon={<Phone aria-hidden="true" />}
               />
               <Input
-                label="Company / Studio"
-                placeholder="Acme Inc."
+                label="Company (optional)"
+                autoComplete="organization"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                leftIcon={<Building2 className="w-4 h-4" />}
+                leftIcon={<Building2 aria-hidden="true" />}
               />
             </div>
 
             <Button
               type="submit"
-              variant="teal"
               size="lg"
-              className="w-full font-bold shadow-md shadow-teal-700/20"
-              isLoading={isLoading}
+              className="w-full"
+              isLoading={isSubmitting}
             >
-              <span>Get Started</span>
-              <ArrowRight className="w-4 h-4" />
+              Create account
             </Button>
           </form>
+        </Card>
 
-          <div className="pt-2 text-center text-xs text-slate-500">
-            Already have an account?{" "}
-            <Link href="/auth/login" className="font-bold text-teal-700 hover:text-teal-800">
-              Sign In
-            </Link>
-          </div>
-
-        </div>
+        <p className="mt-6 text-center text-sm text-ink-muted">
+          Already have an account?{" "}
+          <Link
+            href="/auth/login"
+            className="rounded-sm font-medium text-accent hover:text-accent-hover"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

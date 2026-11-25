@@ -1,31 +1,88 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest, ActivationStatus } from "@/types";
 import { ActivationStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Modal } from "@/components/ui/Modal";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Select, Textarea } from "@/components/ui/Input";
+import { FilterTabs, PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { formatDate } from "@/lib/utils";
-import {
-  Sparkles,
-  ShieldCheck,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  MapPin,
-  Layers,
-  DollarSign,
-  FileText,
-  Sliders,
-  Check,
-} from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { Sparkles } from "lucide-react";
+
+const STAGE_LABELS: Record<ActivationStatus, string> = {
+  submitted: "Submitted",
+  under_review: "Under review",
+  assessment_required: "Assessment required",
+  approved_for_assessment: "Approved for assessment",
+  ready_for_launch: "Ready for launch",
+  rejected: "Declined",
+};
+
+const FILTERS = [
+  "all",
+  "submitted",
+  "under_review",
+  "assessment_required",
+  "approved_for_assessment",
+  "ready_for_launch",
+  "rejected",
+] as const;
+
+function humanize(value: string): string {
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function ScoreSlider({
+  id,
+  label,
+  max,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  max: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={id} className="text-sm font-medium text-ink">
+          {label}
+        </label>
+        <span className="shrink-0 text-sm tabular-nums text-ink-muted">
+          <span className="font-semibold text-ink">{value}</span> / {max}
+        </span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-6 w-full cursor-pointer accent-accent"
+      />
+    </div>
+  );
+}
 
 export default function AdminActivationsPage() {
-  const { success } = useToast();
-  const [requests, setRequests] = useState<PropertyActivationRequest[]>([]);
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const requests = useMemo<PropertyActivationRequest[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getActivationRequests();
+  }, [dataVersion]);
+  const [isSaving, setIsSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | ActivationStatus>("all");
   const [selectedRequest, setSelectedRequest] = useState<PropertyActivationRequest | null>(null);
 
@@ -37,14 +94,6 @@ export default function AdminActivationsPage() {
   const [readinessScore, setReadinessScore] = useState(15);
   const [locationScore, setLocationScore] = useState(12);
   const [opScore, setOpScore] = useState(8);
-
-  const loadRequests = () => {
-    setRequests(SpaceGoStore.getActivationRequests());
-  };
-
-  useEffect(() => {
-    loadRequests();
-  }, []);
 
   const openReviewModal = (req: PropertyActivationRequest) => {
     setSelectedRequest(req);
@@ -59,13 +108,14 @@ export default function AdminActivationsPage() {
     }
   };
 
-  const handleSaveReview = (e: React.FormEvent) => {
+  const handleSaveReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRequest) return;
+    if (!selectedRequest || isSaving) return;
 
     const total = demandScore + econScore + readinessScore + locationScore + opScore;
 
-    const updated = SpaceGoStore.updateActivationStatus(
+    setIsSaving(true);
+    const result = await SpaceGoStore.updateActivationStatus(
       selectedRequest.id,
       newStatus,
       adminNotes,
@@ -80,11 +130,14 @@ export default function AdminActivationsPage() {
       }
     );
 
-    if (updated) {
-      loadRequests();
-      setSelectedRequest(null);
-      success("Activation Request Updated", `Updated ${updated.id} to ${newStatus.toUpperCase()}`);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      error("Could not update activation request", result.error);
+      return;
     }
+    setSelectedRequest(null);
+    success("Activation request updated", `${result.data.id} is now ${STAGE_LABELS[newStatus].toLowerCase()}.`);
   };
 
   const filtered = requests.filter((r) => {
@@ -92,241 +145,149 @@ export default function AdminActivationsPage() {
     return r.status === filterStatus;
   });
 
+  const filterOptions = FILTERS.map((value) => ({
+    value,
+    label: value === "all" ? "All" : STAGE_LABELS[value],
+    count: value === "all" ? requests.length : requests.filter((r) => r.status === value).length,
+  }));
+
+  const runningTotal = demandScore + econScore + readinessScore + locationScore + opScore;
+
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-teal-700">
-            Demand-Backed Workspace Pipeline
-          </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Property Activation Assessments
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Evaluate owner submissions against local demand signals, apply 100-point scoring, and manage stage gates.
-          </p>
-        </div>
+      <PageHeader
+        title="Activations"
+        description="Property owners asking SpaceGo to help turn unused space into bookable workspace. Score each request out of 100 and move it through the review stages."
+      />
 
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-2xl">
-          {(["all", "submitted", "under_review", "approved_for_assessment", "ready_for_launch", "rejected"] as const).map(
-            (tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilterStatus(tab)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
-                  filterStatus === tab
-                    ? "bg-white text-slate-950 shadow-xs font-bold"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+      <FilterTabs label="Filter activation requests by stage" value={filterStatus} options={filterOptions} onChange={setFilterStatus} />
+
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Sparkles />}
+          title={filterStatus === "all" ? "No activation requests yet" : `Nothing in "${STAGE_LABELS[filterStatus]}"`}
+          description={
+            filterStatus === "all"
+              ? "When an owner submits a property for activation, it will appear here for review."
+              : "No requests are at this stage right now."
+          }
+          actionLabel={filterStatus === "all" ? undefined : "Show all requests"}
+          onAction={filterStatus === "all" ? undefined : () => setFilterStatus("all")}
+        />
+      ) : (
+        <Card padding="none">
+          <ul className="divide-y divide-line">
+            {filtered.map((req) => (
+              <li
+                key={req.id}
+                className="flex flex-col gap-4 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-8"
               >
-                {tab.replace("_", " ")}
-              </button>
-            )
-          )}
-        </div>
-      </div>
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ActivationStatusBadge status={req.status} />
+                    <span className="font-mono text-xs text-ink-subtle">{req.id}</span>
+                    <span className="text-sm text-ink-subtle">· {formatDate(req.created_at)}</span>
+                  </div>
 
-      {/* Requests List */}
-      <div className="space-y-4">
-        {filtered.map((req) => (
-          <div
-            key={req.id}
-            className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                  {req.id}
-                </span>
-                <ActivationStatusBadge status={req.status} />
-                <span className="text-xs font-bold text-slate-800">• Owner: {req.owner_name} ({req.email})</span>
-              </div>
+                  <h2 className="text-base font-semibold text-ink">
+                    {req.property_address}, {req.city}
+                  </h2>
 
-              <h3 className="text-base font-bold text-slate-900">{req.property_address}, {req.city}</h3>
-              
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span className="capitalize">{req.property_type.replace("_", " ")}</span>
-                <span>•</span>
-                <span>{req.approx_square_feet.toLocaleString()} sq.ft.</span>
-                <span>•</span>
-                <span className="capitalize">Condition: {req.current_condition.replace("_", " ")}</span>
-                <span>•</span>
-                <span>Budget: ${req.expected_budget_usd.toLocaleString()}</span>
-              </div>
+                  <p className="text-sm text-ink-muted">
+                    {req.owner_name} · {req.email}
+                  </p>
 
-              {req.admin_notes && (
-                <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 max-w-xl">
-                  <span className="font-semibold text-slate-900">Notes: </span>
-                  {req.admin_notes}
-                </p>
-              )}
-            </div>
+                  <p className="text-sm text-ink-muted">
+                    {humanize(req.property_type)} · {req.approx_square_feet.toLocaleString()} sq ft ·{" "}
+                    {humanize(req.current_condition)} · Budget {formatCurrency(req.expected_budget_usd)}
+                  </p>
 
-            <div className="flex items-center gap-4 self-end lg:self-center">
-              {req.activation_score && (
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Score</span>
-                  <span className="text-xl font-black text-teal-600">
-                    {req.activation_score.total}/100
-                  </span>
+                  {req.admin_notes && (
+                    <p className="mt-2 max-w-2xl rounded-md bg-surface-muted px-3.5 py-2.5 text-sm text-ink-muted">
+                      <span className="font-medium text-ink">Notes: </span>
+                      {req.admin_notes}
+                    </p>
+                  )}
                 </div>
-              )}
 
-              <Button
-                variant="teal"
-                size="sm"
-                onClick={() => openReviewModal(req)}
-                className="gap-1 font-semibold"
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                <span>Score & Update</span>
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
+                <div className="flex shrink-0 items-center justify-between gap-4 lg:justify-end">
+                  {req.activation_score ? (
+                    <p className="text-sm text-ink-muted">
+                      Score{" "}
+                      <span className="text-lg font-semibold tabular-nums text-ink">{req.activation_score.total}</span>
+                      /100
+                    </p>
+                  ) : (
+                    <p className="text-sm text-ink-subtle">Not scored yet</p>
+                  )}
+
+                  <Button variant="outline" size="sm" onClick={() => openReviewModal(req)}>
+                    Review
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       {/* Scoring & Review Modal */}
       {selectedRequest && (
         <Modal
           isOpen={Boolean(selectedRequest)}
           onClose={() => setSelectedRequest(null)}
-          title={`Review & Score: ${selectedRequest.property_address}`}
-          description={`Reference: ${selectedRequest.id} • ${selectedRequest.city}`}
+          title={`Review ${selectedRequest.property_address}`}
+          description={`${selectedRequest.id} · ${selectedRequest.city} · ${selectedRequest.owner_name}`}
           maxWidth="2xl"
         >
-          <form onSubmit={handleSaveReview} className="space-y-5">
-            
-            {/* Status Selector */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Pipeline Stage Gate Status
-              </label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as any)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-              >
-                <option value="submitted">Submitted (In Queue)</option>
-                <option value="under_review">Under Review</option>
-                <option value="assessment_required">Assessment Required</option>
-                <option value="approved_for_assessment">Approved for Assessment (Passed Initial Gate)</option>
-                <option value="ready_for_launch">Ready for Launch (Passport Certified)</option>
-                <option value="rejected">Rejected (Does Not Meet Criteria)</option>
-              </select>
-            </div>
+          <form onSubmit={handleSaveReview} className="space-y-6">
+            <Select
+              label="Stage"
+              value={newStatus}
+              onChange={(e) => setNewStatus(e.target.value as ActivationStatus)}
+            >
+              <option value="submitted">{STAGE_LABELS.submitted}</option>
+              <option value="under_review">{STAGE_LABELS.under_review}</option>
+              <option value="assessment_required">{STAGE_LABELS.assessment_required}</option>
+              <option value="approved_for_assessment">{STAGE_LABELS.approved_for_assessment}</option>
+              <option value="ready_for_launch">{STAGE_LABELS.ready_for_launch}</option>
+              <option value="rejected">{STAGE_LABELS.rejected}</option>
+            </Select>
 
-            {/* 100-Point Matrix Sliders */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  100-Point Activation Scoring Matrix
-                </span>
-                <span className="text-sm font-black text-teal-700">
-                  Total: {demandScore + econScore + readinessScore + locationScore + opScore} / 100
-                </span>
+            <fieldset className="space-y-4 rounded-md border border-line p-4">
+              <legend className="px-1 text-sm font-medium text-ink">Activation score</legend>
+              <div className="flex items-baseline justify-between border-b border-line pb-3">
+                <span className="text-sm text-ink-muted">Total</span>
+                <span className="text-lg font-semibold tabular-nums text-ink">{runningTotal} / 100</span>
               </div>
 
-              <div>
-                <div className="flex justify-between text-xs text-slate-700 mb-1">
-                  <span>Qualified Local Demand (Max 30):</span>
-                  <span className="font-bold text-teal-700">{demandScore} / 30</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={30}
-                  value={demandScore}
-                  onChange={(e) => setDemandScore(Number(e.target.value))}
-                  className="w-full accent-teal-600"
-                />
-              </div>
+              <ScoreSlider id="score-demand" label="Local demand" max={30} value={demandScore} onChange={setDemandScore} />
+              <ScoreSlider id="score-economics" label="Conversion cost and payback" max={25} value={econScore} onChange={setEconScore} />
+              <ScoreSlider id="score-readiness" label="Physical readiness" max={20} value={readinessScore} onChange={setReadinessScore} />
+              <ScoreSlider id="score-location" label="Location and access" max={15} value={locationScore} onChange={setLocationScore} />
+              <ScoreSlider id="score-operations" label="Day-to-day operations" max={10} value={opScore} onChange={setOpScore} />
+            </fieldset>
 
-              <div>
-                <div className="flex justify-between text-xs text-slate-700 mb-1">
-                  <span>Conversion Economics & Payback (Max 25):</span>
-                  <span className="font-bold text-teal-700">{econScore} / 25</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={25}
-                  value={econScore}
-                  onChange={(e) => setEconScore(Number(e.target.value))}
-                  className="w-full accent-teal-600"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-slate-700 mb-1">
-                  <span>Workspace Physical Readiness (Max 20):</span>
-                  <span className="font-bold text-teal-700">{readinessScore} / 20</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={20}
-                  value={readinessScore}
-                  onChange={(e) => setReadinessScore(Number(e.target.value))}
-                  className="w-full accent-teal-600"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-slate-700 mb-1">
-                  <span>Location, Transit & Access (Max 15):</span>
-                  <span className="font-bold text-teal-700">{locationScore} / 15</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={15}
-                  value={locationScore}
-                  onChange={(e) => setLocationScore(Number(e.target.value))}
-                  className="w-full accent-teal-600"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-slate-700 mb-1">
-                  <span>Operational Feasibility & Care (Max 10):</span>
-                  <span className="font-bold text-teal-700">{opScore} / 10</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={10}
-                  value={opScore}
-                  onChange={(e) => setOpScore(Number(e.target.value))}
-                  className="w-full accent-teal-600"
-                />
-              </div>
-            </div>
-
-            {/* Assessment Notes */}
             <Textarea
-              label="Auditor Assessment Notes (Visible to Owner)"
+              label="Notes for the owner"
+              helperText="The owner can see these notes."
               rows={3}
               value={adminNotes}
               onChange={(e) => setAdminNotes(e.target.value)}
-              placeholder="Detail on-site survey findings, contractor quotation progress, power tests..."
+              placeholder="Site visit findings, quotes received, what's needed next..."
             />
 
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setSelectedRequest(null)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="teal" className="font-bold">
-                Save Assessment & Notify Owner
+              <Button type="submit" variant="primary" isLoading={isSaving}>
+                Save review
               </Button>
             </div>
           </form>
         </Modal>
       )}
-
     </div>
   );
 }

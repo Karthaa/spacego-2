@@ -2,12 +2,13 @@
 
 import React, { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Input, Textarea, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { WorkspaceCategory } from "@/types";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useToast } from "@/components/ui/Toast";
-import { Sparkles, MapPin, Users, Calendar, DollarSign } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { MapPin, Users, Calendar, DollarSign } from "lucide-react";
 
 interface DemandRequestModalProps {
   isOpen: boolean;
@@ -22,9 +23,10 @@ export function DemandRequestModal({
   defaultLocation = "",
   defaultCategory = "all",
 }: DemandRequestModalProps) {
-  const { success } = useToast();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { success, error } = useToast();
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.full_name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [company, setCompany] = useState("");
   const [location, setLocation] = useState(defaultLocation);
   const [category, setCategory] = useState<WorkspaceCategory | "all">(defaultCategory);
@@ -34,16 +36,21 @@ export function DemandRequestModal({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim() || !email.trim() || !location.trim()) {
+      error("Missing information", "Please enter your name, email and target location.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      SpaceGoStore.createEnquiry({
-        user_name: name || "Anonymous Seeker",
-        email: email || "seeker@example.com",
+      const result = await SpaceGoStore.createEnquiry({
+        user_name: name.trim(),
+        email: email.trim(),
         company,
-        location_requested: location || "Downtown",
+        location_requested: location.trim(),
         category_requested: category,
         seats_needed: Number(seats) || 1,
         preferred_start: startDate || new Date().toISOString().split("T")[0],
@@ -51,17 +58,22 @@ export function DemandRequestModal({
         notes,
       });
 
-      // Also record into demand search signals
-      SpaceGoStore.logSearchQuery({
-        location: location || "Downtown",
+      if (!result.ok) {
+        error("Request not submitted", result.error);
+        return;
+      }
+
+      // Also record into demand search signals (best effort).
+      void SpaceGoStore.logSearchQuery({
+        location: location.trim(),
         category: category !== "all" ? category : undefined,
         seats: Number(seats),
         resultCount: 0,
       });
 
       success(
-        "Workspace Request Submitted!",
-        "Our property activation team evaluates active local demand to onboard matching spaces in this zone."
+        "Request sent",
+        "The SpaceGo team will see your request when looking for new spaces in this area."
       );
 
       onClose();
@@ -74,107 +86,103 @@ export function DemandRequestModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Request an Unlisted Workspace"
-      description="Can't find what you need? We use qualified demand signals to activate underutilized spaces directly in your preferred location."
+      title="Request a workspace"
+      description="Can't find a suitable space? Tell us what you need and where. The SpaceGo team uses these requests when deciding which spaces to bring onto SpaceGo."
       maxWidth="lg"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4">
           <Input
-            label="Your Name *"
+            label="Your name"
             required
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Jane Doe"
           />
           <Input
-            label="Work Email *"
+            label="Email"
             type="email"
             required
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@company.com"
+            placeholder="you@example.com"
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4">
           <Input
-            label="Company / Team"
+            label="Company or team (optional)"
+            autoComplete="organization"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
-            placeholder="e.g. Acme Studio"
           />
           <Input
-            label="Target City or Area *"
+            label="City or area"
             required
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Austin Downtown, or Kochi"
-            leftIcon={<MapPin className="w-4 h-4" />}
+            placeholder="e.g. Kochi or Austin downtown"
+            leftIcon={<MapPin aria-hidden="true" />}
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-              Workspace Type
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as any)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-            >
-              <option value="all">Any Suitable Space</option>
-              <option value="coworking">Coworking Desks</option>
-              <option value="private_office">Private Office</option>
-              <option value="meeting_room">Meeting Room</option>
-              <option value="training_room">Training Hall</option>
-              <option value="studio">Production Studio</option>
-              <option value="event_space">Event / Demo Hall</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-4">
+          <Select
+            label="Type of space"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
+          >
+            <option value="all">Any type</option>
+            <option value="coworking">Coworking desks</option>
+            <option value="private_office">Private office</option>
+            <option value="meeting_room">Meeting room</option>
+            <option value="training_room">Training room</option>
+            <option value="studio">Studio</option>
+            <option value="event_space">Event space</option>
+          </Select>
 
           <Input
-            label="Seats Needed"
+            label="Seats"
             type="number"
             min={1}
             max={200}
             value={seats}
             onChange={(e) => setSeats(Number(e.target.value))}
-            leftIcon={<Users className="w-4 h-4" />}
+            leftIcon={<Users aria-hidden="true" />}
           />
 
           <Input
-            label="Target Start"
+            label="Start date (optional)"
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            leftIcon={<Calendar className="w-4 h-4" />}
+            leftIcon={<Calendar aria-hidden="true" />}
           />
         </div>
 
         <Input
-          label="Estimated Budget"
+          label="Budget (optional)"
           value={budget}
           onChange={(e) => setBudget(e.target.value)}
-          placeholder="e.g. $1,200/month or $50/day"
-          leftIcon={<DollarSign className="w-4 h-4" />}
+          placeholder="e.g. $1,200 per month or $50 per day"
+          leftIcon={<DollarSign aria-hidden="true" />}
         />
 
         <Textarea
-          label="Specific Requirements"
+          label="Requirements (optional)"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. Need soundproof booths, 24/7 keycard access, generator backup..."
+          placeholder="e.g. Quiet phone booths, after-hours access, parking"
         />
 
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="teal" isLoading={isSubmitting}>
-            Submit Demand Signal
+          <Button type="submit" isLoading={isSubmitting}>
+            Send request
           </Button>
         </div>
       </form>

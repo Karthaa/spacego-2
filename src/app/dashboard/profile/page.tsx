@@ -3,139 +3,185 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { User, Mail, Phone, Building2, Shield, CheckCircle2 } from "lucide-react";
+import { ProfileAvatar } from "@/components/layout/DashboardShell";
+import type { UserProfile } from "@/types";
+import { User, Mail, Phone, Building2 } from "lucide-react";
+
+const ROLE_LABEL: Record<UserProfile["role"], string> = {
+  seeker: "Member",
+  owner: "Host",
+  admin: "Administrator",
+};
 
 export default function SeekerProfilePage() {
-  const { user, updateProfile } = useAuth();
-  const { success } = useToast();
+  const { user } = useAuth();
 
-  const [fullName, setFullName] = useState(user?.full_name || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [companyName, setCompanyName] = useState(user?.company_name || "");
+  if (!user) {
+    return (
+      <div className="space-y-6" role="status" aria-label="Loading profile">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-5 w-72" />
+        </div>
+        <Card className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-16 w-16 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-1/3" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((n) => (
+              <Skeleton key={n} className="h-11" />
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return <ProfileForm key={user.id} user={user} />;
+}
+
+function ProfileForm({ user }: { user: UserProfile }) {
+  const { updateProfile } = useAuth();
+  const { success, error } = useToast();
+
+  const [fullName, setFullName] = useState(user.full_name ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [companyName, setCompanyName] = useState(user.company_name ?? "");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({
-      full_name: fullName,
-      phone,
-      company_name: companyName,
-    });
-    success("Profile Updated", "Your profile details and preferences have been saved.");
+    setIsSaving(true);
+
+    try {
+      const result = await updateProfile({
+        full_name: fullName,
+        phone,
+        company_name: companyName,
+      });
+
+      if (result.error) {
+        error("Profile Update Failed", result.error);
+        return;
+      }
+
+      success("Profile updated", "Your profile details have been saved.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const checkboxClass = "mt-0.5 h-5 w-5 shrink-0 rounded-sm border-line-strong accent-accent";
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-          Profile & Account Settings
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Manage your personal information, corporate affiliation, and communication preferences.
-        </p>
-      </div>
+      <PageHeader title="Profile" description="Your name and contact details." />
 
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
-        <form onSubmit={handleSave} className="space-y-6">
-          
-          <div className="flex items-center gap-4 border-b border-slate-100 pb-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={user?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80"}
-              alt="Profile"
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs"
-            />
-            <div>
-              <h3 className="text-base font-bold text-slate-900">{user?.full_name}</h3>
-              <p className="text-xs text-slate-500">{user?.email}</p>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded mt-1 inline-block">
-                Role: {user?.role.toUpperCase()}
-              </span>
+      <form onSubmit={handleSave} className="space-y-6">
+        <Card>
+          <div className="flex items-center gap-4 border-b border-line pb-5">
+            <ProfileAvatar name={user.full_name} url={user.avatar_url} size="lg" />
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-ink">{user.full_name}</p>
+              <p className="truncate text-sm text-ink-muted">{user.email}</p>
+              <p className="text-sm text-ink-subtle">{ROLE_LABEL[user.role]}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 pt-5 sm:grid-cols-2">
             <Input
-              label="Full Name"
+              label="Full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              leftIcon={<User className="w-4 h-4" />}
+              autoComplete="name"
+              leftIcon={<User />}
             />
 
             <Input
-              label="Email Address"
+              label="Email address"
               disabled
-              value={user?.email || ""}
-              helperText="Email cannot be changed directly."
-              leftIcon={<Mail className="w-4 h-4" />}
+              value={user.email}
+              helperText="Email can't be changed here."
+              leftIcon={<Mail />}
             />
 
             <Input
-              label="Phone Number"
+              label="Phone number"
+              type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 (555) 000-0000"
-              leftIcon={<Phone className="w-4 h-4" />}
+              placeholder="+1 555 000 0000"
+              autoComplete="tel"
+              leftIcon={<Phone />}
             />
 
             <Input
-              label="Company / Team"
+              label="Company or team"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="e.g. Acme Tech Labs"
-              leftIcon={<Building2 className="w-4 h-4" />}
+              placeholder="Optional"
+              autoComplete="organization"
+              leftIcon={<Building2 />}
             />
           </div>
+        </Card>
 
-          {/* Preferences */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Notification Preferences
-            </h4>
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>
+              These choices aren&apos;t saved to your account yet and reset when you leave this page.
+            </CardDescription>
+          </CardHeader>
 
-            <div className="space-y-2">
-              <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                <div>
-                  <span className="text-xs font-bold text-slate-900 block">Email Booking Confirmation & Passes</span>
-                  <span className="text-[11px] text-slate-500">Receive digital QR pass and host approval notices via email.</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={emailNotifications}
-                  onChange={(e) => setEmailNotifications(e.target.checked)}
-                  className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
-                />
-              </label>
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3 hover:bg-surface-muted">
+              <input
+                type="checkbox"
+                checked={emailNotifications}
+                onChange={(e) => setEmailNotifications(e.target.checked)}
+                className={checkboxClass}
+              />
+              <span>
+                <span className="block text-base font-medium text-ink">Email updates</span>
+                <span className="block text-sm text-ink-muted">
+                  Booking confirmations and host replies by email.
+                </span>
+              </span>
+            </label>
 
-              <label className="flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                <div>
-                  <span className="text-xs font-bold text-slate-900 block">SMS Alerts & Access Reminders</span>
-                  <span className="text-[11px] text-slate-500">Instant check-in pass reminder sent 1 hour before scheduled start.</span>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={smsNotifications}
-                  onChange={(e) => setSmsNotifications(e.target.checked)}
-                  className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
-                />
-              </label>
-            </div>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3 hover:bg-surface-muted">
+              <input
+                type="checkbox"
+                checked={smsNotifications}
+                onChange={(e) => setSmsNotifications(e.target.checked)}
+                className={checkboxClass}
+              />
+              <span>
+                <span className="block text-base font-medium text-ink">Text messages</span>
+                <span className="block text-sm text-ink-muted">Booking reminders by SMS.</span>
+              </span>
+            </label>
           </div>
+        </Card>
 
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <Button type="submit" variant="teal" size="md" className="font-bold">
-              Save Profile Changes
-            </Button>
-          </div>
-
-        </form>
-      </div>
-
+        <div className="flex justify-end">
+          <Button type="submit" isLoading={isSaving}>
+            Save changes
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

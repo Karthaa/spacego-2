@@ -1,215 +1,161 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space, Booking } from "@/types";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { useToast } from "@/components/ui/Toast";
+import { buttonClasses } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Select } from "@/components/ui/Input";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { formatDate } from "@/lib/utils";
-import {
-  Calendar,
-  Lock,
-  Plus,
-  Trash2,
-  Building2,
-  Clock,
-  ShieldCheck,
-  CheckCircle2,
-} from "lucide-react";
+import { Building2, CalendarCheck, Info } from "lucide-react";
+
+const DURATION_UNIT: Record<Booking["duration_type"], [string, string]> = {
+  hourly: ["hour", "hours"],
+  daily: ["day", "days"],
+  monthly: ["month", "months"],
+};
+
+function formatDuration(b: Booking): string {
+  const [one, many] = DURATION_UNIT[b.duration_type] ?? [b.duration_type, b.duration_type];
+  return `${b.duration_units} ${b.duration_units === 1 ? one : many}`;
+}
+
+function seatsLabel(seats: number): string {
+  return `${seats} ${seats === 1 ? "seat" : "seats"}`;
+}
 
 export default function OwnerAvailabilityPage() {
-  const { success, error } = useToast();
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [selectedSpaceId, setSelectedSpaceId] = useState("");
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  
-  // Blocked slots local state
-  const [blockedSlots, setBlockedSlots] = useState<{ id: string; date: string; reason: string }[]>([
-    { id: "blk-1", date: "2026-11-20", reason: "Scheduled HVAC Filter Replacement" },
-    { id: "blk-2", date: "2026-11-24", reason: "Private Corporate Keynote" },
-  ]);
+  const { user } = useAuth();
+  const dataVersion = useSpaceGoVersion();
+  const [pickedSpaceId, setSelectedSpaceId] = useState("");
 
-  const [newBlockDate, setNewBlockDate] = useState("");
-  const [newBlockReason, setNewBlockReason] = useState("");
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getSpacesByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
-  useEffect(() => {
-    const list = SpaceGoStore.getSpaces();
-    setSpaces(list);
-    if (list.length > 0) setSelectedSpaceId(list[0].id);
-    setBookings(SpaceGoStore.getBookings());
-  }, []);
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
-  const handleAddBlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBlockDate) {
-      error("Date required", "Please choose a date to block.");
-      return;
-    }
-
-    const newBlock = {
-      id: `blk-${Date.now()}`,
-      date: newBlockDate,
-      reason: newBlockReason || "Host Reserved Block",
-    };
-
-    setBlockedSlots([newBlock, ...blockedSlots]);
-    setNewBlockDate("");
-    setNewBlockReason("");
-    success("Date Blocked", `Blocked ${newBlockDate} on public booking engine.`);
-  };
-
-  const handleRemoveBlock = (id: string) => {
-    setBlockedSlots(blockedSlots.filter((b) => b.id !== id));
-    success("Block Removed", "The date is now available for public bookings.");
-  };
-
+  const selectedSpaceId = pickedSpaceId || spaces[0]?.id || "";
   const activeSpace = spaces.find((s) => s.id === selectedSpaceId) || spaces[0];
-  const spaceBookings = bookings.filter((b) => b.space_id === selectedSpaceId && b.status === "approved");
+  const spaceBookings = bookings
+    .filter((b) => b.space_id === selectedSpaceId && b.status === "approved")
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Availability & Calendar Rules
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Manage open booking windows, block reserved slots, and avoid double booking.
-          </p>
-        </div>
+      <PageHeader
+        title="Availability"
+        description="See when each of your spaces is already booked."
+      />
 
-        {/* Space Picker */}
-        {spaces.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">Workspace:</span>
-            <select
+      <div className="flex gap-3 rounded-lg border border-line bg-surface-muted p-4 text-sm text-ink-muted">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+        <p>
+          <span className="font-medium text-ink">Blocking dates isn&apos;t available yet.</span> For now, decline
+          requests for dates you can&apos;t host, or unpublish a listing from{" "}
+          <Link href="/owner/properties" className="font-medium text-accent hover:text-accent-hover">
+            My listings
+          </Link>{" "}
+          to stop new requests.
+        </p>
+      </div>
+
+      {spaces.length === 0 ? (
+        <EmptyState
+          icon={<Building2 />}
+          title="No listings yet"
+          description="Add a workspace to start taking bookings. Confirmed bookings will show here."
+          action={
+            <Link href="/owner/spaces/new" className={buttonClasses()}>
+              Add a workspace
+            </Link>
+          }
+        />
+      ) : (
+        <section aria-labelledby="schedule-heading" className="space-y-4">
+          <div className="max-w-md">
+            <Select
+              label="Workspace"
               value={selectedSpaceId}
               onChange={(e) => setSelectedSpaceId(e.target.value)}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
             >
               {spaces.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.title}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left: Confirmed Calendar Bookings */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-teal-600" />
-              <h3 className="text-base font-bold text-slate-900">
-                Confirmed Occupancy Schedule ({spaceBookings.length})
-              </h3>
-            </div>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              Live Synced
-            </span>
-          </div>
+          <h2 id="schedule-heading" className="text-lg font-semibold text-ink">
+            Confirmed bookings{activeSpace ? ` for ${activeSpace.title}` : ""}{" "}
+            <span className="font-normal text-ink-subtle">({spaceBookings.length})</span>
+          </h2>
 
           {spaceBookings.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              No confirmed bookings currently scheduled for this workspace.
-            </div>
+            <EmptyState
+              icon={<CalendarCheck />}
+              title="No confirmed bookings"
+              description="This space has no confirmed bookings right now. Requests waiting for your reply are on the Bookings page."
+              action={
+                <Link href="/owner/bookings" className={buttonClasses({ variant: "outline" })}>
+                  Go to bookings
+                </Link>
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              {spaceBookings.map((b) => (
-                <div
-                  key={b.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-slate-800">{b.id}</span>
-                      <span className="text-xs font-bold text-slate-900">• {b.user_name}</span>
-                    </div>
-                    <div className="text-xs text-slate-600 mt-1">
-                      {formatDate(b.start_date)} ({b.duration_units} {b.duration_type}) • {b.seats} seats
-                    </div>
+            <>
+              {/* Wide screens: table */}
+              <Card padding="none" className="hidden overflow-hidden sm:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-line bg-surface-muted text-ink-muted">
+                    <tr>
+                      <th scope="col" className="px-4 py-3 font-medium">Starts</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Length</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Guest</th>
+                      <th scope="col" className="px-4 py-3 font-medium">Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {spaceBookings.map((b) => (
+                      <tr key={b.id}>
+                        <td className="px-4 py-3 font-medium whitespace-nowrap text-ink">{formatDate(b.start_date)}</td>
+                        <td className="px-4 py-3 text-ink-muted">
+                          {formatDuration(b)} · {seatsLabel(b.seats)}
+                        </td>
+                        <td className="px-4 py-3 text-ink">{b.user_name}</td>
+                        <td className="px-4 py-3 font-mono text-ink-muted">{b.id}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+
+              {/* Small screens: stacked */}
+              <Card padding="none" className="divide-y divide-line sm:hidden">
+                {spaceBookings.map((b) => (
+                  <div key={b.id} className="space-y-1 p-4 text-sm">
+                    <p className="text-base font-medium text-ink">{formatDate(b.start_date)}</p>
+                    <p className="text-ink-muted">
+                      {formatDuration(b)} · {seatsLabel(b.seats)} · {b.user_name}
+                    </p>
+                    <p className="font-mono text-ink-subtle">{b.id}</p>
                   </div>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                    Occupied
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </Card>
+            </>
           )}
-        </div>
-
-        {/* Right: Block Custom Dates Manager */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-5">
-          <div className="border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-amber-600" />
-              <h3 className="text-base font-bold text-slate-900">Block Dates & Maintenance</h3>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Prevent bookings during private events, holidays, or renovation.
-            </p>
-          </div>
-
-          <form onSubmit={handleAddBlock} className="space-y-3">
-            <Input
-              label="Select Date to Block *"
-              type="date"
-              required
-              min={new Date().toISOString().split("T")[0]}
-              value={newBlockDate}
-              onChange={(e) => setNewBlockDate(e.target.value)}
-            />
-
-            <Input
-              label="Reason / Event Name"
-              placeholder="e.g. Maintenance, Private Buyout..."
-              value={newBlockReason}
-              onChange={(e) => setNewBlockReason(e.target.value)}
-            />
-
-            <Button type="submit" variant="teal" size="sm" className="w-full font-bold gap-1">
-              <Plus className="w-4 h-4" />
-              <span>Block Selected Date</span>
-            </Button>
-          </form>
-
-          {/* List of currently blocked dates */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-              Currently Blocked ({blockedSlots.length})
-            </span>
-
-            {blockedSlots.map((slot) => (
-              <div
-                key={slot.id}
-                className="p-3 rounded-xl border border-amber-200 bg-amber-50/50 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <span className="font-bold text-slate-900 block">{formatDate(slot.date)}</span>
-                  <span className="text-[11px] text-slate-500">{slot.reason}</span>
-                </div>
-                <button
-                  onClick={() => handleRemoveBlock(slot.id)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 transition-colors"
-                  aria-label="Unblock"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-
-        </div>
-
-      </div>
-
+        </section>
+      )}
     </div>
   );
 }
