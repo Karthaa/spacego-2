@@ -13,7 +13,6 @@ import {
   Info,
   MapPin,
   Share2,
-  Star,
   Users,
   Zap,
 } from "lucide-react";
@@ -135,16 +134,8 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{space.title}</h1>
+            {/* No ratings: there is no reviews feature yet (stored values are demo data). */}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-muted">
-              {space.review_count > 0 ? (
-                <span className="flex items-center gap-1 text-ink">
-                  <Star className="h-4 w-4 fill-current" aria-hidden="true" />
-                  {space.rating.toFixed(1)}
-                  <span className="text-ink-muted">({space.review_count} reviews)</span>
-                </span>
-              ) : (
-                <span>No reviews yet</span>
-              )}
               {place && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" aria-hidden="true" />

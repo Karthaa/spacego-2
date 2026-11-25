@@ -5,20 +5,41 @@ import Link from "next/link";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space } from "@/types";
-import { VerificationBadge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  Building2,
-  ShieldCheck,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  Trash2,
-  Sparkles,
-  MapPin,
-} from "lucide-react";
+import { categoryNoun } from "@/lib/categories";
+import { formatCurrency } from "@/lib/utils";
+import { Building2, ExternalLink } from "lucide-react";
+
+const VERIFICATION_LABELS: Record<Space["verification_level"], string> = {
+  listed: "New listing",
+  checked: "Reviewed by SpaceGo",
+  ready: "SpaceGo Ready",
+  pro: "SpaceGo Pro",
+};
+
+const STATUS_BADGES: Record<Space["status"], { label: string; variant: "success" | "warning" | "neutral" }> = {
+  published: { label: "Published", variant: "success" },
+  draft: { label: "Draft", variant: "neutral" },
+  under_review: { label: "In review", variant: "warning" },
+  archived: { label: "Archived", variant: "neutral" },
+};
+
+const GRID_COLS =
+  "md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1.5fr)_minmax(0,1.2fr)_2.75rem]";
+
+function priceLabel(space: Space): string {
+  const { pricing } = space;
+  if (pricing.daily) return `${formatCurrency(pricing.daily, pricing.currency)}/day`;
+  if (pricing.hourly) return `${formatCurrency(pricing.hourly, pricing.currency)}/hour`;
+  if (pricing.monthly) return `${formatCurrency(pricing.monthly, pricing.currency)}/month`;
+  return "No price set";
+}
 
 export default function AdminSpacesPage() {
   const { success, error } = useToast();
@@ -34,7 +55,7 @@ export default function AdminSpacesPage() {
       error("Could not update verification tier", result.error);
       return;
     }
-    success("Verification Tier Updated", `Assigned ${level.toUpperCase()} to space.`);
+    success("Verification tier updated", `Tier set to ${VERIFICATION_LABELS[level]}.`);
   };
 
   const handleToggleStatus = async (id: string, currentStatus: Space["status"]) => {
@@ -44,92 +65,134 @@ export default function AdminSpacesPage() {
       error("Could not change status", result.error);
       return;
     }
-    success("Status Changed", `Workspace is now ${next}.`);
+    success(next === "published" ? "Space published" : "Space unpublished", `The space is now ${next}.`);
   };
+
+  const publishedCount = spaces.filter((s) => s.status === "published").length;
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Workspace Moderation & Verification
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Supervise active listings, audit Space Passport™ certifications, and manage visibility.
-          </p>
-        </div>
+      <PageHeader
+        title="Spaces"
+        description={
+          spaces.length === 0
+            ? "Moderate listings and assign verification tiers."
+            : `${spaces.length} spaces, ${publishedCount} published. Assign verification tiers and control what guests can see.`
+        }
+      />
 
-        <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700">
-          Total Workspaces: {spaces.length}
-        </span>
-      </div>
+      {spaces.length === 0 ? (
+        <EmptyState
+          icon={<Building2 />}
+          title="No spaces yet"
+          description="Spaces listed by owners will appear here for moderation."
+        />
+      ) : (
+        <Card padding="none" role="table" aria-label="Spaces">
+          <div
+            role="row"
+            className={`hidden border-b border-line bg-surface-muted px-6 py-2.5 text-sm font-medium text-ink-muted md:grid md:gap-4 ${GRID_COLS}`}
+          >
+            <span role="columnheader">Space</span>
+            <span role="columnheader">Host and location</span>
+            <span role="columnheader">Verification tier</span>
+            <span role="columnheader">Visibility</span>
+            <span role="columnheader">
+              <span className="sr-only">Open listing</span>
+            </span>
+          </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-100">
-              <tr>
-                <th className="p-4">Workspace</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Location</th>
-                <th className="p-4">Host</th>
-                <th className="p-4">Passport Tier</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {spaces.map((s) => (
-                <tr key={s.id} className="hover:bg-slate-50/50">
-                  <td className="p-4 flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.images[0]?.url} alt="" className="w-12 h-12 rounded-xl object-cover border border-slate-200" />
-                    <div>
-                      <span className="font-bold text-slate-900 block max-w-[180px] truncate">{s.title}</span>
-                      <span className="text-slate-400 text-[11px]">{s.capacity} seats • {formatCurrency(s.pricing.daily || s.pricing.hourly || 0)}/day</span>
+          <div role="rowgroup" className="divide-y divide-line">
+            {spaces.map((s) => {
+              const status = STATUS_BADGES[s.status] ?? { label: s.status, variant: "neutral" as const };
+              const cover = s.images[0]?.url;
+              return (
+                <div
+                  key={s.id}
+                  role="row"
+                  className={`grid grid-cols-1 gap-3 px-5 py-4 sm:px-6 md:items-center md:gap-4 ${GRID_COLS}`}
+                >
+                  <div role="cell" className="flex min-w-0 items-center gap-3">
+                    {cover ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cover}
+                        alt=""
+                        className="h-12 w-12 shrink-0 rounded-md border border-line object-cover"
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink-subtle"
+                      >
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-medium text-ink">{s.title}</p>
+                      <p className="truncate text-sm text-ink-subtle">
+                        {categoryNoun(s.category)} · {s.capacity} seats · {priceLabel(s)}
+                      </p>
                     </div>
-                  </td>
-                  <td className="p-4 uppercase text-[10px] font-bold text-slate-600">{s.category.replace("_", " ")}</td>
-                  <td className="p-4 text-slate-600">{s.location.city}, {s.location.country}</td>
-                  <td className="p-4 text-slate-800 font-semibold">{s.owner_name}</td>
-                  <td className="p-4">
-                    <select
+                  </div>
+
+                  <div role="cell" className="min-w-0 text-sm">
+                    <p className="truncate text-ink">{s.owner_name}</p>
+                    <p className="truncate text-ink-subtle">
+                      {s.location.city}, {s.location.country}
+                    </p>
+                  </div>
+
+                  <div role="cell">
+                    <Select
+                      aria-label={`Verification tier for ${s.title}`}
                       value={s.verification_level}
                       onChange={(e) => handleUpdateLevel(s.id, e.target.value as Space["verification_level"])}
-                      className="rounded-lg border border-slate-300 bg-white p-1 text-[11px] font-bold text-slate-800"
                     >
-                      <option value="listed">Listed (Unverified)</option>
-                      <option value="checked">Checked</option>
-                      <option value="ready">SpaceGo Ready</option>
-                      <option value="pro">SpaceGo Pro</option>
-                    </select>
-                  </td>
-                  <td className="p-4">
-                    <button
-                      onClick={() => handleToggleStatus(s.id, s.status)}
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded cursor-pointer ${
-                        s.status === "published" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {s.status}
-                    </button>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Link href={`/spaces/${s.id}`} target="_blank">
-                      <Button variant="ghost" size="sm" className="p-1.5">
-                        <Eye className="w-4 h-4 text-slate-600" />
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      <option value="listed">{VERIFICATION_LABELS.listed}</option>
+                      <option value="checked">{VERIFICATION_LABELS.checked}</option>
+                      <option value="ready">{VERIFICATION_LABELS.ready}</option>
+                      <option value="pro">{VERIFICATION_LABELS.pro}</option>
+                    </Select>
+                  </div>
 
+                  <div role="cell" className="flex items-center justify-between gap-3 md:justify-start">
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleStatus(s.id, s.status)}
+                    >
+                      {s.status === "published" ? "Unpublish" : "Publish"}
+                    </Button>
+                  </div>
+
+                  <div role="cell" className="hidden md:block">
+                    <Link
+                      href={`/spaces/${s.id}`}
+                      target="_blank"
+                      aria-label={`Open ${s.title} in a new tab`}
+                      className={buttonClasses({ variant: "ghost", size: "icon" })}
+                    >
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </div>
+                  <div role="cell" className="md:hidden">
+                    <Link
+                      href={`/spaces/${s.id}`}
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+                    >
+                      Open listing
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

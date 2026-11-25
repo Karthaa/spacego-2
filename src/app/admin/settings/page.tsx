@@ -1,140 +1,94 @@
 "use client";
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { useToast } from "@/components/ui/Toast";
-import { Settings, ShieldCheck, Database, Key, Server, CheckCircle2 } from "lucide-react";
+import React from "react";
+import Link from "next/link";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { CheckCircle2, HardDrive } from "lucide-react";
+
+const MIGRATION_PATH = "supabase/migrations/20261119_spacego_app_state.sql";
 
 export default function AdminSettingsPage() {
-  const { success } = useToast();
   const supabaseConnected = isSupabaseConfigured();
-
-  const [platformCommission, setPlatformCommission] = useState(15);
-  const [minBookingBufferMinutes, setMinBookingBufferMinutes] = useState(15);
-  const [passportRenewalDays, setPassportRenewalDays] = useState(365);
-  const [requireHostApprovalByDefault, setRequireHostApprovalByDefault] = useState(true);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    success("Platform Configuration Saved", "Global system parameters updated across all environments.");
-  };
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Platform Governance & System Settings
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Configure marketplace commission waterfalls, Space Passport™ audit cycles, and backend connectivity.
+      <PageHeader
+        title="Settings"
+        description="How this SpaceGo deployment is set up. Platform rules are fixed in code and can't be edited here yet."
+      />
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle>Data storage</CardTitle>
+            {supabaseConnected ? (
+              <Badge variant="success" size="md">
+                <CheckCircle2 aria-hidden="true" />
+                Supabase configured
+              </Badge>
+            ) : (
+              <Badge variant="warning" size="md">
+                <HardDrive aria-hidden="true" />
+                Local demo storage
+              </Badge>
+            )}
+          </div>
+          <CardDescription>Where bookings, spaces and requests are read from and saved to.</CardDescription>
+        </CardHeader>
+
+        <p className="text-base leading-relaxed text-ink-muted">
+          {supabaseConnected ? (
+            <>
+              The app loads its collections from the Supabase app-state tables and saves changes back to Supabase.
+              Apply <code className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-sm text-ink">{MIGRATION_PATH}</code>{" "}
+              before the first deploy.
+            </>
+          ) : (
+            <>
+              The app is using built-in demo data stored in this browser. To connect Supabase, apply{" "}
+              <code className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-sm text-ink">{MIGRATION_PATH}</code>{" "}
+              and set{" "}
+              <code className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-sm text-ink">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
+              and{" "}
+              <code className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-sm text-ink">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{" "}
+              for the build.
+            </>
+          )}
         </p>
-      </div>
+      </Card>
 
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
-        <form onSubmit={handleSave} className="space-y-6">
-          
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-teal-600" />
-              1. Commercial & Booking Rules
-            </h3>
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform rules</CardTitle>
+          <CardDescription>Current behaviour. Changing these requires a code change.</CardDescription>
+        </CardHeader>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Input
-                label="Standard Platform Commission (%)"
-                type="number"
-                min={5}
-                max={30}
-                value={platformCommission}
-                onChange={(e) => setPlatformCommission(Number(e.target.value))}
-                helperText="Applied to completed transactions"
-              />
-
-              <Input
-                label="Buffer Between Reservations (Mins)"
-                type="number"
-                min={0}
-                max={60}
-                value={minBookingBufferMinutes}
-                onChange={(e) => setMinBookingBufferMinutes(Number(e.target.value))}
-                helperText="Turnover & cleaning buffer"
-              />
-
-              <Input
-                label="Space Passport™ Expiry (Days)"
-                type="number"
-                min={90}
-                max={730}
-                value={passportRenewalDays}
-                onChange={(e) => setPassportRenewalDays(Number(e.target.value))}
-                helperText="Periodic re-inspection cadence"
-              />
-            </div>
-
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-900 block">Host Approval Required by Default</span>
-                <span className="text-[11px] text-slate-500">New spaces require host sign-off unless explicitly approved for Instant Book.</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={requireHostApprovalByDefault}
-                onChange={(e) => setRequireHostApprovalByDefault(e.target.checked)}
-                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
-              />
-            </div>
+        <dl className="divide-y divide-line">
+          <div className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:justify-between sm:gap-6">
+            <dt className="text-base font-medium text-ink">Service fee</dt>
+            <dd className="text-base text-ink-muted sm:text-right">10% of the booking cost, shown to guests and included in totals</dd>
           </div>
-
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <Database className="w-4 h-4 text-teal-600" />
-              2. Backend Infrastructure & Storage
-            </h3>
-
-            <div className="p-4 rounded-2xl bg-teal-50/60 border border-teal-200 space-y-2 text-xs">
-              <div className="flex items-center gap-2 font-bold text-teal-950">
-                <CheckCircle2 className="w-4 h-4 text-teal-600" />
-                <span>
-                  {supabaseConnected
-                    ? "Supabase Backend Configured"
-                    : "Local Demo Storage Active"}
-                </span>
-              </div>
-              <p className="text-teal-900 leading-relaxed">
-                {supabaseConnected ? (
-                  <>
-                    The app is configured to load its collections from the
-                    Supabase app-state tables and mirror writes back to
-                    Supabase. Apply{" "}
-                    <code>supabase/migrations/20261119_spacego_app_state.sql</code>{" "}
-                    before the first deploy.
-                  </>
-                ) : (
-                  <>
-                    The app is using the built-in localStorage demo data. To
-                    connect Supabase, apply{" "}
-                    <code>supabase/migrations/20261119_spacego_app_state.sql</code>{" "}
-                    and set <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-                    <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> for the build.
-                  </>
-                )}
-              </p>
-            </div>
+          <div className="flex flex-col gap-1 py-3 sm:flex-row sm:justify-between sm:gap-6">
+            <dt className="text-base font-medium text-ink">Verification tiers</dt>
+            <dd className="text-base text-ink-muted sm:text-right">
+              Assigned by admins on the{" "}
+              <Link href="/admin/spaces" className="font-medium text-accent hover:text-accent-hover">
+                Spaces
+              </Link>{" "}
+              page. New listings start as &ldquo;New listing&rdquo;.
+            </dd>
           </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <Button type="submit" variant="teal" size="md" className="font-bold">
-              Save Global Configuration
-            </Button>
+          <div className="flex flex-col gap-1 py-3 last:pb-0 sm:flex-row sm:justify-between sm:gap-6">
+            <dt className="text-base font-medium text-ink">Admin access</dt>
+            <dd className="text-base text-ink-muted sm:text-right">
+              Granted by setting a profile&rsquo;s role to admin in Supabase
+            </dd>
           </div>
-
-        </form>
-      </div>
-
+        </dl>
+      </Card>
     </div>
   );
 }

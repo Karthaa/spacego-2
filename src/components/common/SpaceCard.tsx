@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, Star, Zap, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Heart, Zap, ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { Space } from "@/types";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -142,24 +142,14 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
       </div>
 
       <div className={cn(layout === "grid" ? "pt-3" : "flex flex-col justify-center")}>
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="min-w-0 text-base font-semibold text-ink">
-            {/* The title link covers the whole card for a large click target. */}
-            <Link href={href} className="line-clamp-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
-              {space.title}
-            </Link>
-          </h3>
-          {space.review_count > 0 ? (
-            <span className="flex shrink-0 items-center gap-1 text-sm text-ink">
-              <Star className="h-4 w-4 fill-current" aria-hidden="true" />
-              <span>{space.rating.toFixed(1)}</span>
-              <span className="text-ink-subtle">({space.review_count})</span>
-              <span className="sr-only">reviews</span>
-            </span>
-          ) : (
-            <span className="shrink-0 text-sm text-ink-subtle">New</span>
-          )}
-        </div>
+        {/* Ratings are intentionally not shown: SpaceGo has no reviews feature
+            yet, and stored rating values are demo data. */}
+        <h3 className="min-w-0 text-base font-semibold text-ink">
+          {/* The title link covers the whole card for a large click target. */}
+          <Link href={href} className="line-clamp-1 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none">
+            {space.title}
+          </Link>
+        </h3>
 
         <p className="mt-0.5 text-sm text-ink-muted">
           {categoryNoun(space.category)}

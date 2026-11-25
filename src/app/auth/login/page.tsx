@@ -6,24 +6,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
+import { Logo } from "@/components/navigation/Navbar";
 import { authErrorMessage } from "@/lib/auth/messages";
 import { homeForRole, safeNextPath } from "@/lib/auth/redirects";
-import {
-  Building2,
-  Mail,
-  Lock,
-  ArrowRight,
-  AlertTriangle,
-  LogOut,
-} from "lucide-react";
+import { Mail, Lock, AlertTriangle, LogOut } from "lucide-react";
 
 export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-          Loading login…
+        <div className="flex min-h-screen items-center justify-center bg-canvas text-base text-ink-muted">
+          Loading…
         </div>
       }
     >
@@ -89,49 +84,43 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-teal-400 shadow-md">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">
-            Space<span className="text-teal-600">Go</span>
-          </span>
-        </Link>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Sign In to Your Account
-        </h2>
-        <p className="text-xs text-slate-500">
-          Enter your email and password to access your bookings, listings, or
-          management console.
+    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center">
+          <Logo />
+        </div>
+        <h1 className="mt-8 text-center text-2xl font-semibold tracking-tight text-ink">
+          Sign in to SpaceGo
+        </h1>
+        <p className="mt-2 text-center text-base text-ink-muted">
+          Manage your bookings, listings and requests.
         </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-slate-200 shadow-xl space-y-6">
+        <Card elevation="raised" padding="lg" className="mt-8 space-y-6">
           {profileMissing && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-amber-900">
-                    Your SpaceGo profile is missing
-                  </p>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
-                    You are signed in, but your account has no profile record.
-                    Apply the profiles migration or contact support. You can
-                    sign out and try another account.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => void signOut()}
-                    className="inline-flex items-center gap-1.5 pt-1 text-[11px] font-bold text-amber-900 hover:text-amber-950"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign out
-                  </button>
-                </div>
+            <div className="flex items-start gap-3 rounded-md bg-warning-soft p-4">
+              <AlertTriangle
+                className="mt-0.5 h-5 w-5 shrink-0 text-warning"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 space-y-2">
+                <p className="text-sm font-semibold text-ink">
+                  Your SpaceGo profile is missing
+                </p>
+                <p className="text-sm text-ink-muted">
+                  You are signed in, but this account has no profile record.
+                  Apply the profiles migration or contact support, or sign out
+                  and try another account.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void signOut()}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Sign out
+                </Button>
               </div>
             </div>
           )}
@@ -139,67 +128,65 @@ function LoginContent() {
           {(formError || queryError) && (
             <div
               role="alert"
-              className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-[11px] font-medium text-rose-800"
+              className="rounded-md bg-danger-soft p-3 text-sm font-medium text-danger"
             >
               {formError ?? authErrorMessage(queryError)}
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4" noValidate>
+          <form onSubmit={handleLogin} className="space-y-5" noValidate>
             <Input
-              label="Email Address"
+              label="Email"
               type="email"
               required
               autoComplete="email"
-              placeholder="you@domain.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              leftIcon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail aria-hidden="true" />}
             />
 
-            <Input
-              label="Password"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              leftIcon={<Lock className="w-4 h-4" />}
-            />
-
-            <div className="flex items-center justify-end text-xs">
-              <Link
-                href="/auth/forgot-password"
-                className="font-semibold text-teal-700 hover:text-teal-800"
-              >
-                Forgot password?
-              </Link>
+            <div className="space-y-2">
+              <Input
+                label="Password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                leftIcon={<Lock aria-hidden="true" />}
+              />
+              <div className="flex justify-end">
+                <Link
+                  href="/auth/forgot-password"
+                  className="rounded-sm text-sm font-medium text-accent hover:text-accent-hover"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             <Button
               type="submit"
-              variant="teal"
               size="lg"
-              className="w-full font-bold shadow-md shadow-teal-700/20"
+              className="w-full"
               isLoading={isSubmitting}
             >
-              <span>Sign In</span>
-              <ArrowRight className="w-4 h-4" />
+              Sign in
             </Button>
           </form>
+        </Card>
 
-          <div className="pt-2 text-center text-xs text-slate-500">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/auth/register"
-              className="font-bold text-teal-700 hover:text-teal-800"
-            >
-              Create an account
-            </Link>
-          </div>
-        </div>
+        <p className="mt-6 text-center text-sm text-ink-muted">
+          New to SpaceGo?{" "}
+          <Link
+            href="/auth/register"
+            className="rounded-sm font-medium text-accent hover:text-accent-hover"
+          >
+            Create an account
+          </Link>
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

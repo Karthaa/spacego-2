@@ -6,22 +6,36 @@ import { useAuth } from "@/context/AuthContext";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space } from "@/types";
-import { VerificationBadge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Badge, VerificationBadge } from "@/components/ui/Badge";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
+import { categoryNoun } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
-import {
-  Building2,
-  PlusCircle,
-  Edit3,
-  Trash2,
-  ExternalLink,
-  Eye,
-  Users,
-  MapPin,
-  Sparkles,
-} from "lucide-react";
+import { Building2, Eye, MapPin, Plus, Trash2, Users } from "lucide-react";
+
+function SpaceStatusBadge({ status }: { status: Space["status"] }) {
+  switch (status) {
+    case "published":
+      return <Badge variant="success">Published</Badge>;
+    case "under_review":
+      return <Badge variant="warning">Under review</Badge>;
+    case "archived":
+      return <Badge variant="neutral">Archived</Badge>;
+    case "draft":
+    default:
+      return <Badge variant="neutral">Draft</Badge>;
+  }
+}
+
+function spaceRate(space: Space): string | null {
+  if (space.pricing.daily) return `${formatCurrency(space.pricing.daily, space.pricing.currency)} / day`;
+  if (space.pricing.hourly) return `${formatCurrency(space.pricing.hourly, space.pricing.currency)} / hour`;
+  if (space.pricing.monthly) return `${formatCurrency(space.pricing.monthly, space.pricing.currency)} / month`;
+  return null;
+}
 
 export default function OwnerPropertiesPage() {
   const { user } = useAuth();
@@ -46,14 +60,16 @@ export default function OwnerPropertiesPage() {
       return;
     }
     success(
-      nextStatus === "published" ? "Listing Published" : "Listing Set to Draft",
-      "Availability has been updated on the public marketplace."
+      nextStatus === "published" ? "Listing published" : "Listing moved to drafts",
+      nextStatus === "published"
+        ? "People can now find and book this space."
+        : "The listing is hidden from search until you publish it again."
     );
   };
 
   const handleDelete = async (id: string) => {
     if (busySpaceId) return;
-    if (!confirm("Are you sure you want to remove this workspace listing?")) return;
+    if (!confirm("Remove this listing? People will no longer be able to find or book it.")) return;
 
     setBusySpaceId(id);
     const result = await SpaceGoStore.deleteSpace(id);
@@ -64,120 +80,116 @@ export default function OwnerPropertiesPage() {
       return;
     }
     success(
-      result.data === "archived" ? "Listing Archived" : "Space Removed",
+      result.data === "archived" ? "Listing archived" : "Listing removed",
       result.data === "archived"
-        ? "The listing is archived and no longer visible on the marketplace."
-        : "The workspace listing has been deleted."
+        ? "The listing is archived and no longer visible to guests."
+        : "The listing has been deleted."
     );
   };
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            My Workspace Listings
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Manage published workspaces, configure rates, and monitor Space Passport™ audit statuses.
-          </p>
-        </div>
-
-        <Link href="/owner/spaces/new">
-          <Button variant="teal" size="sm" className="font-bold gap-1.5">
-            <PlusCircle className="w-4 h-4" />
-            <span>Add New Workspace</span>
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="My listings"
+        description="Publish, preview and remove the workspaces you list on SpaceGo."
+        actions={
+          <Link href="/owner/spaces/new" className={buttonClasses()}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add a workspace
+          </Link>
+        }
+      />
 
       {spaces.length === 0 ? (
         <EmptyState
-          icon={<Building2 className="w-8 h-8" />}
-          title="No properties listed yet"
-          description="Create your first workspace listing or submit an idle property for activation."
-          actionLabel="Create Listing"
-          onAction={() => (window.location.href = "/owner/spaces/new")}
+          icon={<Building2 />}
+          title="No listings yet"
+          description="Add your first workspace so people can find and book it."
+          action={
+            <Link href="/owner/spaces/new" className={buttonClasses()}>
+              Add a workspace
+            </Link>
+          }
         />
       ) : (
-        <div className="space-y-4">
-          {spaces.map((space) => (
-            <div
-              key={space.id}
-              className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-5"
-            >
-              <div className="flex items-start sm:items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={space.images[0]?.url}
-                  alt={space.title}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border border-slate-200 shrink-0"
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <VerificationBadge level={space.verification_level} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                      {space.category.replace("_", " ")}
-                    </span>
-                    <button
-                      onClick={() => handleToggleStatus(space.id, space.status)}
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                        space.status === "published"
-                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                          : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                      }`}
+        <ul className="space-y-4">
+          {spaces.map((space) => {
+            const rate = spaceRate(space);
+            const isBusy = busySpaceId === space.id;
+            return (
+              <li key={space.id}>
+                <Card padding="sm" className="flex flex-col gap-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 gap-4">
+                    {space.images[0]?.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={space.images[0].url}
+                        alt=""
+                        className="h-20 w-20 shrink-0 rounded-md border border-line object-cover sm:h-24 sm:w-24"
+                      />
+                    ) : (
+                      <div
+                        aria-hidden="true"
+                        className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink-subtle sm:h-24 sm:w-24"
+                      >
+                        <Building2 className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <SpaceStatusBadge status={space.status} />
+                        <VerificationBadge level={space.verification_level} />
+                      </div>
+                      <h2 className="text-base font-medium text-ink">{space.title}</h2>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+                        <span>{categoryNoun(space.category)}</span>
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+                          {[space.location.address, space.location.city].filter(Boolean).join(", ")}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Users className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+                          Up to {space.capacity} people
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-ink">{rate ?? "No price set"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
+                    <Link
+                      href={`/spaces/${space.id}`}
+                      className={buttonClasses({ variant: "outline", size: "sm" })}
                     >
-                      ● {space.status}
-                    </button>
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                      Preview
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleStatus(space.id, space.status)}
+                      disabled={busySpaceId !== null}
+                      isLoading={isBusy}
+                    >
+                      {space.status === "published" ? "Unpublish" : "Publish"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(space.id)}
+                      disabled={busySpaceId !== null}
+                      className="hover:text-danger"
+                      aria-label={`Remove ${space.title}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
                   </div>
-
-                  <h3 className="text-base font-bold text-slate-900">{space.title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{space.location.address}, {space.location.city}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" /> Up to {space.capacity} seats
-                    </span>
-                  </div>
-
-                  <div className="text-xs text-teal-800 font-semibold pt-0.5">
-                    Rate: {formatCurrency(space.pricing.daily || space.pricing.hourly || 0)}/{space.pricing.daily ? "day" : "hr"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 self-end lg:self-center">
-                <Link href={`/spaces/${space.id}`}>
-                  <Button variant="outline" size="sm" className="gap-1 text-xs">
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Preview</span>
-                  </Button>
-                </Link>
-
-                <button
-                  onClick={() => handleToggleStatus(space.id, space.status)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  {space.status === "published" ? "Unpublish" : "Publish"}
-                </button>
-
-                <button
-                  onClick={() => handleDelete(space.id)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                  aria-label="Delete listing"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                </Card>
+              </li>
+            );
+          })}
+        </ul>
       )}
-
     </div>
   );
 }

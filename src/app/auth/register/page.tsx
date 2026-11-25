@@ -4,21 +4,29 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/Button";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
+import { Logo } from "@/components/navigation/Navbar";
 import { homeForRole } from "@/lib/auth/redirects";
-import {
-  Building2,
-  Mail,
-  Lock,
-  ArrowRight,
-  User,
-  Phone,
-  CheckCircle2,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Mail, Lock, User, Phone, Building2 } from "lucide-react";
 
 type PublicRole = "seeker" | "owner";
+
+const ROLE_OPTIONS: { value: PublicRole; title: string; description: string }[] = [
+  {
+    value: "seeker",
+    title: "Book workspace",
+    description: "Find and book desks, offices and rooms.",
+  },
+  {
+    value: "owner",
+    title: "Host a space",
+    description: "List a space or submit one for review.",
+  },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -89,205 +97,186 @@ export default function RegisterPage() {
 
   if (confirmationEmail) {
     return (
-      <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-          <Link href="/" className="inline-flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-teal-400 shadow-md">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">
-              Space<span className="text-teal-600">Go</span>
-            </span>
-          </Link>
-        </div>
+      <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center">
+            <Logo />
+          </div>
 
-        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-          <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
-            <div className="mx-auto w-14 h-14 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center">
-              <Mail className="w-7 h-7" />
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <Card elevation="raised" padding="lg" className="mt-8 text-center">
+            <span
+              aria-hidden="true"
+              className="mx-auto flex h-12 w-12 items-center justify-center rounded-md bg-accent-soft text-accent-soft-ink"
+            >
+              <Mail className="h-6 w-6" />
+            </span>
+            <h1 className="mt-4 text-xl font-semibold tracking-tight text-ink">
               Check your email
-            </h2>
-            <p className="text-xs text-slate-600 leading-relaxed">
+            </h1>
+            <p className="mt-2 text-base text-ink-muted">
               We sent a confirmation link to{" "}
-              <strong className="text-slate-900">{confirmationEmail}</strong>.
+              <strong className="font-semibold text-ink">{confirmationEmail}</strong>.
               Open it to activate your account, then sign in.
             </p>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
+            <p className="mt-3 text-sm text-ink-subtle">
               You are not signed in yet. If the message does not arrive, check
               your spam folder or try registering again.
             </p>
-            <Link href="/auth/login" className="block pt-2">
-              <Button variant="teal" size="lg" className="w-full font-bold">
-                <span>Back to sign in</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
+            <Link
+              href="/auth/login"
+              className={buttonClasses({ size: "lg", className: "mt-6 w-full" })}
+            >
+              Back to sign in
             </Link>
-          </div>
+          </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-teal-400 shadow-md">
-            <Building2 className="w-5 h-5" />
-          </div>
-          <span className="text-2xl font-bold text-slate-900 tracking-tight">
-            Space<span className="text-teal-600">Go</span>
-          </span>
-        </Link>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Create Your SpaceGo Account
-        </h2>
-        <p className="text-xs text-slate-500">
-          Book flexible workspaces or list and activate your properties.
+    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center">
+          <Logo />
+        </div>
+        <h1 className="mt-8 text-center text-2xl font-semibold tracking-tight text-ink">
+          Create your account
+        </h1>
+        <p className="mt-2 text-center text-base text-ink-muted">
+          Book flexible workspace, or host your own space.
         </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-slate-200 shadow-xl space-y-6">
-          <form onSubmit={handleRegister} className="space-y-4" noValidate>
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                I want to:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole("seeker")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    role === "seeker"
-                      ? "border-teal-500 bg-teal-50/70 shadow-xs"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-slate-900">
-                    Find Workspaces
-                  </span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">
-                    Freelancer / Team Seeker
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRole("owner")}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    role === "owner"
-                      ? "border-teal-500 bg-teal-50/70 shadow-xs"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-slate-900">
-                    List or Activate Space
-                  </span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">
-                    Property Owner / Host
-                  </span>
-                </button>
+        <Card elevation="raised" padding="lg" className="mt-8">
+          <form onSubmit={handleRegister} className="space-y-5" noValidate>
+            <fieldset>
+              <legend className="text-sm font-medium text-ink">
+                How will you use SpaceGo?
+              </legend>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {ROLE_OPTIONS.map((option) => {
+                  const selected = role === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        "flex min-h-11 cursor-pointer flex-col rounded-md border p-3 transition-colors",
+                        "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
+                        selected
+                          ? "border-accent bg-accent-soft"
+                          : "border-line-strong bg-surface hover:bg-surface-muted"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={option.value}
+                        checked={selected}
+                        onChange={() => setRole(option.value)}
+                        className="sr-only"
+                      />
+                      <span className="text-sm font-semibold text-ink">
+                        {option.title}
+                      </span>
+                      <span className="mt-0.5 text-sm text-ink-muted">
+                        {option.description}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
-            </div>
+            </fieldset>
 
             {formError && (
               <div
                 role="alert"
-                className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-[11px] font-medium text-rose-800"
+                className="rounded-md bg-danger-soft p-3 text-sm font-medium text-danger"
               >
                 {formError}
               </div>
             )}
 
             <Input
-              label="Full Name *"
+              label="Full name"
               required
               autoComplete="name"
               placeholder="Your full name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              leftIcon={<User className="w-4 h-4" />}
+              leftIcon={<User aria-hidden="true" />}
             />
 
             <Input
-              label="Work Email *"
+              label="Email"
               type="email"
               required
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              leftIcon={<Mail className="w-4 h-4" />}
+              leftIcon={<Mail aria-hidden="true" />}
             />
 
             <Input
-              label="Password *"
+              label="Password"
               type="password"
               required
               autoComplete="new-password"
-              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               helperText="At least 8 characters."
-              leftIcon={<Lock className="w-4 h-4" />}
+              leftIcon={<Lock aria-hidden="true" />}
             />
 
             <Input
-              label="Confirm Password *"
+              label="Confirm password"
               type="password"
               required
               autoComplete="new-password"
-              placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              leftIcon={<CheckCircle2 className="w-4 h-4" />}
+              leftIcon={<Lock aria-hidden="true" />}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-3">
               <Input
-                label="Phone Number"
+                label="Phone (optional)"
+                type="tel"
                 autoComplete="tel"
-                placeholder="+1 (555) 000-0000"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                leftIcon={<Phone className="w-4 h-4" />}
+                leftIcon={<Phone aria-hidden="true" />}
               />
               <Input
-                label="Company / Studio"
+                label="Company (optional)"
                 autoComplete="organization"
-                placeholder="Acme Inc."
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                leftIcon={<Building2 className="w-4 h-4" />}
+                leftIcon={<Building2 aria-hidden="true" />}
               />
             </div>
 
             <Button
               type="submit"
-              variant="teal"
               size="lg"
-              className="w-full font-bold shadow-md shadow-teal-700/20"
+              className="w-full"
               isLoading={isSubmitting}
             >
-              <span>Get Started</span>
-              <ArrowRight className="w-4 h-4" />
+              Create account
             </Button>
           </form>
+        </Card>
 
-          <div className="pt-2 text-center text-xs text-slate-500">
-            Already have an account?{" "}
-            <Link
-              href="/auth/login"
-              className="font-bold text-teal-700 hover:text-teal-800"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
+        <p className="mt-6 text-center text-sm text-ink-muted">
+          Already have an account?{" "}
+          <Link
+            href="/auth/login"
+            className="rounded-sm font-medium text-accent hover:text-accent-hover"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
-    </div>
+    </main>
   );
 }

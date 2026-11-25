@@ -19,7 +19,7 @@ import { CATEGORIES } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { Space, WorkspaceCategory, VerificationLevel } from "@/types";
 
-type SortKey = "recommended" | "price_asc" | "price_desc" | "rating" | "capacity";
+type SortKey = "recommended" | "price_asc" | "price_desc" | "capacity";
 type Duration = "all" | "hourly" | "daily" | "monthly";
 
 interface Filters {
@@ -154,8 +154,6 @@ function SpacesContent() {
             return priceOf(a) - priceOf(b);
           case "price_desc":
             return priceOf(b) - priceOf(a);
-          case "rating":
-            return b.rating * Math.min(b.review_count, 1) - a.rating * Math.min(a.review_count, 1);
           case "capacity":
             return b.capacity - a.capacity;
           default:
@@ -314,7 +312,6 @@ function SpacesContent() {
                   <option value="recommended">Newest</option>
                   <option value="price_asc">Price: low to high</option>
                   <option value="price_desc">Price: high to low</option>
-                  <option value="rating">Highest rated</option>
                   <option value="capacity">Largest capacity</option>
                 </select>
 

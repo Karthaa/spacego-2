@@ -6,20 +6,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { WorkspaceCategory } from "@/types";
-import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Input, Select, Textarea } from "@/components/ui/Input";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import {
-  Building2,
-  MapPin,
-  Users,
-  DollarSign,
-  Clock,
-  Sparkles,
-  ArrowRight,
-  ChevronLeft,
-  Check,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, Check, Info } from "lucide-react";
 
 export default function NewWorkspaceListingPage() {
   const router = useRouter();
@@ -32,7 +25,7 @@ export default function NewWorkspaceListingPage() {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("San Francisco");
-  const [country, setCountry] = useState("United States");
+  const [country] = useState("United States");
   const [capacity, setCapacity] = useState(12);
   const [squareFeet, setSquareFeet] = useState(1400);
 
@@ -86,19 +79,19 @@ export default function NewWorkspaceListingPage() {
 
   const imagePresets = [
     {
-      label: "Open Workstation",
+      label: "Open workspace",
       url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80",
     },
     {
-      label: "Private Office",
+      label: "Private office",
       url: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
     },
     {
-      label: "Boardroom Suite",
+      label: "Boardroom",
       url: "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=1200&q=80",
     },
     {
-      label: "Podcast Studio",
+      label: "Studio",
       url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=1200&q=80",
     },
   ];
@@ -106,7 +99,7 @@ export default function NewWorkspaceListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !address || !city) {
-      error("Missing Information", "Please enter workspace title and location address.");
+      error("Missing information", "Enter a title, street address and city for the workspace.");
       return;
     }
 
@@ -116,7 +109,7 @@ export default function NewWorkspaceListingPage() {
     }
 
     if (!hourlyPrice && !dailyPrice && !monthlyPrice) {
-      error("Missing Pricing", "Enter at least one hourly, daily or monthly price.");
+      error("Missing price", "Enter at least one hourly, daily or monthly price.");
       return;
     }
 
@@ -169,7 +162,7 @@ export default function NewWorkspaceListingPage() {
         return;
       }
 
-      success("Workspace Created & Published!", `Listing is now live on SpaceGo: ${result.data.title}`);
+      success("Listing published", `${result.data.title} is now live on SpaceGo.`);
       router.push("/owner/properties");
     } finally {
       setIsSubmitting(false);
@@ -178,100 +171,97 @@ export default function NewWorkspaceListingPage() {
 
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/owner/properties" className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-            <ChevronLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Create New Workspace Listing
-            </h1>
-            <p className="text-xs text-slate-500">
-              Configure property specifications, pricing tiers, amenities, and publish to the marketplace.
-            </p>
-          </div>
-        </div>
+      <div>
+        <Link
+          href="/owner/properties"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink-muted hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          My listings
+        </Link>
+        <PageHeader
+          className="mt-1"
+          title="Add a workspace"
+          description="Describe your space, set prices and choose a photo. The listing is published as soon as you submit."
+        />
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-xs">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          
-          {/* Section 1: Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-teal-600" />
-              1. Title & Workspace Type
-            </h3>
+      <div className="flex gap-3 rounded-lg border border-line bg-surface-muted p-4 text-sm text-ink-muted">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+        <p>
+          New listings appear as <span className="font-medium text-ink">New listing</span>, without a review badge.
+          Review levels such as &ldquo;Reviewed by SpaceGo&rdquo; are set by the SpaceGo team, not when you publish.
+        </p>
+      </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basics */}
+        <Card>
+          <CardHeader>
+            <CardTitle>About the space</CardTitle>
+            <CardDescription>The title and description guests see on your listing.</CardDescription>
+          </CardHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="sm:col-span-2">
                 <Input
-                  label="Workspace Title *"
+                  label="Title"
                   required
-                  placeholder="e.g. The Silicon Atelier Focus Cabin"
+                  placeholder="e.g. Quiet corner office near the station"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
-                  Workspace Category *
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as WorkspaceCategory)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                >
-                  <option value="coworking">Coworking Space</option>
-                  <option value="private_office">Private Office Suite</option>
-                  <option value="meeting_room">Meeting / Boardroom</option>
-                  <option value="training_room">Training Hall</option>
-                  <option value="studio">Production Studio</option>
-                  <option value="event_space">Event / Demo Hall</option>
-                </select>
-              </div>
+              <Select
+                label="Type of space"
+                value={category}
+                onChange={(e) => setCategory(e.target.value as WorkspaceCategory)}
+              >
+                <option value="coworking">Coworking desk</option>
+                <option value="private_office">Private office</option>
+                <option value="meeting_room">Meeting room</option>
+                <option value="training_room">Training room</option>
+                <option value="studio">Studio</option>
+                <option value="event_space">Event space</option>
+              </Select>
             </div>
 
             <Input
-              label="Headline (Punchy Summary)"
-              placeholder="e.g. Ergonomic 10-person private office with dual monitors & natural light"
+              label="Headline (optional)"
+              placeholder="e.g. 10-person private office with natural light"
+              helperText="One short sentence shown under the title."
               value={headline}
               onChange={(e) => setHeadline(e.target.value)}
             />
 
             <Textarea
-              label="Full Description"
-              rows={3}
-              placeholder="Detail the layout, acoustic qualities, high-speed fiber specifications, transit access..."
+              label="Description (optional)"
+              rows={4}
+              placeholder="Layout, noise level, internet, nearby transport…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
+        </Card>
 
-          {/* Section 2: Location & Dimensions */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-teal-600" />
-              2. Location & Capacity
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Location & size */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Location and size</CardTitle>
+          </CardHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="sm:col-span-2">
                 <Input
-                  label="Street Address *"
+                  label="Street address"
                   required
-                  placeholder="e.g. 100 Innovation Boulevard, 3rd Floor"
+                  placeholder="e.g. 100 Market Street, 3rd floor"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                 />
               </div>
-
               <Input
-                label="City *"
+                label="City"
                 required
                 placeholder="e.g. San Francisco"
                 value={city}
@@ -279,21 +269,21 @@ export default function NewWorkspaceListingPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
-                label="Maximum Seating Capacity (Seats) *"
+                label="Maximum people"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={200}
                 required
                 value={capacity}
                 onChange={(e) => setCapacity(Number(e.target.value))}
-                leftIcon={<Users className="w-4 h-4" />}
               />
-
               <Input
-                label="Floor Area (Square Feet) *"
+                label="Floor area (sq ft)"
                 type="number"
+                inputMode="numeric"
                 min={50}
                 required
                 value={squareFeet}
@@ -301,125 +291,146 @@ export default function NewWorkspaceListingPage() {
               />
             </div>
           </div>
+        </Card>
 
-          {/* Section 3: Pricing Configuration */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-teal-600" />
-              3. Pricing & Booking Model
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Pricing & booking */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Prices and booking</CardTitle>
+            <CardDescription>Prices are in US dollars. Enter at least one.</CardDescription>
+          </CardHeader>
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Input
-                label="Hourly Rate ($ USD)"
+                label="Per hour"
                 type="number"
+                inputMode="decimal"
                 min={1}
                 placeholder="e.g. 25"
                 value={hourlyPrice}
                 onChange={(e) => setHourlyPrice(e.target.value ? Number(e.target.value) : "")}
-                leftIcon={<DollarSign className="w-4 h-4" />}
+                leftIcon={<span className="text-base">$</span>}
               />
-
               <Input
-                label="Daily Rate ($ USD)"
+                label="Per day"
                 type="number"
+                inputMode="decimal"
                 min={1}
                 placeholder="e.g. 120"
                 value={dailyPrice}
                 onChange={(e) => setDailyPrice(e.target.value ? Number(e.target.value) : "")}
-                leftIcon={<DollarSign className="w-4 h-4" />}
+                leftIcon={<span className="text-base">$</span>}
               />
-
               <Input
-                label="Monthly Rate ($ USD - Optional)"
+                label="Per month"
                 type="number"
+                inputMode="decimal"
                 min={100}
                 placeholder="e.g. 2400"
                 value={monthlyPrice}
                 onChange={(e) => setMonthlyPrice(e.target.value ? Number(e.target.value) : "")}
-                leftIcon={<DollarSign className="w-4 h-4" />}
+                leftIcon={<span className="text-base">$</span>}
               />
             </div>
 
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-bold text-slate-900 block">Instant Booking Confirmation</span>
-                <span className="text-[11px] text-slate-500">Allow customers to instantly confirm reservations without waiting for manual host review.</span>
-              </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input
+                label="Opens"
+                type="time"
+                value={openTime}
+                onChange={(e) => setOpenTime(e.target.value)}
+                helperText="Monday to Friday"
+              />
+              <Input
+                label="Closes"
+                type="time"
+                value={closeTime}
+                onChange={(e) => setCloseTime(e.target.value)}
+              />
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-4 hover:bg-surface-muted">
               <input
                 type="checkbox"
                 checked={instantBook}
                 onChange={(e) => setInstantBook(e.target.checked)}
-                className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4 cursor-pointer"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-accent"
               />
-            </div>
-          </div>
-
-          {/* Section 4: Amenities */}
-          <div className="space-y-3 pt-4 border-t border-slate-100">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              Select Provided Amenities
+              <span>
+                <span className="block text-base font-medium text-ink">Instant booking</span>
+                <span className="block text-sm text-ink-muted">
+                  Bookings are confirmed straight away. Turn this off to approve each request yourself.
+                </span>
+              </span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          </div>
+        </Card>
+
+        {/* Amenities */}
+        <Card>
+          <fieldset>
+            <legend className="text-lg font-semibold text-ink">Amenities</legend>
+            <p className="mt-1 text-sm text-ink-muted">Only select what guests can actually use.</p>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {availableAmenities.map((amenity) => (
                 <label
                   key={amenity}
-                  className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-700 cursor-pointer"
+                  className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-line px-3 py-2 text-sm text-ink hover:bg-surface-muted"
                 >
                   <input
                     type="checkbox"
                     checked={selectedAmenities.includes(amenity)}
                     onChange={() => handleAmenityToggle(amenity)}
-                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-accent"
                   />
-                  <span className="truncate">{amenity}</span>
+                  <span>{amenity}</span>
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
+        </Card>
 
-          {/* Section 5: Photography Selection */}
-          <div className="space-y-3 pt-4 border-t border-slate-100">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              Select Primary Workspace Photography
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {imagePresets.map((img, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedImage(img.url)}
-                  className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
-                    selectedImage === img.url
-                      ? "border-teal-600 ring-2 ring-teal-500/30 scale-102"
-                      : "border-slate-200 opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt={img.label} className="h-28 w-full object-cover" />
-                  <div className="p-1.5 bg-white text-[11px] font-semibold text-slate-800 text-center truncate">
-                    {img.label}
-                  </div>
-                </div>
-              ))}
+        {/* Photo */}
+        <Card>
+          <fieldset>
+            <legend className="text-lg font-semibold text-ink">Cover photo</legend>
+            <p className="mt-1 text-sm text-ink-muted">Choose the photo that best matches your space.</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {imagePresets.map((img) => {
+                const selected = selectedImage === img.url;
+                return (
+                  <button
+                    key={img.url}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSelectedImage(img.url)}
+                    className={cn(
+                      "overflow-hidden rounded-md border text-left transition-colors",
+                      selected ? "border-accent ring-2 ring-accent" : "border-line hover:border-line-strong"
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img.url} alt="" className="h-28 w-full object-cover" />
+                    <span className="flex items-center justify-between gap-2 bg-surface px-3 py-2 text-sm font-medium text-ink">
+                      {img.label}
+                      {selected && <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          </fieldset>
+        </Card>
 
-          {/* Submit Action */}
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
-            <Link href="/owner/properties">
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </Link>
-            <Button type="submit" variant="teal" size="lg" className="font-bold shadow-md" isLoading={isSubmitting}>
-              <span>Publish Workspace Listing</span>
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
-
-        </form>
-      </div>
-
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Link href="/owner/properties" className={buttonClasses({ variant: "outline" })}>
+            Cancel
+          </Link>
+          <Button type="submit" isLoading={isSubmitting}>
+            Publish listing
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -7,25 +7,44 @@ import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, BookingStatus } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterTabs, PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import {
-  Inbox,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  MapPin,
-  Calendar,
-  Users,
-  Search,
-} from "lucide-react";
+import { Check, Inbox, X } from "lucide-react";
+
+type FilterValue = "all" | BookingStatus;
+
+const FILTERS: { value: FilterValue; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "pending", label: "Awaiting reply" },
+  { value: "approved", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+  { value: "declined", label: "Declined" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const DURATION_UNIT: Record<Booking["duration_type"], [string, string]> = {
+  hourly: ["hour", "hours"],
+  daily: ["day", "days"],
+  monthly: ["month", "months"],
+};
+
+function formatDuration(b: Booking): string {
+  const [one, many] = DURATION_UNIT[b.duration_type] ?? [b.duration_type, b.duration_type];
+  return `${b.duration_units} ${b.duration_units === 1 ? one : many}`;
+}
+
+function seatsLabel(seats: number): string {
+  return `${seats} ${seats === 1 ? "seat" : "seats"}`;
+}
 
 export default function OwnerBookingsPage() {
   const { user } = useAuth();
   const { success, error } = useToast();
   const dataVersion = useSpaceGoVersion();
-  const [filterTab, setFilterTab] = useState<"all" | BookingStatus>("all");
+  const [filterTab, setFilterTab] = useState<FilterValue>("all");
   const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
 
   const bookings = useMemo<Booking[]>(() => {
@@ -44,8 +63,8 @@ export default function OwnerBookingsPage() {
       return;
     }
     success(
-      status === "approved" ? "Booking Approved" : "Booking Declined",
-      status === "approved" ? `Reservation ${id} has been confirmed.` : `Request ${id} has been declined.`
+      status === "approved" ? "Booking confirmed" : "Request declined",
+      status === "approved" ? `Booking ${id} is now confirmed.` : `Request ${id} has been declined.`
     );
   };
 
@@ -57,120 +76,180 @@ export default function OwnerBookingsPage() {
     return b.status === filterTab;
   });
 
+  const filterOptions = FILTERS.map((f) => ({
+    ...f,
+    count: f.value === "all" ? bookings.length : bookings.filter((b) => b.status === f.value).length,
+  }));
+
+  const renderActions = (b: Booking) =>
+    b.status === "pending" ? (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={() => handleApprove(b.id)}
+          disabled={busyBookingId !== null}
+          isLoading={busyBookingId === b.id}
+        >
+          {busyBookingId !== b.id && <Check className="h-4 w-4" aria-hidden="true" />}
+          Approve
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleDecline(b.id)}
+          disabled={busyBookingId !== null}
+          className="text-danger"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          Decline
+        </Button>
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Booking Requests & Ledger
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Review seeker reservation requests, approve slots, and manage visitor schedules.
-          </p>
-        </div>
+      <PageHeader
+        title="Bookings"
+        description="Confirm or decline requests for your spaces and keep track of past bookings."
+      />
 
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-2xl">
-          {(["all", "pending", "approved", "completed", "cancelled"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilterTab(tab)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all cursor-pointer ${
-                filterTab === tab
-                  ? "bg-white text-slate-950 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
+      <FilterTabs label="Filter bookings by status" value={filterTab} options={filterOptions} onChange={setFilterTab} />
 
       {filtered.length === 0 ? (
-        <EmptyState
-          icon={<Inbox className="w-8 h-8" />}
-          title="No booking requests found"
-          description="There are currently no reservations under this filter tab."
-        />
+        bookings.length === 0 ? (
+          <EmptyState
+            icon={<Inbox />}
+            title="No bookings yet"
+            description="When someone requests or books one of your spaces, it will appear here."
+          />
+        ) : (
+          <EmptyState
+            icon={<Inbox />}
+            title="No bookings with this status"
+            description="Try another filter to see the rest of your bookings."
+            actionLabel="Show all bookings"
+            onAction={() => setFilterTab("all")}
+          />
+        )
       ) : (
-        <div className="space-y-4">
-          {filtered.map((b) => (
-            <div
-              key={b.id}
-              className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-xs hover:border-slate-300 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-5"
-            >
-              <div className="flex items-start sm:items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={b.space_image}
-                  alt=""
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-200 shrink-0"
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                      {b.id}
-                    </span>
+        <>
+          {/* Wide screens: table */}
+          <Card padding="none" className="hidden overflow-hidden lg:block">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-line bg-surface-muted text-ink-muted">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">Booking</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Guest</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Dates</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Total</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {filtered.map((b) => (
+                  <tr key={b.id} className="align-top">
+                    <td className="px-4 py-4">
+                      <div className="flex gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={b.space_image}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-md border border-line object-cover"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-base font-medium text-ink">{b.space_title}</p>
+                          <p className="font-mono text-sm text-ink-subtle">{b.id}</p>
+                          {b.special_requests && (
+                            <p className="mt-1 max-w-xs text-sm text-ink-muted">
+                              <span className="font-medium text-ink">Note:</span> {b.special_requests}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-ink">{b.user_name}</p>
+                      <p className="break-all text-ink-muted">{b.user_email}</p>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <p className="text-ink">{formatDate(b.start_date)}</p>
+                      <p className="text-ink-muted">
+                        {formatDuration(b)} · {seatsLabel(b.seats)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4 text-right font-medium whitespace-nowrap text-ink">
+                      {formatCurrency(b.total_price, b.currency)}
+                    </td>
+                    <td className="px-4 py-4">
+                      <BookingStatusBadge status={b.status} />
+                    </td>
+                    <td className="px-4 py-4">{renderActions(b)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* Small screens: stacked cards */}
+          <ul className="space-y-3 lg:hidden">
+            {filtered.map((b) => (
+              <li key={b.id}>
+                <Card padding="sm" className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={b.space_image}
+                        alt=""
+                        className="h-12 w-12 shrink-0 rounded-md border border-line object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-base font-medium text-ink">{b.space_title}</p>
+                        <p className="font-mono text-sm text-ink-subtle">{b.id}</p>
+                      </div>
+                    </div>
                     <BookingStatusBadge status={b.status} />
                   </div>
-                  <h3 className="text-base font-bold text-slate-900">{b.space_title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-800">Seeker: {b.user_name}</span>
-                    <span>({b.user_email})</span>
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    {formatDate(b.start_date)} • {b.duration_units} {b.duration_type} • {b.seats} seats
-                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="col-span-2">
+                      <dt className="text-ink-muted">Guest</dt>
+                      <dd className="text-ink">
+                        {b.user_name} <span className="break-all text-ink-muted">({b.user_email})</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-muted">Starts</dt>
+                      <dd className="text-ink">{formatDate(b.start_date)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-muted">Length</dt>
+                      <dd className="text-ink">
+                        {formatDuration(b)} · {seatsLabel(b.seats)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-muted">Total</dt>
+                      <dd className="font-medium text-ink">{formatCurrency(b.total_price, b.currency)}</dd>
+                    </div>
+                  </dl>
+
                   {b.special_requests && (
-                    <p className="text-[11px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 max-w-lg mt-1">
-                      Note: &ldquo;{b.special_requests}&rdquo;
+                    <p className="text-sm text-ink-muted">
+                      <span className="font-medium text-ink">Note:</span> {b.special_requests}
                     </p>
                   )}
-                </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 self-end lg:self-center">
-                <div className="text-right mr-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Value</span>
-                  <span className="text-base font-bold text-slate-900">
-                    {formatCurrency(b.total_price, b.currency)}
-                  </span>
-                </div>
-
-                {b.status === "pending" && (
-                  <>
-                    <Button
-                      variant="teal"
-                      size="sm"
-                      onClick={() => handleApprove(b.id)}
-                      disabled={busyBookingId !== null}
-                      className="gap-1 font-semibold"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Approve</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDecline(b.id)}
-                      disabled={busyBookingId !== null}
-                      className="text-rose-600 border-rose-200 hover:bg-rose-50"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Decline</span>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                  {renderActions(b)}
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-
     </div>
   );
 }
