@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/navigation/Navbar";
@@ -12,6 +12,7 @@ import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest, ActivationStatus } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import {
   Search,
   Sparkles,
@@ -40,39 +41,44 @@ function TrackActivationContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
-  const [searchRef, setSearchRef] = useState(searchParams.get("ref") || "ACT-2026-3420");
-  const [selectedRequest, setSelectedRequest] = useState<PropertyActivationRequest | null>(null);
-  const [allRequests, setAllRequests] = useState<PropertyActivationRequest[]>([]);
+  const dataVersion = useSpaceGoVersion();
+  const refParam = searchParams.get("ref") || "";
+
+  const [searchRef, setSearchRef] = useState(refParam);
+  // null = default selection (the ?ref= record, else the newest visible one).
+  const [lookupId, setLookupId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    const list = SpaceGoStore.getActivationRequests();
-    setAllRequests(list);
+  // In remote mode only the owner's own records (via spacego_owner_activations)
+  // or, for admins, all records are visible, so lookups are naturally scoped.
+  const allRequests = useMemo<PropertyActivationRequest[]>(() => {
+    void dataVersion;
+    if (SpaceGoStore.isRemoteEnabled() && !user) return [];
+    return SpaceGoStore.getActivationRequests();
+  }, [dataVersion, user]);
 
-    const ref = searchParams.get("ref") || "ACT-2026-3420";
-    const found = SpaceGoStore.getActivationRequestById(ref);
-    if (found) {
-      setSelectedRequest(found);
-      setSearchRef(found.id);
-      setErrorMessage("");
-    } else if (list.length > 0) {
-      setSelectedRequest(list[0]);
-      setSearchRef(list[0].id);
-    }
-  }, [searchParams]);
+  const selectedRequest = useMemo<PropertyActivationRequest | null>(() => {
+    const byId = (id: string) =>
+      id ? allRequests.find((r) => r.id.toLowerCase() === id.trim().toLowerCase()) : undefined;
+    if (lookupId !== null) return byId(lookupId) ?? null;
+    return byId(refParam) ?? allRequests[0] ?? null;
+  }, [allRequests, lookupId, refParam]);
+
+  const setSelectedRequest = (req: PropertyActivationRequest) => setLookupId(req.id);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchRef.trim()) return;
 
-    const found = SpaceGoStore.getActivationRequestById(searchRef);
-    if (found) {
-      setSelectedRequest(found);
-      setErrorMessage("");
-    } else {
-      setSelectedRequest(null);
-      setErrorMessage(`No activation record found for reference "${searchRef}". Please check the ID.`);
-    }
+    setLookupId(searchRef.trim());
+    const found = allRequests.some(
+      (r) => r.id.toLowerCase() === searchRef.trim().toLowerCase()
+    );
+    setErrorMessage(
+      found
+        ? ""
+        : `No activation record found for reference "${searchRef}". Check the ID, and make sure you are signed in with the account that submitted it.`
+    );
   };
 
   const stages: { key: ActivationStatus; label: string; desc: string }[] = [
@@ -120,7 +126,7 @@ function TrackActivationContent() {
                 Track Property Activation Status
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Monitor your space's progress through demand cross-referencing, architectural assessment, and Space Passport™ verification.
+                Monitor your space&apos;s progress through demand cross-referencing, architectural assessment, and Space Passport™ verification.
               </p>
             </div>
 

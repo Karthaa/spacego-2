@@ -104,16 +104,26 @@ export default function NewWorkspaceListingPage() {
     },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !address || !city) {
       error("Missing Information", "Please enter workspace title and location address.");
       return;
     }
 
+    if (!user) {
+      error("Sign in required", "Sign in with your owner account to create a listing.");
+      return;
+    }
+
+    if (!hourlyPrice && !dailyPrice && !monthlyPrice) {
+      error("Missing Pricing", "Enter at least one hourly, daily or monthly price.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const created = SpaceGoStore.addSpace({
+      const result = await SpaceGoStore.addSpace({
         title,
         category,
         headline: headline || "Modern flexible workspace tailored for productivity.",
@@ -139,7 +149,6 @@ export default function NewWorkspaceListingPage() {
           days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
         },
         house_rules: ["Quiet focus maintained in open areas", "Clear personal items when leaving"],
-        verification_level: "checked",
         images: [
           {
             url: selectedImage,
@@ -147,16 +156,22 @@ export default function NewWorkspaceListingPage() {
             is_cover: true,
           },
         ],
-        owner_id: user?.id || "user-owner-1",
-        owner_name: user?.full_name || "Elena Rostova",
-        owner_avatar: user?.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80",
-        owner_email: user?.email || "elena.owner@spacego.io",
         status: "published",
         instant_book: instantBook,
+      }, {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        avatar_url: user.avatar_url,
       });
 
+      if (!result.ok) {
+        error("Could not create listing", result.error);
+        return;
+      }
+
       confetti({ particleCount: 70, spread: 60 });
-      success("Workspace Created & Published!", `Listing is now live on SpaceGo: ${created.title}`);
+      success("Workspace Created & Published!", `Listing is now live on SpaceGo: ${result.data.title}`);
       router.push("/owner/properties");
     } finally {
       setIsSubmitting(false);
@@ -210,7 +225,7 @@ export default function NewWorkspaceListingPage() {
                 </label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
+                  onChange={(e) => setCategory(e.target.value as WorkspaceCategory)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                 >
                   <option value="coworking">Coworking Space</option>

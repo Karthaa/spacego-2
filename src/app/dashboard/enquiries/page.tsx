@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { WorkspaceEnquiry } from "@/types";
 import { DemandRequestModal } from "@/components/common/DemandRequestModal";
@@ -13,17 +14,14 @@ import { Sparkles, MapPin, Users, Calendar, DollarSign, Plus } from "lucide-reac
 
 export default function SeekerEnquiriesPage() {
   const { user } = useAuth();
-  const [enquiries, setEnquiries] = useState<WorkspaceEnquiry[]>([]);
+  const dataVersion = useSpaceGoVersion();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const loadData = () => {
-    const list = SpaceGoStore.getEnquiries();
-    setEnquiries(list);
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [user]);
+  // Only the signed-in user's own requests (RLS also enforces this remotely).
+  const enquiries = useMemo<WorkspaceEnquiry[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getEnquiriesByUser(user.id) : [];
+  }, [user, dataVersion]);
 
   return (
     <div className="space-y-6">
@@ -105,10 +103,7 @@ export default function SeekerEnquiriesPage() {
 
       <DemandRequestModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          loadData();
-        }}
+        onClose={() => setIsModalOpen(false)}
       />
 
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest } from "@/types";
 import { ActivationStatusBadge } from "@/components/ui/Badge";
@@ -21,14 +22,14 @@ import {
 
 export default function OwnerActivationProjectsPage() {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<PropertyActivationRequest[]>([]);
+  const dataVersion = useSpaceGoVersion();
 
-  useEffect(() => {
-    if (user) {
-      const all = SpaceGoStore.getActivationRequests();
-      setRequests(all);
-    }
-  }, [user]);
+  // Remote mode loads this from spacego_owner_activations, which already
+  // limits rows to auth.uid(); filtering by owner keeps admins/demo correct.
+  const requests = useMemo<PropertyActivationRequest[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getActivationRequestsByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
   return (
     <div className="space-y-6">

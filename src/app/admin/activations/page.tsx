@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { PropertyActivationRequest, ActivationStatus } from "@/types";
 import { ActivationStatusBadge } from "@/components/ui/Badge";
@@ -24,8 +25,13 @@ import {
 } from "lucide-react";
 
 export default function AdminActivationsPage() {
-  const { success } = useToast();
-  const [requests, setRequests] = useState<PropertyActivationRequest[]>([]);
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const requests = useMemo<PropertyActivationRequest[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getActivationRequests();
+  }, [dataVersion]);
+  const [isSaving, setIsSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | ActivationStatus>("all");
   const [selectedRequest, setSelectedRequest] = useState<PropertyActivationRequest | null>(null);
 
@@ -37,14 +43,6 @@ export default function AdminActivationsPage() {
   const [readinessScore, setReadinessScore] = useState(15);
   const [locationScore, setLocationScore] = useState(12);
   const [opScore, setOpScore] = useState(8);
-
-  const loadRequests = () => {
-    setRequests(SpaceGoStore.getActivationRequests());
-  };
-
-  useEffect(() => {
-    loadRequests();
-  }, []);
 
   const openReviewModal = (req: PropertyActivationRequest) => {
     setSelectedRequest(req);
@@ -59,13 +57,14 @@ export default function AdminActivationsPage() {
     }
   };
 
-  const handleSaveReview = (e: React.FormEvent) => {
+  const handleSaveReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRequest) return;
+    if (!selectedRequest || isSaving) return;
 
     const total = demandScore + econScore + readinessScore + locationScore + opScore;
 
-    const updated = SpaceGoStore.updateActivationStatus(
+    setIsSaving(true);
+    const result = await SpaceGoStore.updateActivationStatus(
       selectedRequest.id,
       newStatus,
       adminNotes,
@@ -80,11 +79,14 @@ export default function AdminActivationsPage() {
       }
     );
 
-    if (updated) {
-      loadRequests();
-      setSelectedRequest(null);
-      success("Activation Request Updated", `Updated ${updated.id} to ${newStatus.toUpperCase()}`);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      error("Could not update activation request", result.error);
+      return;
     }
+    setSelectedRequest(null);
+    success("Activation Request Updated", `Updated ${result.data.id} to ${newStatus.toUpperCase()}`);
   };
 
   const filtered = requests.filter((r) => {
@@ -207,7 +209,7 @@ export default function AdminActivationsPage() {
               </label>
               <select
                 value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as any)}
+                onChange={(e) => setNewStatus(e.target.value as ActivationStatus)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
               >
                 <option value="submitted">Submitted (In Queue)</option>
@@ -319,7 +321,7 @@ export default function AdminActivationsPage() {
               <Button type="button" variant="outline" onClick={() => setSelectedRequest(null)}>
                 Cancel
               </Button>
-              <Button type="submit" variant="teal" className="font-bold">
+              <Button type="submit" variant="teal" className="font-bold" isLoading={isSaving}>
                 Save Assessment & Notify Owner
               </Button>
             </div>

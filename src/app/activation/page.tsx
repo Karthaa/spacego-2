@@ -101,17 +101,23 @@ export default function PropertyActivationPage() {
     },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ownerName || !email || !propertyAddress || !city) {
       error("Missing Required Fields", "Please provide owner contact and property location.");
       return;
     }
 
+    if (SpaceGoStore.isRemoteEnabled() && !user) {
+      error("Sign in required", "Sign in with an owner account to submit a property for activation.");
+      router.push(`/auth/login?redirect=${encodeURIComponent("/activation")}`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const created = SpaceGoStore.createActivationRequest({
+      const result = await SpaceGoStore.createActivationRequest({
         owner_id: user?.id,
         owner_name: ownerName,
         email,
@@ -129,13 +135,18 @@ export default function PropertyActivationPage() {
         photos: [selectedPhoto],
       });
 
-      setSubmittedRequest(created);
+      if (!result.ok) {
+        error("Activation request not submitted", result.error);
+        return;
+      }
+
+      setSubmittedRequest(result.data);
       confetti({
         particleCount: 90,
         spread: 70,
         origin: { y: 0.6 },
       });
-      success("Activation Request Registered!", `Reference Code: ${created.id}`);
+      success("Activation Request Registered!", `Reference Code: ${result.data.id}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -391,7 +402,7 @@ export default function PropertyActivationPage() {
                   </label>
                   <select
                     value={propertyType}
-                    onChange={(e) => setPropertyType(e.target.value as any)}
+                    onChange={(e) => setPropertyType(e.target.value as PropertyActivationRequest["property_type"])}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   >
                     <option value="vacant_floor">Vacant Commercial Floor</option>
@@ -420,7 +431,7 @@ export default function PropertyActivationPage() {
                   </label>
                   <select
                     value={condition}
-                    onChange={(e) => setCondition(e.target.value as any)}
+                    onChange={(e) => setCondition(e.target.value as PropertyActivationRequest["current_condition"])}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   >
                     <option value="fully_furnished">Fully Furnished & Wired</option>
@@ -479,7 +490,7 @@ export default function PropertyActivationPage() {
                   </label>
                   <select
                     value={preferredModel}
-                    onChange={(e) => setPreferredModel(e.target.value as any)}
+                    onChange={(e) => setPreferredModel(e.target.value as PropertyActivationRequest["preferred_model"])}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   >
                     <option value="assisted_activation">Assisted Activation (Recommended)</option>

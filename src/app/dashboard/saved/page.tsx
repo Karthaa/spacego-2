@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space } from "@/types";
 import { SpaceCard } from "@/components/common/SpaceCard";
@@ -12,19 +13,14 @@ import { Button } from "@/components/ui/Button";
 
 export default function SavedSpacesPage() {
   const { user } = useAuth();
-  const [savedSpaces, setSavedSpaces] = useState<Space[]>([]);
+  const dataVersion = useSpaceGoVersion();
 
-  const loadSaved = () => {
-    if (user) {
-      const favIds = SpaceGoStore.getUserFavourites(user.id);
-      const allSpaces = SpaceGoStore.getSpaces();
-      setSavedSpaces(allSpaces.filter((s) => favIds.includes(s.id)));
-    }
-  };
-
-  useEffect(() => {
-    loadSaved();
-  }, [user]);
+  const savedSpaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    if (!user) return [];
+    const favIds = SpaceGoStore.getUserFavourites(user.id);
+    return SpaceGoStore.getPublishedSpaces().filter((s) => favIds.includes(s.id));
+  }, [user, dataVersion]);
 
   return (
     <div className="space-y-6">
@@ -62,8 +58,6 @@ export default function SavedSpacesPage() {
             <SpaceCard
               key={space.id}
               space={space}
-              isFavorited={true}
-              onFavoriteToggle={() => loadSaved()}
             />
           ))}
         </div>

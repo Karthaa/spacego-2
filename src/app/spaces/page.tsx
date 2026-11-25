@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { SpaceCardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { Space, WorkspaceCategory, VerificationLevel } from "@/types";
 import {
   Search,
@@ -43,8 +44,14 @@ function SpacesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const dataVersion = useSpaceGoVersion();
+  // The data provider hydrates before rendering, so there is no separate
+  // loading phase here; the list refreshes whenever the store changes.
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getPublishedSpaces();
+  }, [dataVersion]);
+  const isLoading = false;
 
   // Filter States
   const [query, setQuery] = useState(searchParams.get("location") || "");
@@ -69,21 +76,17 @@ function SpacesContent() {
   // Demand Request Modal
   const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
 
-  // Load spaces from store
-  useEffect(() => {
-    setIsLoading(true);
-    const data = SpaceGoStore.getSpaces();
-    setSpaces(data);
-    setIsLoading(false);
-  }, []);
-
-  // Update query when searchParams change
-  useEffect(() => {
+  // Update filters when the URL search params change (adjusting state during
+  // render, rather than in an effect, avoids a cascading re-render).
+  const paramsKey = searchParams.toString();
+  const [syncedParamsKey, setSyncedParamsKey] = useState(paramsKey);
+  if (paramsKey !== syncedParamsKey) {
+    setSyncedParamsKey(paramsKey);
     const loc = searchParams.get("location");
     if (loc) setQuery(loc);
     const cat = searchParams.get("category") as WorkspaceCategory;
     if (cat) setCategory(cat);
-  }, [searchParams]);
+  }
 
   const allAmenitiesList = [
     "Ultra-Fast 500 Mbps Fiber",
@@ -248,7 +251,7 @@ function SpacesContent() {
               {quickCategories.map((cat) => (
                 <button
                   key={cat.id}
-                  onClick={() => setCategory(cat.id as any)}
+                  onClick={() => setCategory(cat.id as WorkspaceCategory | "all")}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     category === cat.id
                       ? "bg-slate-950 text-white shadow-xs"
@@ -322,7 +325,7 @@ function SpacesContent() {
                 </label>
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
+                  onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                 >
                   <option value="all">All Categories</option>
@@ -379,7 +382,7 @@ function SpacesContent() {
                 </label>
                 <select
                   value={selectedVerification}
-                  onChange={(e) => setSelectedVerification(e.target.value as any)}
+                  onChange={(e) => setSelectedVerification(e.target.value as VerificationLevel | "all")}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                 >
                   <option value="all">Any Verification Tier</option>
@@ -488,7 +491,7 @@ function SpacesContent() {
                   <label className="text-xs font-semibold text-slate-400 hidden sm:block">Sort:</label>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                     className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
                   >
                     <option value="recommended">Recommended & Verified</option>

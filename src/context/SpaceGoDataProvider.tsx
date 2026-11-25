@@ -1,38 +1,57 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useAuth } from "@/context/AuthContext";
 
 const HYDRATION_TIMEOUT_MS = 8000;
 
 /**
- * Loads the Supabase-backed collections before rendering the app. When
- * Supabase is not configured, this is a pass-through and the demo keeps
- * using localStorage.
+ * Loads the data the signed-in viewer may see (public spaces for everyone,
+ * plus RLS-filtered private rows for the signed-in user) and reloads it when
+ * the user or their role changes. When Supabase is not configured this is a
+ * pass-through and the demo keeps using localStorage.
+ *
+ * Must be rendered inside <AuthProvider>.
  */
 export function SpaceGoDataProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(!SpaceGoStore.isRemoteEnabled());
+  const { user, isLoading } = useAuth();
+  const remote = SpaceGoStore.isRemoteEnabled();
+  const [ready, setReady] = useState(!remote);
+
+  const viewerId = user?.id ?? null;
+  const viewerRole = user?.role ?? null;
 
   useEffect(() => {
-    if (!SpaceGoStore.isRemoteEnabled()) return;
+    if (!remote || isLoading) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const timeout = new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(false), HYDRATION_TIMEOUT_MS);
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), HYDRATION_TIMEOUT_MS);
     });
 
-    Promise.race([SpaceGoStore.hydrate(), timeout]).finally(() => {
-      if (timer) clearTimeout(timer);
-      if (!cancelled) setReady(true);
-    });
+    const next = viewerId && viewerRole ? { id: viewerId, role: viewerRole } : null;
+
+    Promise.race([SpaceGoStore.hydrate(next), timeout])
+      .then((result) => {
+        if (result && !result.ok) {
+          console.error("SpaceGo: some workspace data could not be loaded:", result.error);
+        } else if (!result) {
+          console.error("SpaceGo: loading workspace data timed out; showing what is available.");
+        }
+      })
+      .finally(() => {
+        if (timer) clearTimeout(timer);
+        if (!cancelled) setReady(true);
+      });
 
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, []);
+  }, [remote, isLoading, viewerId, viewerRole]);
 
   if (!ready) {
     return (
@@ -48,4 +67,17 @@ export function SpaceGoDataProvider({ children }: { children: React.ReactNode })
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Subscribe a component to store changes. Read store snapshots inside
+ * `useMemo(() => ..., [version, ...])` so they refresh after hydration and
+ * after every successful write.
+ */
+export function useSpaceGoVersion(): number {
+  return useSyncExternalStore(
+    SpaceGoStore.subscribe,
+    SpaceGoStore.getVersion,
+    () => 0
+  );
 }

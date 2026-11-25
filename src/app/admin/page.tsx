@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
-import { Space, Booking, PropertyActivationRequest, DemandSearch } from "@/types";
+import { Space, Booking, PropertyActivationRequest } from "@/types";
 import { BookingStatusBadge, ActivationStatusBadge, VerificationBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -21,17 +22,19 @@ import {
 } from "lucide-react";
 
 export default function AdminOverviewPage() {
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activations, setActivations] = useState<PropertyActivationRequest[]>([]);
-  const [demandSearches, setDemandSearches] = useState<DemandSearch[]>([]);
-
-  useEffect(() => {
-    setSpaces(SpaceGoStore.getSpaces());
-    setBookings(SpaceGoStore.getBookings());
-    setActivations(SpaceGoStore.getActivationRequests());
-    setDemandSearches(SpaceGoStore.getDemandSearches());
-  }, []);
+  const dataVersion = useSpaceGoVersion();
+  const { spaces, bookings, activations } = useMemo<{
+    spaces: Space[];
+    bookings: Booking[];
+    activations: PropertyActivationRequest[];
+  }>(() => {
+    void dataVersion;
+    return {
+      spaces: SpaceGoStore.getSpaces(),
+      bookings: SpaceGoStore.getBookings(),
+      activations: SpaceGoStore.getActivationRequests(),
+    };
+  }, [dataVersion]);
 
   const totalGMV = bookings
     .filter((b) => b.status === "approved" || b.status === "completed")

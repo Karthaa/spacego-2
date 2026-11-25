@@ -10,6 +10,8 @@ import {
   ActivationStatus,
   BookingStatus,
   ActivationScore,
+  UserRole,
+  WorkspaceCategory,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -20,18 +22,92 @@ import {
   INITIAL_NOTIFICATIONS,
 } from "./mockData";
 import {
-  deleteRow,
-  fetchFavourites,
+  callRpc,
+  deleteSpaceRow,
+  fetchFavouriteIds,
   fetchRows,
+  insertSpaceRow,
   isRemoteEnabled as isSupabaseBackendEnabled,
+  REMOTE_RPCS,
   REMOTE_TABLES,
-  saveRow,
-  seedFavourites,
-  seedRows,
+  REMOTE_VIEWS,
   setFavouriteRow,
+  updateSpaceRow,
 } from "./remote";
 
-// Storage keys
+/**
+ * SpaceGo data store.
+ *
+ * Two modes:
+ *  - Remote (Supabase configured): data lives in memory only, loaded for the
+ *    signed-in viewer through RLS-filtered tables, the sanitized public view
+ *    and the owner activation view. Every write goes through a validated RPC
+ *    (or, for spaces/favourites, an RLS-guarded direct write) and is awaited;
+ *    failures are returned to the caller, never swallowed.
+ *  - Local demo (Supabase not configured): the original localStorage demo.
+ *
+ * Reads are synchronous snapshots. Components subscribe via
+ * `useSpaceGoVersion()` (see SpaceGoDataProvider) to re-read after changes.
+ */
+
+export type StoreResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+export interface StoreViewer {
+  id: string;
+  role: UserRole;
+}
+
+export interface DemandAnalyticsRow {
+  location_query: string;
+  category: string | null;
+  total_searches: number;
+  zero_result_searches: number;
+  searches_with_seats: number;
+}
+
+export interface CreateBookingInput {
+  space: Space;
+  user: { id: string; name: string; email: string };
+  start_date: string;
+  end_date: string;
+  duration_type: "hourly" | "daily" | "monthly";
+  duration_units: number;
+  seats: number;
+  /** Used by local demo mode only; the server always recalculates the price. */
+  total_price: number;
+  special_requests?: string;
+}
+
+export type NewSpaceInput = Partial<Space> & {
+  title: string;
+  category: Space["category"];
+};
+
+export interface SpaceOwner {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar_url?: string;
+}
+
+export type ActivationInput = Omit<
+  PropertyActivationRequest,
+  "id" | "status" | "created_at" | "activation_score" | "admin_notes"
+>;
+
+export type EnquiryInput = Omit<WorkspaceEnquiry, "id" | "status" | "created_at" | "user_id">;
+
+const WORKSPACE_CATEGORIES: readonly WorkspaceCategory[] = [
+  "coworking",
+  "private_office",
+  "meeting_room",
+  "training_room",
+  "studio",
+  "event_space",
+];
+
+// Local demo storage keys. In remote mode these are never written, and any
+// copies left by older builds (which cached other users' rows) are removed.
 const SPACES_KEY = "spacego_spaces";
 const BOOKINGS_KEY = "spacego_bookings";
 const ACTIVATIONS_KEY = "spacego_activations";
@@ -40,16 +116,83 @@ const ENQUIRIES_KEY = "spacego_enquiries";
 const NOTIFICATIONS_KEY = "spacego_notifications";
 const FAVOURITES_KEY = "spacego_favourites";
 
-const DEFAULT_FAVOURITES: Record<string, string[]> = {
-  "user-seeker-1": ["space-1", "space-3"],
-};
+const LEGACY_LOCAL_KEYS = [
+  SPACES_KEY,
+  BOOKINGS_KEY,
+  ACTIVATIONS_KEY,
+  DEMAND_KEY,
+  ENQUIRIES_KEY,
+  NOTIFICATIONS_KEY,
+  FAVOURITES_KEY,
+];
 
-let hydratePromise: Promise<boolean> | null = null;
+// ---------------------------------------------------------------------------
+// Change subscription
+// ---------------------------------------------------------------------------
+
+const listeners = new Set<() => void>();
+let version = 0;
+
+function notify(): void {
+  version += 1;
+  listeners.forEach((listener) => listener());
+}
+
+// ---------------------------------------------------------------------------
+// Remote (in-memory) state
+// ---------------------------------------------------------------------------
+
+interface RemoteState {
+  spaces: Space[];
+  bookings: Booking[];
+  activations: PropertyActivationRequest[];
+  demand: DemandSearch[];
+  enquiries: WorkspaceEnquiry[];
+  notifications: NotificationItem[];
+  favourites: string[];
+}
+
+function emptyRemoteState(): RemoteState {
+  return {
+    spaces: [],
+    bookings: [],
+    activations: [],
+    demand: [],
+    enquiries: [],
+    notifications: [],
+    favourites: [],
+  };
+}
+
+let remoteState: RemoteState = emptyRemoteState();
+let viewer: StoreViewer | null = null;
+let hydrateKey: string | null = null;
+let hydratePromise: Promise<StoreResult<null>> | null = null;
+
+function remoteMode(): boolean {
+  return isSupabaseBackendEnabled();
+}
+
+function viewerKey(next: StoreViewer | null): string {
+  return next ? `${next.id}:${next.role}` : "anon";
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function newestFirst<T extends { created_at?: string }>(items: T[]): T[] {
   return [...items].sort((a, b) =>
     (b.created_at ?? "").localeCompare(a.created_at ?? "")
   );
+}
+
+function upsertById<T extends { id: string }>(items: T[], item: T): T[] {
+  const index = items.findIndex((existing) => existing.id === item.id);
+  if (index === -1) return [item, ...items];
+  const next = [...items];
+  next[index] = item;
+  return next;
 }
 
 function getStored<T>(key: string, fallback: T): T {
@@ -72,136 +215,368 @@ function setStored<T>(key: string, data: T): void {
   }
 }
 
+function clearLegacyLocalCopies(): void {
+  if (typeof window === "undefined") return;
+  try {
+    LEGACY_LOCAL_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage may be unavailable (private browsing); nothing to clean up.
+  }
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function stringOr(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/**
+ * Normalise a space row. Rows from `spacego_public_spaces` intentionally omit
+ * owner_id, owner_email, coordinates and passport inspector fields, and emit
+ * null for unset prices; fill safe defaults so the UI types hold.
+ */
+function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
+  const location: Partial<Space["location"]> = raw.location ?? {};
+  const pricing: Partial<Space["pricing"]> = raw.pricing ?? {};
+  const passport: Partial<Space["passport"]> = raw.passport ?? {};
+  const hours: Partial<Space["operating_hours"]> = raw.operating_hours ?? {};
+
+  return {
+    id: raw.id,
+    title: stringOr(raw.title, "Untitled workspace"),
+    slug: stringOr(raw.slug, raw.id),
+    category: (WORKSPACE_CATEGORIES as readonly string[]).includes(raw.category ?? "")
+      ? (raw.category as WorkspaceCategory)
+      : "coworking",
+    headline: stringOr(raw.headline, ""),
+    description: stringOr(raw.description, ""),
+    location: {
+      city: stringOr(location.city, ""),
+      address: stringOr(location.address, ""),
+      state: optionalString(location.state),
+      country: stringOr(location.country, ""),
+      postal_code: optionalString(location.postal_code),
+      landmark: optionalString(location.landmark),
+      coordinates: {
+        lat: numberOr(location.coordinates?.lat, 0),
+        lng: numberOr(location.coordinates?.lng, 0),
+      },
+    },
+    capacity: numberOr(raw.capacity, 0),
+    square_feet: numberOr(raw.square_feet, 0),
+    pricing: {
+      hourly: optionalNumber(pricing.hourly),
+      daily: optionalNumber(pricing.daily),
+      weekly: optionalNumber(pricing.weekly),
+      monthly: optionalNumber(pricing.monthly),
+      currency: stringOr(pricing.currency, "USD") || "USD",
+    },
+    amenities: Array.isArray(raw.amenities) ? raw.amenities : [],
+    operating_hours: {
+      open: stringOr(hours.open, ""),
+      close: stringOr(hours.close, ""),
+      days: Array.isArray(hours.days) ? hours.days : [],
+    },
+    house_rules: Array.isArray(raw.house_rules) ? raw.house_rules : [],
+    verification_level: raw.verification_level ?? "listed",
+    passport: {
+      identity_verified: Boolean(passport.identity_verified),
+      property_authority_verified: Boolean(passport.property_authority_verified),
+      permitted_use_confirmed: Boolean(passport.permitted_use_confirmed),
+      connectivity_tested_mbps: numberOr(passport.connectivity_tested_mbps, 0),
+      power_backup_tested: Boolean(passport.power_backup_tested),
+      fire_safety_inspected: Boolean(passport.fire_safety_inspected),
+      inspected_by: stringOr(passport.inspected_by, ""),
+      inspected_at: stringOr(passport.inspected_at, ""),
+      renewal_date: stringOr(passport.renewal_date, ""),
+      notes: stringOr(passport.notes, ""),
+    },
+    images: Array.isArray(raw.images) ? raw.images : [],
+    owner_id: stringOr(raw.owner_id, ""),
+    owner_name: stringOr(raw.owner_name, ""),
+    owner_avatar: stringOr(raw.owner_avatar, ""),
+    owner_email: optionalString(raw.owner_email),
+    status: raw.status ?? "published",
+    rating: numberOr(Number(raw.rating), 0),
+    review_count: numberOr(Number(raw.review_count), 0),
+    instant_book: Boolean(raw.instant_book),
+    created_at: stringOr(raw.created_at, ""),
+  };
+}
+
+function normalizeBooking(raw: Booking): Booking {
+  return {
+    ...raw,
+    total_price: Number(raw.total_price) || 0,
+    special_requests: optionalString(raw.special_requests),
+    access_code: optionalString(raw.access_code),
+  };
+}
+
+/** Owner view rows omit breakdown_notes/admin_notes and may carry null scores. */
+function normalizeActivation(raw: PropertyActivationRequest): PropertyActivationRequest {
+  const score = raw.activation_score as Partial<Record<keyof ActivationScore, unknown>> | null | undefined;
+  const hasScore = score && typeof score === "object" && typeof score.total === "number";
+
+  return {
+    ...raw,
+    existing_facilities: Array.isArray(raw.existing_facilities) ? raw.existing_facilities : [],
+    photos: Array.isArray(raw.photos) ? raw.photos : [],
+    approx_square_feet: Number(raw.approx_square_feet) || 0,
+    expected_budget_usd: Number(raw.expected_budget_usd) || 0,
+    admin_notes: optionalString(raw.admin_notes),
+    activation_score: hasScore
+      ? {
+          total: numberOr(score.total, 0),
+          demand_score: numberOr(score.demand_score, 0),
+          economics_score: numberOr(score.economics_score, 0),
+          readiness_score: numberOr(score.readiness_score, 0),
+          location_score: numberOr(score.location_score, 0),
+          operational_score: numberOr(score.operational_score, 0),
+          breakdown_notes: stringOr(score.breakdown_notes, ""),
+        }
+      : undefined,
+  };
+}
+
+function normalizeEnquiry(raw: WorkspaceEnquiry): WorkspaceEnquiry {
+  return {
+    ...raw,
+    company: optionalString(raw.company),
+    budget_range: stringOr(raw.budget_range, ""),
+    notes: stringOr(raw.notes, ""),
+  };
+}
+
+function normalizeDemand(raw: DemandSearch): DemandSearch {
+  return {
+    ...raw,
+    category: optionalString(raw.category),
+    seats: optionalNumber(raw.seats),
+  };
+}
+
+function validCategory(category?: string): WorkspaceCategory | null {
+  return category && (WORKSPACE_CATEGORIES as readonly string[]).includes(category)
+    ? (category as WorkspaceCategory)
+    : null;
+}
+
+function requireViewer(): StoreResult<StoreViewer> {
+  if (!viewer) {
+    return { ok: false, error: "Please sign in to continue." };
+  }
+  return { ok: true, data: viewer };
+}
+
+function newLocalId(prefix: string): string {
+  const random =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+      : Math.random().toString(36).slice(2, 14);
+  return `${prefix}-${random}`;
+}
+
+// ---------------------------------------------------------------------------
+// Local demo helpers
+// ---------------------------------------------------------------------------
+
+function addLocalNotification(
+  notification: Omit<NotificationItem, "id" | "read" | "created_at">
+): void {
+  const all = getStored<NotificationItem[]>(NOTIFICATIONS_KEY, INITIAL_NOTIFICATIONS);
+  const newNotif: NotificationItem = {
+    ...notification,
+    id: newLocalId("notif"),
+    read: false,
+    created_at: new Date().toISOString(),
+  };
+  setStored(NOTIFICATIONS_KEY, [newNotif, ...all]);
+}
+
+// ---------------------------------------------------------------------------
+// Remote loading
+// ---------------------------------------------------------------------------
+
+async function loadRemote(next: StoreViewer | null): Promise<StoreResult<null>> {
+  const errors: string[] = [];
+  const state = emptyRemoteState();
+
+  const isOwner = next?.role === "owner";
+  const isAdmin = next?.role === "admin";
+
+  const [publicSpaces, ownSpaces, bookings, notifications, enquiries, favourites, activations, demand] =
+    await Promise.all([
+      fetchRows<Space>(REMOTE_VIEWS.publicSpaces),
+      next && (isOwner || isAdmin) ? fetchRows<Space>(REMOTE_TABLES.spaces) : null,
+      next ? fetchRows<Booking>(REMOTE_TABLES.bookings) : null,
+      next ? fetchRows<NotificationItem>(REMOTE_TABLES.notifications) : null,
+      next ? fetchRows<WorkspaceEnquiry>(REMOTE_TABLES.enquiries) : null,
+      next ? fetchFavouriteIds(next.id) : null,
+      isAdmin
+        ? fetchRows<PropertyActivationRequest>(REMOTE_TABLES.activations)
+        : isOwner
+          ? fetchRows<PropertyActivationRequest>(REMOTE_VIEWS.ownerActivations)
+          : null,
+      isAdmin ? fetchRows<DemandSearch>(REMOTE_TABLES.demandSearches) : null,
+    ]);
+
+  if (publicSpaces.ok) {
+    state.spaces = publicSpaces.data.map(normalizeSpace);
+  } else {
+    errors.push(publicSpaces.error);
+  }
+
+  if (ownSpaces) {
+    if (ownSpaces.ok) {
+      // Full owner/admin rows override the sanitized public copies.
+      for (const space of ownSpaces.data.map(normalizeSpace)) {
+        state.spaces = upsertById(state.spaces, space);
+      }
+    } else {
+      errors.push(ownSpaces.error);
+    }
+  }
+  state.spaces = newestFirst(state.spaces);
+
+  if (bookings) {
+    if (bookings.ok) state.bookings = newestFirst(bookings.data.map(normalizeBooking));
+    else errors.push(bookings.error);
+  }
+  if (notifications) {
+    if (notifications.ok) state.notifications = newestFirst(notifications.data);
+    else errors.push(notifications.error);
+  }
+  if (enquiries) {
+    if (enquiries.ok) state.enquiries = newestFirst(enquiries.data.map(normalizeEnquiry));
+    else errors.push(enquiries.error);
+  }
+  if (favourites) {
+    if (favourites.ok) state.favourites = favourites.data;
+    else errors.push(favourites.error);
+  }
+  if (activations) {
+    if (activations.ok) state.activations = newestFirst(activations.data.map(normalizeActivation));
+    else errors.push(activations.error);
+  }
+  if (demand) {
+    if (demand.ok) state.demand = newestFirst(demand.data.map(normalizeDemand));
+    else errors.push(demand.error);
+  }
+
+  // Ignore a stale load if the viewer changed while it was in flight.
+  if (viewerKey(next) !== hydrateKey) return { ok: true, data: null };
+
+  remoteState = state;
+  notify();
+
+  if (errors.length > 0) {
+    return { ok: false, error: Array.from(new Set(errors)).join(" ") };
+  }
+  return { ok: true, data: null };
+}
+
+async function refreshNotifications(): Promise<void> {
+  if (!remoteMode() || !viewer) return;
+  const key = hydrateKey;
+  const result = await fetchRows<NotificationItem>(REMOTE_TABLES.notifications);
+  if (!result.ok || key !== hydrateKey) return;
+  remoteState = { ...remoteState, notifications: newestFirst(result.data) };
+  notify();
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 export const SpaceGoStore = {
-  isRemoteEnabled: (): boolean => isSupabaseBackendEnabled(),
+  isRemoteEnabled: (): boolean => remoteMode(),
+
+  subscribe: (listener: () => void): (() => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  },
+
+  getVersion: (): number => version,
 
   /**
-   * Load the Supabase copy into localStorage before the app renders. Empty
-   * remote tables are seeded from the current local demo state, so the first
-   * connection does not lose edits made in demo mode.
+   * Load the data the given viewer may see. Call again whenever the signed-in
+   * user (or their role) changes. Local demo mode has nothing to load.
    */
-  hydrate: async (): Promise<boolean> => {
-    if (!isSupabaseBackendEnabled()) return false;
-    if (hydratePromise) return hydratePromise;
+  hydrate: (next: StoreViewer | null): Promise<StoreResult<null>> => {
+    if (!remoteMode()) {
+      viewer = next;
+      return Promise.resolve({ ok: true, data: null });
+    }
 
-    hydratePromise = (async () => {
-      const [spaces, bookings, activations, demand, enquiries, notifications, favourites] =
-        await Promise.all([
-          fetchRows<Space>(REMOTE_TABLES.spaces),
-          fetchRows<Booking>(REMOTE_TABLES.bookings),
-          fetchRows<PropertyActivationRequest>(REMOTE_TABLES.activations),
-          fetchRows<DemandSearch>(REMOTE_TABLES.demandSearches),
-          fetchRows<WorkspaceEnquiry>(REMOTE_TABLES.enquiries),
-          fetchRows<NotificationItem>(REMOTE_TABLES.notifications),
-          fetchFavourites(),
-        ]);
+    const key = viewerKey(next);
+    if (hydratePromise && hydrateKey === key) return hydratePromise;
 
-      if (spaces !== null) {
-        if (spaces.length === 0) {
-          const local = getStored<Space[]>(SPACES_KEY, INITIAL_SPACES);
-          setStored(SPACES_KEY, local);
-          void seedRows(REMOTE_TABLES.spaces, local);
-        } else {
-          setStored(SPACES_KEY, spaces);
-        }
-      }
+    if (hydrateKey !== key) {
+      // Drop the previous viewer's private data immediately.
+      remoteState = { ...emptyRemoteState(), spaces: remoteState.spaces.filter((s) => s.status === "published") };
+      notify();
+    }
 
-      if (bookings !== null) {
-        if (bookings.length === 0) {
-          const local = getStored<Booking[]>(BOOKINGS_KEY, INITIAL_BOOKINGS);
-          setStored(BOOKINGS_KEY, local);
-          void seedRows(REMOTE_TABLES.bookings, local);
-        } else {
-          setStored(BOOKINGS_KEY, newestFirst(bookings));
-        }
-      }
+    viewer = next;
+    hydrateKey = key;
+    clearLegacyLocalCopies();
+    hydratePromise = loadRemote(next);
+    return hydratePromise;
+  },
 
-      if (activations !== null) {
-        if (activations.length === 0) {
-          const local = getStored<PropertyActivationRequest[]>(
-            ACTIVATIONS_KEY,
-            INITIAL_ACTIVATION_REQUESTS
-          );
-          setStored(ACTIVATIONS_KEY, local);
-          void seedRows(REMOTE_TABLES.activations, local);
-        } else {
-          setStored(ACTIVATIONS_KEY, newestFirst(activations));
-        }
-      }
-
-      if (demand !== null) {
-        if (demand.length === 0) {
-          const local = getStored<DemandSearch[]>(DEMAND_KEY, INITIAL_DEMAND_SEARCHES);
-          setStored(DEMAND_KEY, local);
-          void seedRows(REMOTE_TABLES.demandSearches, local);
-        } else {
-          setStored(DEMAND_KEY, newestFirst(demand));
-        }
-      }
-
-      if (enquiries !== null) {
-        if (enquiries.length === 0) {
-          const local = getStored<WorkspaceEnquiry[]>(ENQUIRIES_KEY, INITIAL_ENQUIRIES);
-          setStored(ENQUIRIES_KEY, local);
-          void seedRows(REMOTE_TABLES.enquiries, local);
-        } else {
-          setStored(ENQUIRIES_KEY, newestFirst(enquiries));
-        }
-      }
-
-      if (notifications !== null) {
-        if (notifications.length === 0) {
-          const local = getStored<NotificationItem[]>(
-            NOTIFICATIONS_KEY,
-            INITIAL_NOTIFICATIONS
-          );
-          setStored(NOTIFICATIONS_KEY, local);
-          void seedRows(REMOTE_TABLES.notifications, local);
-        } else {
-          setStored(NOTIFICATIONS_KEY, newestFirst(notifications));
-        }
-      }
-
-      if (favourites !== null) {
-        const hasRows = Object.keys(favourites).length > 0;
-        const local = getStored<Record<string, string[]>>(
-          FAVOURITES_KEY,
-          DEFAULT_FAVOURITES
-        );
-        const next = hasRows ? favourites : local;
-        setStored(FAVOURITES_KEY, next);
-        if (!hasRows) void seedFavourites(next);
-      }
-
-      return true;
-    })().catch((error) => {
-      console.error("SpaceGo: Supabase hydration failed; using local demo data.", error);
-      return false;
-    });
-
+  /** Re-fetch everything for the current viewer. */
+  refresh: (): Promise<StoreResult<null>> => {
+    if (!remoteMode()) {
+      notify();
+      return Promise.resolve({ ok: true, data: null });
+    }
+    hydratePromise = loadRemote(viewer);
     return hydratePromise;
   },
 
   // --- SPACES ---
   getSpaces: (): Space[] => {
+    if (remoteMode()) return remoteState.spaces;
     return getStored<Space[]>(SPACES_KEY, INITIAL_SPACES);
   },
 
+  /** Published spaces only — use for public discovery screens. */
+  getPublishedSpaces: (): Space[] => {
+    return SpaceGoStore.getSpaces().filter((s) => s.status === "published");
+  },
+
   getSpaceById: (id: string): Space | undefined => {
-    const spaces = SpaceGoStore.getSpaces();
-    return spaces.find((s) => s.id === id || s.slug === id);
+    return SpaceGoStore.getSpaces().find((s) => s.id === id || s.slug === id);
   },
 
   getSpacesByOwner: (ownerId: string): Space[] => {
-    const spaces = SpaceGoStore.getSpaces();
-    return spaces.filter((s) => s.owner_id === ownerId);
+    return SpaceGoStore.getSpaces().filter((s) => s.owner_id === ownerId);
   },
 
-  addSpace: (newSpaceData: Partial<Space> & { title: string; category: Space["category"] }): Space => {
-    const spaces = SpaceGoStore.getSpaces();
-    const id = `space-${Date.now()}`;
-    const slug = newSpaceData.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    
+  addSpace: async (
+    newSpaceData: NewSpaceInput,
+    owner: SpaceOwner
+  ): Promise<StoreResult<Space>> => {
+    const id = newLocalId("space");
+    const baseSlug = newSpaceData.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const slug = `${baseSlug || "workspace"}-${id.slice(-6)}`;
+
     const space: Space = {
       id,
       slug,
@@ -222,33 +597,27 @@ export const SpaceGoStore = {
         daily: 120,
         currency: "USD",
       },
-      amenities: newSpaceData.amenities || [
-        "High-Speed Fiber WiFi",
-        "Conference AV",
-        "Ergonomic Seating",
-        "Espresso Machine",
-      ],
+      amenities: newSpaceData.amenities || [],
       operating_hours: newSpaceData.operating_hours || {
         open: "08:00",
         close: "20:00",
         days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
       },
-      house_rules: newSpaceData.house_rules || [
-        "Respect quiet zones",
-        "Clear desks when leaving",
-      ],
-      verification_level: newSpaceData.verification_level || "checked",
-      passport: newSpaceData.passport || {
-        identity_verified: true,
-        property_authority_verified: true,
-        permitted_use_confirmed: true,
-        connectivity_tested_mbps: 350,
-        power_backup_tested: true,
-        fire_safety_inspected: true,
-        inspected_by: "SpaceGo Verification Ops",
-        inspected_at: new Date().toISOString().split("T")[0],
-        renewal_date: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().split("T")[0],
-        notes: "Verified on listing onboarding.",
+      house_rules: newSpaceData.house_rules || [],
+      // New listings start unverified; only admins raise the level. The
+      // database write guard enforces this for non-admins regardless.
+      verification_level: "listed",
+      passport: {
+        identity_verified: false,
+        property_authority_verified: false,
+        permitted_use_confirmed: false,
+        connectivity_tested_mbps: 0,
+        power_backup_tested: false,
+        fire_safety_inspected: false,
+        inspected_by: "",
+        inspected_at: "",
+        renewal_date: "",
+        notes: "",
       },
       images: newSpaceData.images && newSpaceData.images.length > 0 ? newSpaceData.images : [
         {
@@ -257,121 +626,188 @@ export const SpaceGoStore = {
           is_cover: true,
         },
       ],
-      owner_id: newSpaceData.owner_id || "user-owner-1",
-      owner_name: newSpaceData.owner_name || "Elena Rostova",
-      owner_avatar: newSpaceData.owner_avatar || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=250&q=80",
-      owner_email: newSpaceData.owner_email || "elena.owner@spacego.io",
-      status: newSpaceData.status || "published",
+      owner_id: owner.id,
+      owner_name: owner.full_name,
+      owner_avatar: owner.avatar_url || "",
+      owner_email: owner.email,
+      status: newSpaceData.status === "draft" ? "draft" : "published",
       rating: 5.0,
       review_count: 0,
       instant_book: Boolean(newSpaceData.instant_book),
       created_at: new Date().toISOString(),
     };
 
-    const updated = [space, ...spaces];
-    setStored(SPACES_KEY, updated);
-    void saveRow(REMOTE_TABLES.spaces, space);
-    return space;
+    // JSON payloads must not carry undefined-valued price keys.
+    space.pricing = Object.fromEntries(
+      Object.entries(space.pricing).filter(([, value]) => value !== undefined)
+    ) as Space["pricing"];
+
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+      if (who.data.id !== owner.id && who.data.role !== "admin") {
+        return { ok: false, error: "You can only create listings for your own account." };
+      }
+
+      const result = await insertSpaceRow(space);
+      if (!result.ok) return result;
+      const saved = normalizeSpace(result.data);
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    setStored(SPACES_KEY, [space, ...SpaceGoStore.getSpaces()]);
+    notify();
+    return { ok: true, data: space };
   },
 
-  updateSpace: (id: string, updates: Partial<Space>): Space | null => {
-    const spaces = SpaceGoStore.getSpaces();
-    const index = spaces.findIndex((s) => s.id === id);
-    if (index === -1) return null;
+  updateSpace: async (id: string, updates: Partial<Space>): Promise<StoreResult<Space>> => {
+    const current = SpaceGoStore.getSpaces().find((s) => s.id === id);
+    if (!current) return { ok: false, error: "Workspace not found." };
 
-    const updatedSpace = { ...spaces[index], ...updates };
-    spaces[index] = updatedSpace;
+    const updatedSpace: Space = { ...current, ...updates, id: current.id };
+
+    if (remoteMode()) {
+      // Rows from the public view carry no owner_id; only owners (who load
+      // their full rows) and admins (who load every row) can edit.
+      if (!current.owner_id && viewer?.role !== "admin") {
+        return { ok: false, error: "You can only edit workspaces you own." };
+      }
+      const result = await updateSpaceRow(updatedSpace);
+      if (!result.ok) return result;
+      const saved = normalizeSpace(result.data);
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    const spaces = SpaceGoStore.getSpaces().map((s) => (s.id === id ? updatedSpace : s));
     setStored(SPACES_KEY, spaces);
-    void saveRow(REMOTE_TABLES.spaces, updatedSpace);
-    return updatedSpace;
+    notify();
+    return { ok: true, data: updatedSpace };
   },
 
-  deleteSpace: (id: string): boolean => {
+  /**
+   * Admins hard-delete. Owners have no DELETE policy after the RLS hardening,
+   * so their "remove" archives the listing instead.
+   */
+  deleteSpace: async (id: string): Promise<StoreResult<"deleted" | "archived">> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      if (who.data.role === "admin") {
+        const result = await deleteSpaceRow(id);
+        if (!result.ok) return result;
+        remoteState = { ...remoteState, spaces: remoteState.spaces.filter((s) => s.id !== id) };
+        notify();
+        return { ok: true, data: "deleted" };
+      }
+
+      const archived = await SpaceGoStore.updateSpace(id, { status: "archived" });
+      if (!archived.ok) return archived;
+      return { ok: true, data: "archived" };
+    }
+
     const spaces = SpaceGoStore.getSpaces();
     const filtered = spaces.filter((s) => s.id !== id);
-    if (filtered.length === spaces.length) return false;
+    if (filtered.length === spaces.length) return { ok: false, error: "Workspace not found." };
     setStored(SPACES_KEY, filtered);
-    void deleteRow(REMOTE_TABLES.spaces, id);
-    return true;
+    notify();
+    return { ok: true, data: "deleted" };
   },
 
-  // --- BOOKINGS & CONFLICT PREVENTION ---
+  // --- BOOKINGS ---
   getBookings: (): Booking[] => {
+    if (remoteMode()) return remoteState.bookings;
     return getStored<Booking[]>(BOOKINGS_KEY, INITIAL_BOOKINGS);
   },
 
   getBookingById: (id: string): Booking | undefined => {
-    const bookings = SpaceGoStore.getBookings();
-    return bookings.find((b) => b.id === id);
+    return SpaceGoStore.getBookings().find((b) => b.id === id);
   },
 
   getBookingsBySeeker: (userId: string): Booking[] => {
-    const bookings = SpaceGoStore.getBookings();
-    return bookings.filter((b) => b.user_id === userId);
+    return SpaceGoStore.getBookings().filter((b) => b.user_id === userId);
   },
 
   getBookingsByOwner: (ownerId: string): Booking[] => {
-    const bookings = SpaceGoStore.getBookings();
-    return bookings.filter((b) => b.owner_id === ownerId);
+    return SpaceGoStore.getBookings().filter((b) => b.owner_id === ownerId);
   },
 
-  // Check if a time slot has a confirmed or pending booking conflict
+  /**
+   * UX hint only. The server (spacego_create_booking / approval) is the source
+   * of truth, and in remote mode the client can only see bookings it is a
+   * party to. Mirrors the server rule: approved/completed bookings hold
+   * inventory; pending requests may overlap.
+   */
   checkBookingConflict: (
     spaceId: string,
     startDateStr: string,
     endDateStr: string,
     excludeBookingId?: string
   ): { hasConflict: boolean; conflictingBooking?: Booking } => {
-    const bookings = SpaceGoStore.getBookings();
     const reqStart = new Date(startDateStr).getTime();
     const reqEnd = new Date(endDateStr).getTime();
 
-    const conflict = bookings.find((b) => {
+    const conflict = SpaceGoStore.getBookings().find((b) => {
       if (b.space_id !== spaceId) return false;
       if (excludeBookingId && b.id === excludeBookingId) return false;
-      // Only approved or pending bookings block slots (cancelled or declined do not)
-      if (b.status === "cancelled" || b.status === "declined") return false;
+      if (b.status !== "approved" && b.status !== "completed") return false;
 
       const bStart = new Date(b.start_date).getTime();
       const bEnd = new Date(b.end_date).getTime();
-
-      // Overlap formula: startA < endB and endA > startB
       return reqStart < bEnd && reqEnd > bStart;
     });
 
-    return {
-      hasConflict: Boolean(conflict),
-      conflictingBooking: conflict,
-    };
+    return { hasConflict: Boolean(conflict), conflictingBooking: conflict };
   },
 
-  createBooking: (bookingInput: {
-    space: Space;
-    user: { id: string; name: string; email: string };
-    start_date: string;
-    end_date: string;
-    duration_type: "hourly" | "daily" | "monthly";
-    duration_units: number;
-    seats: number;
-    total_price: number;
-    special_requests?: string;
-  }): { success: boolean; booking?: Booking; error?: string } => {
-    // 1. Conflict verification
-    const { hasConflict, conflictingBooking } = SpaceGoStore.checkBookingConflict(
+  createBooking: async (bookingInput: CreateBookingInput): Promise<StoreResult<Booking>> => {
+    const { hasConflict } = SpaceGoStore.checkBookingConflict(
       bookingInput.space.id,
       bookingInput.start_date,
       bookingInput.end_date
     );
-
     if (hasConflict) {
       return {
-        success: false,
-        error: `This space is already booked during this period (${conflictingBooking?.status === "approved" ? "Confirmed Booking" : "Hold in Progress"}). Please select alternative dates or times.`,
+        ok: false,
+        error: "This space is already booked during this period. Please select alternative dates or times.",
       };
     }
 
-    const id = `SPG-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const accessCode = `PASS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      const result = await callRpc<Booking>(REMOTE_RPCS.createBooking, {
+        p_space_id: bookingInput.space.id,
+        p_start_date: bookingInput.start_date,
+        p_end_date: bookingInput.end_date,
+        p_duration_type: bookingInput.duration_type,
+        p_duration_units: bookingInput.duration_units,
+        p_seats: bookingInput.seats,
+        p_special_requests: bookingInput.special_requests?.trim() || null,
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The booking service returned an unexpected response." };
+      }
+
+      const booking = normalizeBooking(result.data);
+      remoteState = { ...remoteState, bookings: upsertById(remoteState.bookings, booking) };
+      notify();
+      void refreshNotifications();
+      return { ok: true, data: booking };
+    }
+
+    const id = `SPG-${new Date().getFullYear()}-${newLocalId("x").slice(2, 8).toUpperCase()}`;
+    const status: BookingStatus = bookingInput.space.instant_book ? "approved" : "pending";
+    const accessCode =
+      status === "approved"
+        ? `PASS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+        : undefined;
 
     const newBooking: Booking = {
       id,
@@ -391,52 +827,71 @@ export const SpaceGoStore = {
       seats: bookingInput.seats,
       total_price: bookingInput.total_price,
       currency: bookingInput.space.pricing.currency || "USD",
-      status: bookingInput.space.instant_book ? "approved" : "pending",
+      status,
       special_requests: bookingInput.special_requests,
       access_code: accessCode,
       created_at: new Date().toISOString(),
     };
 
-    const bookings = SpaceGoStore.getBookings();
-    setStored(BOOKINGS_KEY, [newBooking, ...bookings]);
-    void saveRow(REMOTE_TABLES.bookings, newBooking);
+    setStored(BOOKINGS_KEY, [newBooking, ...SpaceGoStore.getBookings()]);
 
-    // Send notifications to owner and user
-    SpaceGoStore.addNotification({
+    addLocalNotification({
       user_id: bookingInput.space.owner_id,
       title: "New Booking Request",
       message: `${bookingInput.user.name} submitted a ${bookingInput.duration_type} request for ${bookingInput.space.title} (${id}).`,
       type: "booking_update",
       link: "/owner/bookings",
     });
-
-    SpaceGoStore.addNotification({
+    addLocalNotification({
       user_id: bookingInput.user.id,
-      title: newBooking.status === "approved" ? "Booking Confirmed!" : "Booking Request Received",
+      title: status === "approved" ? "Booking Confirmed!" : "Booking Request Received",
       message:
-        newBooking.status === "approved"
+        status === "approved"
           ? `Your booking at ${bookingInput.space.title} is confirmed. Pass code: ${accessCode}`
           : `Your request for ${bookingInput.space.title} is awaiting host approval. Reference: ${id}`,
       type: "booking_update",
       link: "/dashboard/bookings",
     });
 
-    return { success: true, booking: newBooking };
+    notify();
+    return { ok: true, data: newBooking };
   },
 
-  updateBookingStatus: (id: string, status: BookingStatus): Booking | null => {
+  updateBookingStatus: async (
+    id: string,
+    status: BookingStatus,
+    note?: string
+  ): Promise<StoreResult<Booking>> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      const result = await callRpc<Booking>(REMOTE_RPCS.updateBookingStatus, {
+        p_booking_id: id,
+        p_new_status: status,
+        p_note: note?.trim() || null,
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The booking service returned an unexpected response." };
+      }
+
+      const booking = normalizeBooking(result.data);
+      remoteState = { ...remoteState, bookings: upsertById(remoteState.bookings, booking) };
+      notify();
+      void refreshNotifications();
+      return { ok: true, data: booking };
+    }
+
     const bookings = SpaceGoStore.getBookings();
     const index = bookings.findIndex((b) => b.id === id);
-    if (index === -1) return null;
+    if (index === -1) return { ok: false, error: "Booking not found." };
 
-    const booking = bookings[index];
-    booking.status = status;
+    const booking = { ...bookings[index], status };
     bookings[index] = booking;
     setStored(BOOKINGS_KEY, bookings);
-    void saveRow(REMOTE_TABLES.bookings, booking);
 
-    // Notify seeker
-    SpaceGoStore.addNotification({
+    addLocalNotification({
       user_id: booking.user_id,
       title: `Booking Status: ${status.toUpperCase()}`,
       message: `Your booking for ${booking.space_title} (${id}) has been updated to ${status}.`,
@@ -444,35 +899,70 @@ export const SpaceGoStore = {
       link: "/dashboard/bookings",
     });
 
-    return booking;
+    notify();
+    return { ok: true, data: booking };
   },
 
   // --- PROPERTY ACTIVATION SERVICE ---
   getActivationRequests: (): PropertyActivationRequest[] => {
+    if (remoteMode()) return remoteState.activations;
     return getStored<PropertyActivationRequest[]>(ACTIVATIONS_KEY, INITIAL_ACTIVATION_REQUESTS);
   },
 
   getActivationRequestById: (id: string): PropertyActivationRequest | undefined => {
-    const list = SpaceGoStore.getActivationRequests();
-    return list.find((item) => item.id.toLowerCase() === id.trim().toLowerCase());
+    const needle = id.trim().toLowerCase();
+    return SpaceGoStore.getActivationRequests().find((item) => item.id.toLowerCase() === needle);
   },
 
   getActivationRequestsByOwner: (ownerEmailOrId: string): PropertyActivationRequest[] => {
-    const list = SpaceGoStore.getActivationRequests();
-    return list.filter(
-      (item) =>
-        item.owner_id === ownerEmailOrId ||
-        item.email.toLowerCase() === ownerEmailOrId.toLowerCase()
+    const needle = ownerEmailOrId.toLowerCase();
+    return SpaceGoStore.getActivationRequests().filter(
+      (item) => item.owner_id === ownerEmailOrId || item.email.toLowerCase() === needle
     );
   },
 
-  createActivationRequest: (
-    data: Omit<PropertyActivationRequest, "id" | "status" | "created_at">
-  ): PropertyActivationRequest => {
-    const list = SpaceGoStore.getActivationRequests();
-    const id = `ACT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+  createActivationRequest: async (
+    data: ActivationInput
+  ): Promise<StoreResult<PropertyActivationRequest>> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
 
-    // Initial preliminary score calculation based on floor area, condition & facilities
+      // The server assigns id, owner_id, status and timestamps; scoring is
+      // done by the review team, not the browser.
+      const result = await callRpc<PropertyActivationRequest>(REMOTE_RPCS.submitActivation, {
+        p_data: {
+          owner_name: data.owner_name,
+          email: data.email,
+          phone: data.phone,
+          property_address: data.property_address,
+          city: data.city,
+          property_type: data.property_type,
+          approx_square_feet: data.approx_square_feet,
+          current_condition: data.current_condition,
+          existing_facilities: data.existing_facilities,
+          expected_budget_usd: data.expected_budget_usd,
+          preferred_model: data.preferred_model,
+          target_timeline: data.target_timeline,
+          additional_notes: data.additional_notes,
+          photos: data.photos,
+        },
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The activation service returned an unexpected response." };
+      }
+
+      const request = normalizeActivation(result.data);
+      remoteState = { ...remoteState, activations: upsertById(remoteState.activations, request) };
+      notify();
+      void refreshNotifications();
+      return { ok: true, data: request };
+    }
+
+    const id = `ACT-${new Date().getFullYear()}-${newLocalId("x").slice(2, 8).toUpperCase()}`;
+
+    // Demo-only preliminary score.
     let readinessScore = 12;
     if (data.current_condition === "fully_furnished") readinessScore = 19;
     else if (data.current_condition === "partially_furnished") readinessScore = 16;
@@ -480,7 +970,7 @@ export const SpaceGoStore = {
     else readinessScore = 9;
 
     const facilitiesBonus = Math.min(data.existing_facilities.length * 1.5, 6);
-    const demandScore = Math.floor(20 + Math.random() * 8); // based on local demand index
+    const demandScore = Math.floor(20 + Math.random() * 8);
     const econScore = Math.floor(18 + Math.random() * 6);
     const locScore = 12;
     const opScore = 8;
@@ -505,12 +995,10 @@ export const SpaceGoStore = {
       created_at: new Date().toISOString(),
     };
 
-    setStored(ACTIVATIONS_KEY, [newRequest, ...list]);
-    void saveRow(REMOTE_TABLES.activations, newRequest);
+    setStored(ACTIVATIONS_KEY, [newRequest, ...SpaceGoStore.getActivationRequests()]);
 
-    // Notify user
     if (data.owner_id) {
-      SpaceGoStore.addNotification({
+      addLocalNotification({
         user_id: data.owner_id,
         title: "Property Activation Request Submitted",
         message: `Your activation request for ${data.property_address} (${id}) is now queued for preliminary screening.`,
@@ -519,148 +1007,329 @@ export const SpaceGoStore = {
       });
     }
 
-    return newRequest;
+    notify();
+    return { ok: true, data: newRequest };
   },
 
-  updateActivationStatus: (
+  updateActivationStatus: async (
     id: string,
     status: ActivationStatus,
     adminNotes?: string,
     scoreUpdates?: Partial<ActivationScore>
-  ): PropertyActivationRequest | null => {
+  ): Promise<StoreResult<PropertyActivationRequest>> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      const result = await callRpc<PropertyActivationRequest>(REMOTE_RPCS.updateActivationStatus, {
+        p_activation_id: id,
+        p_status: status,
+        p_admin_notes: adminNotes ?? null,
+        p_score: scoreUpdates && Object.keys(scoreUpdates).length > 0 ? scoreUpdates : null,
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The activation service returned an unexpected response." };
+      }
+
+      const request = normalizeActivation(result.data);
+      remoteState = { ...remoteState, activations: upsertById(remoteState.activations, request) };
+      notify();
+      void refreshNotifications();
+      return { ok: true, data: request };
+    }
+
     const list = SpaceGoStore.getActivationRequests();
     const index = list.findIndex((a) => a.id.toLowerCase() === id.toLowerCase());
-    if (index === -1) return null;
+    if (index === -1) return { ok: false, error: "Activation request not found." };
 
-    const request = list[index];
-    request.status = status;
+    const request: PropertyActivationRequest = { ...list[index], status };
     if (adminNotes !== undefined) request.admin_notes = adminNotes;
     if (scoreUpdates && request.activation_score) {
-      request.activation_score = {
-        ...request.activation_score,
-        ...scoreUpdates,
-      };
+      request.activation_score = { ...request.activation_score, ...scoreUpdates };
     }
 
     list[index] = request;
     setStored(ACTIVATIONS_KEY, list);
-    void saveRow(REMOTE_TABLES.activations, request);
 
     if (request.owner_id) {
-      SpaceGoStore.addNotification({
+      addLocalNotification({
         user_id: request.owner_id,
         title: `Activation Request Status: ${status.replace("_", " ").toUpperCase()}`,
-        message: `Status updated for ${request.property_address} (${request.id}). ${adminNotes || ""}`,
+        message: `Status updated for ${request.property_address} (${request.id}).`,
         type: "activation_update",
         link: `/activation/track?ref=${request.id}`,
       });
     }
 
-    return request;
+    notify();
+    return { ok: true, data: request };
   },
 
   // --- DEMAND INTELLIGENCE & ENQUIRIES ---
   getDemandSearches: (): DemandSearch[] => {
+    if (remoteMode()) return remoteState.demand;
     return getStored<DemandSearch[]>(DEMAND_KEY, INITIAL_DEMAND_SEARCHES);
   },
 
-  logSearchQuery: (query: { location: string; category?: string; seats?: number; resultCount: number }): void => {
-    if (!query.location.trim()) return;
-    const searches = SpaceGoStore.getDemandSearches();
+  /**
+   * Record an anonymous demand signal. Failures are logged, not shown: search
+   * must keep working even if logging is rate limited or unavailable.
+   */
+  logSearchQuery: async (query: {
+    location: string;
+    category?: string;
+    seats?: number;
+    resultCount: number;
+  }): Promise<void> => {
+    const location = query.location.trim();
+    if (!location) return;
+    const category = validCategory(query.category);
+    const seats =
+      query.seats && Number.isInteger(query.seats) && query.seats >= 1 && query.seats <= 10000
+        ? query.seats
+        : null;
+    const resultCount = Math.max(0, Math.floor(query.resultCount) || 0);
+
+    if (remoteMode()) {
+      const result = await callRpc<string>(REMOTE_RPCS.logDemand, {
+        p_location: location,
+        p_category: category,
+        p_seats: seats,
+        p_result_count: resultCount,
+      });
+      if (!result.ok) console.warn("SpaceGo: demand signal not recorded:", result.error);
+      return;
+    }
+
     const newEntry: DemandSearch = {
-      id: `ds-${Date.now()}`,
-      location_query: query.location.trim(),
-      category: query.category,
-      seats: query.seats,
-      has_results: query.resultCount > 0,
-      result_count: query.resultCount,
+      id: newLocalId("ds"),
+      location_query: location,
+      category: category ?? undefined,
+      seats: seats ?? undefined,
+      has_results: resultCount > 0,
+      result_count: resultCount,
       created_at: new Date().toISOString(),
     };
-    // keep latest 100 searches
-    setStored(DEMAND_KEY, [newEntry, ...searches].slice(0, 100));
-    void saveRow(REMOTE_TABLES.demandSearches, newEntry);
+    setStored(DEMAND_KEY, [newEntry, ...SpaceGoStore.getDemandSearches()].slice(0, 100));
+    notify();
+  },
+
+  /** Admin-only aggregate of demand signals (server-side in remote mode). */
+  getDemandAnalytics: async (days = 90): Promise<StoreResult<DemandAnalyticsRow[]>> => {
+    if (remoteMode()) {
+      const result = await callRpc<DemandAnalyticsRow[]>(REMOTE_RPCS.demandAnalytics, {
+        p_days: days,
+      });
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        data: (result.data ?? []).map((row) => ({
+          location_query: String(row.location_query ?? "(unknown)"),
+          category: row.category ?? null,
+          total_searches: Number(row.total_searches) || 0,
+          zero_result_searches: Number(row.zero_result_searches) || 0,
+          searches_with_seats: Number(row.searches_with_seats) || 0,
+        })),
+      };
+    }
+
+    const since = Date.now() - days * 24 * 3600 * 1000;
+    const groups = new Map<string, DemandAnalyticsRow>();
+    for (const s of SpaceGoStore.getDemandSearches()) {
+      const created = new Date(s.created_at).getTime();
+      if (Number.isFinite(created) && created < since) continue;
+      const location = s.location_query.trim() || "(unknown)";
+      const category = s.category ?? null;
+      const key = `${location}\u0000${category ?? ""}`;
+      const row = groups.get(key) ?? {
+        location_query: location,
+        category,
+        total_searches: 0,
+        zero_result_searches: 0,
+        searches_with_seats: 0,
+      };
+      row.total_searches += 1;
+      if (!s.has_results) row.zero_result_searches += 1;
+      if (s.seats) row.searches_with_seats += 1;
+      groups.set(key, row);
+    }
+    return {
+      ok: true,
+      data: Array.from(groups.values()).sort(
+        (a, b) => b.total_searches - a.total_searches || a.location_query.localeCompare(b.location_query)
+      ),
+    };
   },
 
   getEnquiries: (): WorkspaceEnquiry[] => {
+    if (remoteMode()) return remoteState.enquiries;
     return getStored<WorkspaceEnquiry[]>(ENQUIRIES_KEY, INITIAL_ENQUIRIES);
   },
 
-  createEnquiry: (data: Omit<WorkspaceEnquiry, "id" | "status" | "created_at">): WorkspaceEnquiry => {
-    const list = SpaceGoStore.getEnquiries();
+  getEnquiriesByUser: (userId: string): WorkspaceEnquiry[] => {
+    return SpaceGoStore.getEnquiries().filter((e) => e.user_id === userId);
+  },
+
+  createEnquiry: async (data: EnquiryInput): Promise<StoreResult<WorkspaceEnquiry>> => {
+    if (remoteMode()) {
+      const preferredStart = /^\d{4}-\d{2}-\d{2}$/.test(data.preferred_start)
+        ? data.preferred_start
+        : null;
+
+      const result = await callRpc<WorkspaceEnquiry>(REMOTE_RPCS.submitEnquiry, {
+        p_user_name: data.user_name,
+        p_email: data.email,
+        p_company: data.company ?? null,
+        p_location_requested: data.location_requested,
+        p_category_requested: data.category_requested,
+        p_seats_needed: data.seats_needed,
+        p_preferred_start: preferredStart,
+        p_budget_range: data.budget_range,
+        p_notes: data.notes,
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The request service returned an unexpected response." };
+      }
+
+      // Anonymous callers receive only a receipt ({ id, status, created_at }).
+      if (viewer) {
+        const enquiry = normalizeEnquiry(result.data);
+        remoteState = { ...remoteState, enquiries: upsertById(remoteState.enquiries, enquiry) };
+        notify();
+        return { ok: true, data: enquiry };
+      }
+      return {
+        ok: true,
+        data: normalizeEnquiry({ ...data, ...result.data, user_id: undefined }),
+      };
+    }
+
     const newEnquiry: WorkspaceEnquiry = {
       ...data,
-      id: `enq-${Date.now()}`,
+      user_id: viewer?.id,
+      id: newLocalId("enq"),
       status: "new",
       created_at: new Date().toISOString(),
     };
-    setStored(ENQUIRIES_KEY, [newEnquiry, ...list]);
-    void saveRow(REMOTE_TABLES.enquiries, newEnquiry);
-    return newEnquiry;
+    setStored(ENQUIRIES_KEY, [newEnquiry, ...SpaceGoStore.getEnquiries()]);
+    notify();
+    return { ok: true, data: newEnquiry };
   },
 
-  updateEnquiryStatus: (id: string, status: "new" | "contacted" | "fulfilled"): void => {
+  updateEnquiryStatus: async (
+    id: string,
+    status: WorkspaceEnquiry["status"]
+  ): Promise<StoreResult<WorkspaceEnquiry>> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      const result = await callRpc<WorkspaceEnquiry>(REMOTE_RPCS.updateEnquiryStatus, {
+        p_enquiry_id: id,
+        p_status: status,
+      });
+      if (!result.ok) return result;
+      if (!result.data || typeof result.data !== "object") {
+        return { ok: false, error: "The request service returned an unexpected response." };
+      }
+
+      const enquiry = normalizeEnquiry(result.data);
+      remoteState = { ...remoteState, enquiries: upsertById(remoteState.enquiries, enquiry) };
+      notify();
+      return { ok: true, data: enquiry };
+    }
+
     const list = SpaceGoStore.getEnquiries();
     const index = list.findIndex((e) => e.id === id);
-    if (index !== -1) {
-      list[index].status = status;
-      setStored(ENQUIRIES_KEY, list);
-      void saveRow(REMOTE_TABLES.enquiries, list[index]);
-    }
+    if (index === -1) return { ok: false, error: "Request not found." };
+    const enquiry = { ...list[index], status };
+    list[index] = enquiry;
+    setStored(ENQUIRIES_KEY, list);
+    notify();
+    return { ok: true, data: enquiry };
   },
 
   // --- FAVOURITES ---
   getUserFavourites: (userId: string): string[] => {
-    const allFavs = getStored<Record<string, string[]>>(
-      FAVOURITES_KEY,
-      DEFAULT_FAVOURITES
-    );
+    if (remoteMode()) {
+      return viewer && viewer.id === userId ? remoteState.favourites : [];
+    }
+    const allFavs = getStored<Record<string, string[]>>(FAVOURITES_KEY, {});
     return allFavs[userId] || [];
   },
 
-  toggleFavourite: (userId: string, spaceId: string): boolean => {
-    const allFavs = getStored<Record<string, string[]>>(
-      FAVOURITES_KEY,
-      DEFAULT_FAVOURITES
-    );
-    const currentList = allFavs[userId] || [];
-    const isFav = currentList.includes(spaceId);
+  /** Returns the new favourite state on success. */
+  toggleFavourite: async (userId: string, spaceId: string): Promise<StoreResult<boolean>> => {
+    const isFav = SpaceGoStore.getUserFavourites(userId).includes(spaceId);
+    const nextActive = !isFav;
 
-    if (isFav) {
-      allFavs[userId] = currentList.filter((id) => id !== spaceId);
-    } else {
-      allFavs[userId] = [...currentList, spaceId];
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+      if (who.data.id !== userId) {
+        return { ok: false, error: "You can only change your own favourites." };
+      }
+
+      const result = await setFavouriteRow(userId, spaceId, nextActive);
+      if (!result.ok) return result;
+
+      remoteState = {
+        ...remoteState,
+        favourites: nextActive
+          ? Array.from(new Set([...remoteState.favourites, spaceId]))
+          : remoteState.favourites.filter((id) => id !== spaceId),
+      };
+      notify();
+      return { ok: true, data: nextActive };
     }
 
+    const allFavs = getStored<Record<string, string[]>>(FAVOURITES_KEY, {});
+    const currentList = allFavs[userId] || [];
+    allFavs[userId] = nextActive
+      ? [...currentList, spaceId]
+      : currentList.filter((id) => id !== spaceId);
     setStored(FAVOURITES_KEY, allFavs);
-    void setFavouriteRow(userId, spaceId, !isFav);
-    return !isFav;
+    notify();
+    return { ok: true, data: nextActive };
   },
 
   // --- NOTIFICATIONS ---
   getUserNotifications: (userId: string): NotificationItem[] => {
+    if (remoteMode()) {
+      return remoteState.notifications.filter((n) => n.user_id === userId);
+    }
     const all = getStored<NotificationItem[]>(NOTIFICATIONS_KEY, INITIAL_NOTIFICATIONS);
     return all.filter((n) => n.user_id === userId);
   },
 
-  markNotificationRead: (id: string): void => {
+  markNotificationRead: async (id: string): Promise<StoreResult<null>> => {
+    if (remoteMode()) {
+      const who = requireViewer();
+      if (!who.ok) return who;
+
+      const result = await callRpc<NotificationItem>(REMOTE_RPCS.markNotificationRead, {
+        p_notification_id: id,
+        p_read: true,
+      });
+      if (!result.ok) return result;
+      remoteState = {
+        ...remoteState,
+        notifications: remoteState.notifications.map((n) =>
+          n.id === id ? { ...n, read: true } : n
+        ),
+      };
+      notify();
+      return { ok: true, data: null };
+    }
+
     const all = getStored<NotificationItem[]>(NOTIFICATIONS_KEY, INITIAL_NOTIFICATIONS);
     const item = all.find((n) => n.id === id);
-    if (item) {
-      item.read = true;
-      setStored(NOTIFICATIONS_KEY, all);
-      void saveRow(REMOTE_TABLES.notifications, item);
-    }
-  },
-
-  addNotification: (notification: Omit<NotificationItem, "id" | "read" | "created_at">): void => {
-    const all = getStored<NotificationItem[]>(NOTIFICATIONS_KEY, INITIAL_NOTIFICATIONS);
-    const newNotif: NotificationItem = {
-      ...notification,
-      id: `notif-${Date.now()}`,
-      read: false,
-      created_at: new Date().toISOString(),
-    };
-    setStored(NOTIFICATIONS_KEY, [newNotif, ...all]);
-    void saveRow(REMOTE_TABLES.notifications, newNotif);
+    if (!item) return { ok: false, error: "Notification not found." };
+    item.read = true;
+    setStored(NOTIFICATIONS_KEY, all);
+    notify();
+    return { ok: true, data: null };
   },
 };

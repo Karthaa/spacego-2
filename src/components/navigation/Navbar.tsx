@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { NotificationItem, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -31,17 +32,17 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
-  const [notificationVersion, setNotificationVersion] = useState(0);
+  const dataVersion = useSpaceGoVersion();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const notifications = useMemo<NotificationItem[]>(() => {
-    // The version is read here so marking a notification read re-reads the
-    // store without a setState-inside-effect cascade.
-    void notificationVersion;
+    // Re-read the store snapshot whenever it changes (hydration, new
+    // server-created notifications, read-state updates).
+    void dataVersion;
     if (!user) return [];
     return SpaceGoStore.getUserNotifications(user.id);
-  }, [user, notificationVersion]);
+  }, [user, dataVersion]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -211,8 +212,13 @@ export function Navbar() {
                           <div
                             key={n.id}
                             onClick={() => {
-                              SpaceGoStore.markNotificationRead(n.id);
-                              setNotificationVersion((version) => version + 1);
+                              if (!n.read) {
+                                void SpaceGoStore.markNotificationRead(n.id).then((result) => {
+                                  if (!result.ok) {
+                                    console.error("SpaceGo: could not mark notification read:", result.error);
+                                  }
+                                });
+                              }
                               setNotifDropdownOpen(false);
                               if (n.link) router.push(n.link);
                             }}

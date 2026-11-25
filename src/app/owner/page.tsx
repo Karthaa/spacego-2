@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, Space } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
@@ -24,41 +25,43 @@ import {
 
 export default function OwnerOverviewPage() {
   const { user } = useAuth();
-  const { success } = useToast();
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
 
-  const [properties, setProperties] = useState<Space[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const properties = useMemo<Space[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getSpacesByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
-  const loadData = () => {
-    const spaces = SpaceGoStore.getSpaces();
-    setProperties(spaces);
-    const allBookings = SpaceGoStore.getBookings();
-    setBookings(allBookings);
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [user]);
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
   const pendingBookings = bookings.filter((b) => b.status === "pending");
   const approvedBookings = bookings.filter((b) => b.status === "approved" || b.status === "completed");
   const totalRevenue = approvedBookings.reduce((sum, b) => sum + b.total_price, 0);
 
-  const handleApprove = (bookingId: string) => {
-    const updated = SpaceGoStore.updateBookingStatus(bookingId, "approved");
-    if (updated) {
-      loadData();
-      success("Booking Request Approved", `Confirmed reservation ${bookingId}. The customer has been issued an access pass.`);
-    }
-  };
+  const handleDecision = async (bookingId: string, status: "approved" | "declined") => {
+    if (busyBookingId) return;
+    setBusyBookingId(bookingId);
+    const result = await SpaceGoStore.updateBookingStatus(bookingId, status);
+    setBusyBookingId(null);
 
-  const handleDecline = (bookingId: string) => {
-    const updated = SpaceGoStore.updateBookingStatus(bookingId, "declined");
-    if (updated) {
-      loadData();
+    if (!result.ok) {
+      error(status === "approved" ? "Could not approve booking" : "Could not decline booking", result.error);
+      return;
+    }
+    if (status === "approved") {
+      success("Booking Request Approved", `Confirmed reservation ${bookingId}. The customer has been issued an access pass.`);
+    } else {
       success("Booking Declined", `Request ${bookingId} has been declined and the slot released.`);
     }
   };
+
+  const handleApprove = (bookingId: string) => void handleDecision(bookingId, "approved");
+  const handleDecline = (bookingId: string) => void handleDecision(bookingId, "declined");
 
   return (
     <div className="space-y-6">
@@ -173,6 +176,7 @@ export default function OwnerOverviewPage() {
                     variant="teal"
                     size="sm"
                     onClick={() => handleApprove(b.id)}
+                    disabled={busyBookingId !== null}
                     className="gap-1 font-semibold"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -182,6 +186,7 @@ export default function OwnerOverviewPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDecline(b.id)}
+                    disabled={busyBookingId !== null}
                     className="text-rose-600 border-rose-200 hover:bg-rose-50"
                   >
                     <XCircle className="w-3.5 h-3.5" />

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { SpaceGoStore } from "@/lib/data/store";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
+import { SpaceGoStore, type DemandAnalyticsRow } from "@/lib/data/store";
 import { DemandSearch, WorkspaceEnquiry } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -22,43 +23,72 @@ import {
 } from "lucide-react";
 
 export default function AdminDemandPage() {
-  const { success } = useToast();
-  const [searches, setSearches] = useState<DemandSearch[]>([]);
-  const [enquiries, setEnquiries] = useState<WorkspaceEnquiry[]>([]);
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const [busyEnquiryId, setBusyEnquiryId] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<DemandAnalyticsRow[]>([]);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
 
-  const loadData = () => {
-    setSearches(SpaceGoStore.getDemandSearches());
-    setEnquiries(SpaceGoStore.getEnquiries());
-  };
+  const searches = useMemo<DemandSearch[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getDemandSearches();
+  }, [dataVersion]);
 
+  const enquiries = useMemo<WorkspaceEnquiry[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getEnquiries();
+  }, [dataVersion]);
+
+  // Aggregates come from the admin-only spacego_demand_analytics RPC.
   useEffect(() => {
-    loadData();
-  }, []);
+    let active = true;
+    void SpaceGoStore.getDemandAnalytics(90).then((result) => {
+      if (!active) return;
+      if (result.ok) {
+        setAnalytics(result.data);
+        setAnalyticsError(null);
+      } else {
+        setAnalyticsError(result.error);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [dataVersion]);
 
-  const handleUpdateEnquiry = (id: string, status: "new" | "contacted" | "fulfilled") => {
-    SpaceGoStore.updateEnquiryStatus(id, status);
-    loadData();
+  const handleUpdateEnquiry = async (id: string, status: "new" | "contacted" | "fulfilled") => {
+    if (busyEnquiryId) return;
+    setBusyEnquiryId(id);
+    const result = await SpaceGoStore.updateEnquiryStatus(id, status);
+    setBusyEnquiryId(null);
+
+    if (!result.ok) {
+      error("Could not update request", result.error);
+      return;
+    }
     success("Status Updated", `Enquiry set to ${status}.`);
   };
 
-  // Group searches by location to compute demand density
+  // Group demand by micro-market (first segment of the query)
   const locationCounts: Record<string, { total: number; zeroResults: number }> = {};
-  searches.forEach((s) => {
-    const loc = s.location_query.split(",")[0].trim() || "Unknown";
+  analytics.forEach((row) => {
+    const loc = row.location_query.split(",")[0].trim() || "Unknown";
     if (!locationCounts[loc]) locationCounts[loc] = { total: 0, zeroResults: 0 };
-    locationCounts[loc].total += 1;
-    if (!s.has_results) locationCounts[loc].zeroResults += 1;
+    locationCounts[loc].total += row.total_searches;
+    locationCounts[loc].zeroResults += row.zero_result_searches;
   });
 
   const sortedLocations = Object.entries(locationCounts).sort((a, b) => b[1].total - a[1].total);
 
-  // Group searches by category
+  // Group demand by category
   const categoryCounts: Record<string, number> = {};
-  searches.forEach((s) => {
-    const cat = s.category || "Any";
-    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  analytics.forEach((row) => {
+    const cat = row.category || "Any";
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + row.total_searches;
   });
 
+  const totalQueries = analytics.reduce((sum, row) => sum + row.total_searches, 0);
+  const unfulfilledCount = analytics.reduce((sum, row) => sum + row.zero_result_searches, 0);
   const unfulfilledQueries = searches.filter((s) => !s.has_results);
 
   return (
@@ -80,10 +110,16 @@ export default function AdminDemandPage() {
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold bg-teal-50 text-teal-800 px-3 py-1.5 rounded-xl border border-teal-200">
-            Total Queries Logged: {searches.length}
+            Total Queries (90 days): {totalQueries}
           </span>
         </div>
       </div>
+
+      {analyticsError && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800">
+          Demand analytics could not be loaded: {analyticsError}
+        </div>
+      )}
 
       {/* Analytics Highlights */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -123,7 +159,7 @@ export default function AdminDemandPage() {
             <span>Unfulfilled Demand Index</span>
           </div>
           <div className="space-y-1">
-            <span className="text-2xl font-black text-amber-600">{unfulfilledQueries.length}</span>
+            <span className="text-2xl font-black text-amber-600">{unfulfilledCount}</span>
             <p className="text-[11px] text-slate-500 leading-snug">
               Queries with zero matching spaces. Ideal targets for SpaceGo owner recruitment and activation campaigns!
             </p>
@@ -204,12 +240,14 @@ export default function AdminDemandPage() {
                 <span className="text-xs text-slate-400">Action:</span>
                 <button
                   onClick={() => handleUpdateEnquiry(enq.id, "contacted")}
+                  disabled={busyEnquiryId !== null}
                   className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Mark Contacted
                 </button>
                 <button
                   onClick={() => handleUpdateEnquiry(enq.id, "fulfilled")}
+                  disabled={busyEnquiryId !== null}
                   className="px-2.5 py-1 rounded-lg bg-teal-50 border border-teal-200 text-xs font-bold text-teal-800 hover:bg-teal-100"
                 >
                   Mark Fulfilled

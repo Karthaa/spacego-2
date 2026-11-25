@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, Space } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
@@ -23,19 +24,19 @@ import {
 
 export default function SeekerOverviewPage() {
   const { user } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [savedSpaces, setSavedSpaces] = useState<Space[]>([]);
+  const dataVersion = useSpaceGoVersion();
 
-  useEffect(() => {
-    if (user) {
-      const userBookings = SpaceGoStore.getBookingsBySeeker(user.id);
-      setBookings(userBookings);
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsBySeeker(user.id) : [];
+  }, [user, dataVersion]);
 
-      const favIds = SpaceGoStore.getUserFavourites(user.id);
-      const allSpaces = SpaceGoStore.getSpaces();
-      setSavedSpaces(allSpaces.filter((s) => favIds.includes(s.id)));
-    }
-  }, [user]);
+  const savedSpaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    if (!user) return [];
+    const favIds = SpaceGoStore.getUserFavourites(user.id);
+    return SpaceGoStore.getPublishedSpaces().filter((s) => favIds.includes(s.id));
+  }, [user, dataVersion]);
 
   const upcomingBooking = bookings.find((b) => b.status === "approved" || b.status === "pending");
   const totalSpend = bookings

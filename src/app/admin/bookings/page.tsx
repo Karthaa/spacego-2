@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, BookingStatus } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
@@ -10,21 +11,25 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { CalendarCheck, Search, Filter } from "lucide-react";
 
 export default function AdminBookingsPage() {
-  const { success } = useToast();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getBookings();
+  }, [dataVersion]);
   const [filterStatus, setFilterStatus] = useState<"all" | BookingStatus>("all");
+  const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
 
-  const loadData = () => {
-    setBookings(SpaceGoStore.getBookings());
-  };
+  const handleStatusOverride = async (id: string, newStatus: BookingStatus) => {
+    if (busyBookingId) return;
+    setBusyBookingId(id);
+    const result = await SpaceGoStore.updateBookingStatus(id, newStatus);
+    setBusyBookingId(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleStatusOverride = (id: string, newStatus: BookingStatus) => {
-    SpaceGoStore.updateBookingStatus(id, newStatus);
-    loadData();
+    if (!result.ok) {
+      error("Could not change booking status", result.error);
+      return;
+    }
     success("Booking Status Overridden", `Updated ${id} to ${newStatus.toUpperCase()}`);
   };
 

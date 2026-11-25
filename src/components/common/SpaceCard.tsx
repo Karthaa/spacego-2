@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Space } from "@/types";
@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import {
   MapPin,
   Heart,
@@ -25,18 +26,27 @@ interface SpaceCardProps {
   onFavoriteToggle?: (spaceId: string) => void;
 }
 
-export function SpaceCard({ space, isFavorited = false, onFavoriteToggle }: SpaceCardProps) {
+export function SpaceCard({ space, isFavorited, onFavoriteToggle }: SpaceCardProps) {
   const { user } = useAuth();
   const { error } = useToast();
   const router = useRouter();
-  const [favorited, setFavorited] = useState(isFavorited);
+  const dataVersion = useSpaceGoVersion();
+  const [isSaving, setIsSaving] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+
+  // The store is the source of truth; the prop is only a fallback before
+  // favourites have loaded.
+  const favorited = useMemo(() => {
+    void dataVersion;
+    if (!user) return Boolean(isFavorited);
+    return SpaceGoStore.getUserFavourites(user.id).includes(space.id);
+  }, [user, space.id, isFavorited, dataVersion]);
 
   const images = space.images && space.images.length > 0
     ? space.images
     : [{ url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80", caption: "Workspace" }];
 
-  const handleFavoriteClick = (e: React.MouseEvent) => {
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -51,8 +61,15 @@ export function SpaceCard({ space, isFavorited = false, onFavoriteToggle }: Spac
       return;
     }
 
-    const nextState = SpaceGoStore.toggleFavourite(user.id, space.id);
-    setFavorited(nextState);
+    if (isSaving) return;
+    setIsSaving(true);
+    const result = await SpaceGoStore.toggleFavourite(user.id, space.id);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      error("Could not update favourites", result.error);
+      return;
+    }
     if (onFavoriteToggle) onFavoriteToggle(space.id);
   };
 

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space } from "@/types";
 import { VerificationBadge } from "@/components/ui/Badge";
@@ -20,27 +21,29 @@ import {
 } from "lucide-react";
 
 export default function AdminSpacesPage() {
-  const { success } = useToast();
-  const [spaces, setSpaces] = useState<Space[]>([]);
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return SpaceGoStore.getSpaces();
+  }, [dataVersion]);
 
-  const loadData = () => {
-    setSpaces(SpaceGoStore.getSpaces());
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleUpdateLevel = (id: string, level: Space["verification_level"]) => {
-    SpaceGoStore.updateSpace(id, { verification_level: level });
-    loadData();
+  const handleUpdateLevel = async (id: string, level: Space["verification_level"]) => {
+    const result = await SpaceGoStore.updateSpace(id, { verification_level: level });
+    if (!result.ok) {
+      error("Could not update verification tier", result.error);
+      return;
+    }
     success("Verification Tier Updated", `Assigned ${level.toUpperCase()} to space.`);
   };
 
-  const handleToggleStatus = (id: string, currentStatus: string) => {
-    const next = currentStatus === "published" ? "draft" : "published";
-    SpaceGoStore.updateSpace(id, { status: next as any });
-    loadData();
+  const handleToggleStatus = async (id: string, currentStatus: Space["status"]) => {
+    const next: Space["status"] = currentStatus === "published" ? "draft" : "published";
+    const result = await SpaceGoStore.updateSpace(id, { status: next });
+    if (!result.ok) {
+      error("Could not change status", result.error);
+      return;
+    }
     success("Status Changed", `Workspace is now ${next}.`);
   };
 
@@ -94,7 +97,7 @@ export default function AdminSpacesPage() {
                   <td className="p-4">
                     <select
                       value={s.verification_level}
-                      onChange={(e) => handleUpdateLevel(s.id, e.target.value as any)}
+                      onChange={(e) => handleUpdateLevel(s.id, e.target.value as Space["verification_level"])}
                       className="rounded-lg border border-slate-300 bg-white p-1 text-[11px] font-bold text-slate-800"
                     >
                       <option value="listed">Listed (Unverified)</option>

@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, BookingStatus } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
@@ -20,34 +22,35 @@ import {
 } from "lucide-react";
 
 export default function OwnerBookingsPage() {
-  const { success } = useToast();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { user } = useAuth();
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
   const [filterTab, setFilterTab] = useState<"all" | BookingStatus>("all");
+  const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
 
-  const loadBookings = () => {
-    const list = SpaceGoStore.getBookings();
-    setBookings(list);
-  };
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
-  useEffect(() => {
-    loadBookings();
-  }, []);
+  const handleDecision = async (id: string, status: "approved" | "declined") => {
+    if (busyBookingId) return;
+    setBusyBookingId(id);
+    const result = await SpaceGoStore.updateBookingStatus(id, status);
+    setBusyBookingId(null);
 
-  const handleApprove = (id: string) => {
-    const updated = SpaceGoStore.updateBookingStatus(id, "approved");
-    if (updated) {
-      loadBookings();
-      success("Booking Approved", `Reservation ${id} has been confirmed.`);
+    if (!result.ok) {
+      error(status === "approved" ? "Could not approve booking" : "Could not decline booking", result.error);
+      return;
     }
+    success(
+      status === "approved" ? "Booking Approved" : "Booking Declined",
+      status === "approved" ? `Reservation ${id} has been confirmed.` : `Request ${id} has been declined.`
+    );
   };
 
-  const handleDecline = (id: string) => {
-    const updated = SpaceGoStore.updateBookingStatus(id, "declined");
-    if (updated) {
-      loadBookings();
-      success("Booking Declined", `Request ${id} has been declined.`);
-    }
-  };
+  const handleApprove = (id: string) => void handleDecision(id, "approved");
+  const handleDecline = (id: string) => void handleDecision(id, "declined");
 
   const filtered = bookings.filter((b) => {
     if (filterTab === "all") return true;
@@ -144,6 +147,7 @@ export default function OwnerBookingsPage() {
                       variant="teal"
                       size="sm"
                       onClick={() => handleApprove(b.id)}
+                      disabled={busyBookingId !== null}
                       className="gap-1 font-semibold"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -153,6 +157,7 @@ export default function OwnerBookingsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDecline(b.id)}
+                      disabled={busyBookingId !== null}
                       className="text-rose-600 border-rose-200 hover:bg-rose-50"
                     >
                       <XCircle className="w-3.5 h-3.5" />

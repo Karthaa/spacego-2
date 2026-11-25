@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navigation/Navbar";
@@ -8,6 +8,7 @@ import { Footer } from "@/components/navigation/Footer";
 import { SpaceCard } from "@/components/common/SpaceCard";
 import { Button } from "@/components/ui/Button";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { WorkspaceCategory } from "@/types";
 import {
   Search,
@@ -34,7 +35,11 @@ import {
 
 export default function HomePage() {
   const router = useRouter();
-  const spaces = SpaceGoStore.getSpaces();
+  const dataVersion = useSpaceGoVersion();
+  const spaces = useMemo(() => {
+    void dataVersion;
+    return SpaceGoStore.getPublishedSpaces();
+  }, [dataVersion]);
   const featuredSpaces = spaces.slice(0, 4);
 
   // Search Bar State
@@ -57,8 +62,8 @@ export default function HomePage() {
     if (date) params.set("date", date);
     if (seats) params.set("seats", seats);
 
-    // Record search demand signal
-    SpaceGoStore.logSearchQuery({
+    // Record search demand signal (best effort; never blocks navigation)
+    void SpaceGoStore.logSearchQuery({
       location: location || "All Locations",
       category: category !== "all" ? category : undefined,
       seats: seats ? Number(seats) : undefined,
@@ -223,7 +228,7 @@ export default function HomePage() {
                   <Building2 className="w-4 h-4 text-teal-600 shrink-0" />
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
+                    onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
                     className="w-full text-xs font-semibold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
                   >
                     <option value="all">All Categories</option>

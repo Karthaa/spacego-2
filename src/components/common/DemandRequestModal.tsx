@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { WorkspaceCategory } from "@/types";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/context/AuthContext";
 import { Sparkles, MapPin, Users, Calendar, DollarSign } from "lucide-react";
 
 interface DemandRequestModalProps {
@@ -22,9 +23,10 @@ export function DemandRequestModal({
   defaultLocation = "",
   defaultCategory = "all",
 }: DemandRequestModalProps) {
-  const { success } = useToast();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { success, error } = useToast();
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.full_name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [company, setCompany] = useState("");
   const [location, setLocation] = useState(defaultLocation);
   const [category, setCategory] = useState<WorkspaceCategory | "all">(defaultCategory);
@@ -34,16 +36,21 @@ export function DemandRequestModal({
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim() || !email.trim() || !location.trim()) {
+      error("Missing information", "Please enter your name, email and target location.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      SpaceGoStore.createEnquiry({
-        user_name: name || "Anonymous Seeker",
-        email: email || "seeker@example.com",
+      const result = await SpaceGoStore.createEnquiry({
+        user_name: name.trim(),
+        email: email.trim(),
         company,
-        location_requested: location || "Downtown",
+        location_requested: location.trim(),
         category_requested: category,
         seats_needed: Number(seats) || 1,
         preferred_start: startDate || new Date().toISOString().split("T")[0],
@@ -51,9 +58,14 @@ export function DemandRequestModal({
         notes,
       });
 
-      // Also record into demand search signals
-      SpaceGoStore.logSearchQuery({
-        location: location || "Downtown",
+      if (!result.ok) {
+        error("Request not submitted", result.error);
+        return;
+      }
+
+      // Also record into demand search signals (best effort).
+      void SpaceGoStore.logSearchQuery({
+        location: location.trim(),
         category: category !== "all" ? category : undefined,
         seats: Number(seats),
         resultCount: 0,
@@ -121,7 +133,7 @@ export function DemandRequestModal({
             </label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as any)}
+              onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
             >
               <option value="all">Any Suitable Space</option>

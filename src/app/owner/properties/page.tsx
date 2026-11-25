@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space } from "@/types";
 import { VerificationBadge } from "@/components/ui/Badge";
@@ -22,34 +24,51 @@ import {
 } from "lucide-react";
 
 export default function OwnerPropertiesPage() {
-  const { success } = useToast();
-  const [spaces, setSpaces] = useState<Space[]>([]);
+  const { user } = useAuth();
+  const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
+  const [busySpaceId, setBusySpaceId] = useState<string | null>(null);
 
-  const loadSpaces = () => {
-    const list = SpaceGoStore.getSpaces();
-    setSpaces(list);
-  };
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getSpacesByOwner(user.id) : [];
+  }, [user, dataVersion]);
 
-  useEffect(() => {
-    loadSpaces();
-  }, []);
+  const handleToggleStatus = async (id: string, currentStatus: Space["status"]) => {
+    if (busySpaceId) return;
+    const nextStatus: Space["status"] = currentStatus === "published" ? "draft" : "published";
+    setBusySpaceId(id);
+    const result = await SpaceGoStore.updateSpace(id, { status: nextStatus });
+    setBusySpaceId(null);
 
-  const handleToggleStatus = (id: string, currentStatus: string) => {
-    const nextStatus = currentStatus === "published" ? "draft" : "published";
-    SpaceGoStore.updateSpace(id, { status: nextStatus as any });
-    loadSpaces();
+    if (!result.ok) {
+      error("Could not update listing", result.error);
+      return;
+    }
     success(
       nextStatus === "published" ? "Listing Published" : "Listing Set to Draft",
       "Availability has been updated on the public marketplace."
     );
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to remove this workspace listing?")) {
-      SpaceGoStore.deleteSpace(id);
-      loadSpaces();
-      success("Space Removed", "The workspace listing has been deleted.");
+  const handleDelete = async (id: string) => {
+    if (busySpaceId) return;
+    if (!confirm("Are you sure you want to remove this workspace listing?")) return;
+
+    setBusySpaceId(id);
+    const result = await SpaceGoStore.deleteSpace(id);
+    setBusySpaceId(null);
+
+    if (!result.ok) {
+      error("Could not remove listing", result.error);
+      return;
     }
+    success(
+      result.data === "archived" ? "Listing Archived" : "Space Removed",
+      result.data === "archived"
+        ? "The listing is archived and no longer visible on the marketplace."
+        : "The workspace listing has been deleted."
+    );
   };
 
   return (

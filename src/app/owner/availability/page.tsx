@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Space, Booking } from "@/types";
 import { Button } from "@/components/ui/Button";
@@ -19,11 +21,23 @@ import {
 } from "lucide-react";
 
 export default function OwnerAvailabilityPage() {
+  const { user } = useAuth();
   const { success, error } = useToast();
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [selectedSpaceId, setSelectedSpaceId] = useState("");
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  
+  const dataVersion = useSpaceGoVersion();
+  const [pickedSpaceId, setSelectedSpaceId] = useState("");
+
+  const spaces = useMemo<Space[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getSpacesByOwner(user.id) : [];
+  }, [user, dataVersion]);
+
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsByOwner(user.id) : [];
+  }, [user, dataVersion]);
+
+  const selectedSpaceId = pickedSpaceId || spaces[0]?.id || "";
+
   // Blocked slots local state
   const [blockedSlots, setBlockedSlots] = useState<{ id: string; date: string; reason: string }[]>([
     { id: "blk-1", date: "2026-11-20", reason: "Scheduled HVAC Filter Replacement" },
@@ -32,13 +46,6 @@ export default function OwnerAvailabilityPage() {
 
   const [newBlockDate, setNewBlockDate] = useState("");
   const [newBlockReason, setNewBlockReason] = useState("");
-
-  useEffect(() => {
-    const list = SpaceGoStore.getSpaces();
-    setSpaces(list);
-    if (list.length > 0) setSelectedSpaceId(list[0].id);
-    setBookings(SpaceGoStore.getBookings());
-  }, []);
 
   const handleAddBlock = (e: React.FormEvent) => {
     e.preventDefault();

@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { Booking } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import confetti from "canvas-confetti";
@@ -46,24 +47,22 @@ export default function SpaceDetailPage({
   const router = useRouter();
   const { user } = useAuth();
   const { success, error } = useToast();
+  const dataVersion = useSpaceGoVersion();
 
-  // The data provider waits for remote hydration before rendering pages, so
-  // the space can be derived during render instead of synced through an effect.
-  const space = useMemo(() => SpaceGoStore.getSpaceById(spaceId), [spaceId]);
+  // Derived from the store snapshot; re-read whenever the store changes.
+  const space = useMemo(() => {
+    void dataVersion;
+    return SpaceGoStore.getSpaceById(spaceId);
+  }, [spaceId, dataVersion]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [favouriteOverride, setFavouriteOverride] = useState<{
-    userId: string;
-    active: boolean;
-  } | null>(null);
+  const [isSavingFavourite, setIsSavingFavourite] = useState(false);
 
   const isFavorited = useMemo(() => {
+    void dataVersion;
     if (!user || !space) return false;
-    if (favouriteOverride?.userId === user.id) {
-      return favouriteOverride.active;
-    }
     return SpaceGoStore.getUserFavourites(user.id).includes(space.id);
-  }, [user, space, favouriteOverride]);
+  }, [user, space, dataVersion]);
 
   // Booking Form State
   const [bookingDate, setBookingDate] = useState(() => {
@@ -118,7 +117,7 @@ export default function SpaceDetailPage({
 
   const pricingSummary = calculateTotal();
 
-  const handleFavoriteToggle = () => {
+  const handleFavoriteToggle = async () => {
     if (!user) {
       error(
         "Sign in required",
@@ -130,9 +129,16 @@ export default function SpaceDetailPage({
       return;
     }
 
-    const next = SpaceGoStore.toggleFavourite(user.id, space.id);
-    setFavouriteOverride({ userId: user.id, active: next });
-    if (next) {
+    if (isSavingFavourite) return;
+    setIsSavingFavourite(true);
+    const result = await SpaceGoStore.toggleFavourite(user.id, space.id);
+    setIsSavingFavourite(false);
+
+    if (!result.ok) {
+      error("Could not update favourites", result.error);
+      return;
+    }
+    if (result.data) {
       success(
         "Saved to Favourites",
         "You can access this anytime from your dashboard."
@@ -140,7 +146,7 @@ export default function SpaceDetailPage({
     }
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bookingDate) {
       error("Missing Date", "Please select a booking date.");
@@ -159,11 +165,19 @@ export default function SpaceDetailPage({
 
     try {
       const startIso = new Date(`${bookingDate}T09:00:00Z`).toISOString();
+      // Must match the server's duration rule: hourly = N hours, daily = N
+      // days, monthly = N × 30 days (spacego_create_booking).
+      const unitMs =
+        durationType === "hourly"
+          ? 3600 * 1000
+          : durationType === "daily"
+            ? 24 * 3600 * 1000
+            : 30 * 24 * 3600 * 1000;
       const endIso = new Date(
-        new Date(startIso).getTime() + (durationType === "hourly" ? durationUnits * 3600 * 1000 : durationUnits * 24 * 3600 * 1000)
+        new Date(startIso).getTime() + durationUnits * unitMs
       ).toISOString();
 
-      const result = SpaceGoStore.createBooking({
+      const result = await SpaceGoStore.createBooking({
         space,
         user: { id: user.id, name: user.full_name, email: user.email },
         start_date: startIso,
@@ -175,14 +189,13 @@ export default function SpaceDetailPage({
         special_requests: specialRequests,
       });
 
-      if (!result.success) {
-        error("Booking Conflict Detected", result.error || "Slot is currently unavailable.");
-        setIsSubmitting(false);
+      if (!result.ok) {
+        error("Booking not completed", result.error);
         return;
       }
 
-      // Success
-      setConfirmedBooking(result.booking || null);
+      // Success — show what the server actually recorded.
+      setConfirmedBooking(result.data);
       confetti({
         particleCount: 80,
         spread: 60,
@@ -190,9 +203,9 @@ export default function SpaceDetailPage({
       });
       success(
         "Booking Request Submitted!",
-        result.booking?.status === "approved"
+        result.data.status === "approved"
           ? "Confirmed instantly! Your electronic pass is ready."
-          : `Sent to host ${space.owner_name} for approval.`
+          : `Sent to host ${space.owner_name || "the host"} for approval.`
       );
     } finally {
       setIsSubmitting(false);
@@ -367,7 +380,9 @@ export default function SpaceDetailPage({
                       SpaceGo Space Passport™ Audit Record
                     </h3>
                     <p className="text-[11px] text-teal-800">
-                      Inspected on {formatDate(space.passport.inspected_at)} • Official Safety Certification
+                      {space.passport.inspected_at
+                      ? <>Inspected on {formatDate(space.passport.inspected_at)} • Official Safety Certification</>
+                      : "Inspection pending"}
                     </p>
                   </div>
                 </div>
@@ -414,9 +429,14 @@ export default function SpaceDetailPage({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-teal-100/40 text-[11px] text-teal-950 font-medium">
-                Audited by: {space.passport.inspected_by} • Next renewal scheduled for {formatDate(space.passport.renewal_date)}
-              </div>
+              {(space.passport.inspected_by || space.passport.renewal_date) && (
+                <div className="p-3 rounded-xl bg-teal-100/40 text-[11px] text-teal-950 font-medium">
+                  {space.passport.inspected_by && <>Audited by: {space.passport.inspected_by} • </>}
+                  {space.passport.renewal_date
+                    ? <>Next renewal scheduled for {formatDate(space.passport.renewal_date)}</>
+                    : "Renewal date pending"}
+                </div>
+              )}
             </div>
 
             {/* Amenities & Equipment */}
@@ -465,15 +485,21 @@ export default function SpaceDetailPage({
 
             {/* Host Profile Card */}
             <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={space.owner_avatar}
-                alt={space.owner_name}
-                className="w-12 h-12 rounded-xl object-cover border border-slate-200"
-              />
+              {space.owner_avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={space.owner_avatar}
+                  alt={space.owner_name}
+                  className="w-12 h-12 rounded-xl object-cover border border-slate-200"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl border border-slate-200 bg-teal-50 text-teal-700 flex items-center justify-center text-base font-black">
+                  {(space.owner_name || "S").charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="flex-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Hosted by</span>
-                <h3 className="text-sm font-bold text-slate-950">{space.owner_name}</h3>
+                <h3 className="text-sm font-bold text-slate-950">{space.owner_name || "SpaceGo Partner Host"}</h3>
                 <p className="text-xs text-slate-500">SpaceGo Partner Host • Fast response rate (under 1 hour)</p>
               </div>
             </div>
@@ -627,7 +653,7 @@ export default function SpaceDetailPage({
 
                 <p className="text-[11px] text-center text-slate-400">
                   {space.instant_book
-                    ? "Instant confirmation. Double-booking conflict check passed."
+                    ? "Instant confirmation once availability is verified by SpaceGo."
                     : "You will not be billed until the host confirms availability."}
                 </p>
               </form>

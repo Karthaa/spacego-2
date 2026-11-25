@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
 import { Booking, BookingStatus } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
@@ -27,36 +28,35 @@ export default function SeekerBookingsPage() {
   const { user } = useAuth();
   const { success, error } = useToast();
 
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const dataVersion = useSpaceGoVersion();
+  const bookings = useMemo<Booking[]>(() => {
+    void dataVersion;
+    return user ? SpaceGoStore.getBookingsBySeeker(user.id) : [];
+  }, [user, dataVersion]);
   const [filterTab, setFilterTab] = useState<"all" | BookingStatus>("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
-
-  const loadBookings = () => {
-    if (user) {
-      const data = SpaceGoStore.getBookingsBySeeker(user.id);
-      setBookings(data);
-    }
-  };
-
-  useEffect(() => {
-    loadBookings();
-  }, [user]);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const filteredBookings = bookings.filter((b) => {
     if (filterTab === "all") return true;
     return b.status === filterTab;
   });
 
-  const handleCancelBooking = (bookingId: string) => {
-    const updated = SpaceGoStore.updateBookingStatus(bookingId, "cancelled");
-    if (updated) {
-      loadBookings();
-      setIsCancelConfirmOpen(false);
-      setSelectedBooking(null);
-      success("Booking Cancelled", "The slot has been released and the host notified.");
+  const handleCancelBooking = async (bookingId: string) => {
+    if (isCancelling) return;
+    setIsCancelling(true);
+    const result = await SpaceGoStore.updateBookingStatus(bookingId, "cancelled");
+    setIsCancelling(false);
+
+    if (!result.ok) {
+      error("Could not cancel booking", result.error);
+      return;
     }
+    setIsCancelConfirmOpen(false);
+    setSelectedBooking(null);
+    success("Booking Cancelled", "The slot has been released and the host notified.");
   };
 
   return (
@@ -255,6 +255,7 @@ export default function SeekerBookingsPage() {
                 variant="danger"
                 size="sm"
                 onClick={() => handleCancelBooking(selectedBooking.id)}
+                isLoading={isCancelling}
               >
                 Confirm Cancellation
               </Button>
