@@ -2,21 +2,21 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Space } from "@/types";
 import { VerificationBadge } from "@/components/ui/Badge";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/Toast";
 import { SpaceGoStore } from "@/lib/data/store";
 import {
   MapPin,
-  Users,
   Heart,
   Star,
   Zap,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Check,
 } from "lucide-react";
 
 interface SpaceCardProps {
@@ -27,6 +27,8 @@ interface SpaceCardProps {
 
 export function SpaceCard({ space, isFavorited = false, onFavoriteToggle }: SpaceCardProps) {
   const { user } = useAuth();
+  const { error } = useToast();
+  const router = useRouter();
   const [favorited, setFavorited] = useState(isFavorited);
   const [imageIndex, setImageIndex] = useState(0);
 
@@ -37,13 +39,21 @@ export function SpaceCard({ space, isFavorited = false, onFavoriteToggle }: Spac
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (user) {
-      const nextState = SpaceGoStore.toggleFavourite(user.id, space.id);
-      setFavorited(nextState);
-      if (onFavoriteToggle) onFavoriteToggle(space.id);
-    } else {
-      setFavorited(!favorited);
+
+    if (!user) {
+      error(
+        "Sign in required",
+        "Sign in to save this space to your favourites."
+      );
+      router.push(
+        `/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`
+      );
+      return;
     }
+
+    const nextState = SpaceGoStore.toggleFavourite(user.id, space.id);
+    setFavorited(nextState);
+    if (onFavoriteToggle) onFavoriteToggle(space.id);
   };
 
   const handlePrevImage = (e: React.MouseEvent) => {

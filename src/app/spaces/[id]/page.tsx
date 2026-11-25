@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
+import React, { useState, useMemo, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/navigation/Navbar";
@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
-import { Space, Booking } from "@/types";
+import { Booking } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import {
@@ -34,8 +34,6 @@ import {
   Zap,
   Check,
   ArrowRight,
-  ChevronLeft,
-  X,
 } from "lucide-react";
 
 export default function SpaceDetailPage({
@@ -49,10 +47,23 @@ export default function SpaceDetailPage({
   const { user } = useAuth();
   const { success, error } = useToast();
 
-  const [space, setSpace] = useState<Space | null>(null);
+  // The data provider waits for remote hydration before rendering pages, so
+  // the space can be derived during render instead of synced through an effect.
+  const space = useMemo(() => SpaceGoStore.getSpaceById(spaceId), [spaceId]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [favouriteOverride, setFavouriteOverride] = useState<{
+    userId: string;
+    active: boolean;
+  } | null>(null);
+
+  const isFavorited = useMemo(() => {
+    if (!user || !space) return false;
+    if (favouriteOverride?.userId === user.id) {
+      return favouriteOverride.active;
+    }
+    return SpaceGoStore.getUserFavourites(user.id).includes(space.id);
+  }, [user, space, favouriteOverride]);
 
   // Booking Form State
   const [bookingDate, setBookingDate] = useState(() => {
@@ -68,17 +79,6 @@ export default function SpaceDetailPage({
 
   // Booking Confirmation Modal
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
-
-  useEffect(() => {
-    const found = SpaceGoStore.getSpaceById(spaceId);
-    if (found) {
-      setSpace(found);
-      if (user) {
-        const favs = SpaceGoStore.getUserFavourites(user.id);
-        setIsFavorited(favs.includes(found.id));
-      }
-    }
-  }, [spaceId, user]);
 
   if (!space) {
     return (
@@ -119,12 +119,24 @@ export default function SpaceDetailPage({
   const pricingSummary = calculateTotal();
 
   const handleFavoriteToggle = () => {
-    if (user) {
-      const next = SpaceGoStore.toggleFavourite(user.id, space.id);
-      setIsFavorited(next);
-      if (next) success("Saved to Favourites", "You can access this anytime from your dashboard.");
-    } else {
-      setIsFavorited(!isFavorited);
+    if (!user) {
+      error(
+        "Sign in required",
+        "Sign in to save this space to your favourites."
+      );
+      router.push(
+        `/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`
+      );
+      return;
+    }
+
+    const next = SpaceGoStore.toggleFavourite(user.id, space.id);
+    setFavouriteOverride({ userId: user.id, active: next });
+    if (next) {
+      success(
+        "Saved to Favourites",
+        "You can access this anytime from your dashboard."
+      );
     }
   };
 
@@ -132,6 +144,14 @@ export default function SpaceDetailPage({
     e.preventDefault();
     if (!bookingDate) {
       error("Missing Date", "Please select a booking date.");
+      return;
+    }
+
+    if (!user) {
+      error("Sign in required", "Sign in to request a booking.");
+      router.push(
+        `/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`
+      );
       return;
     }
 
@@ -143,13 +163,9 @@ export default function SpaceDetailPage({
         new Date(startIso).getTime() + (durationType === "hourly" ? durationUnits * 3600 * 1000 : durationUnits * 24 * 3600 * 1000)
       ).toISOString();
 
-      const bookingUser = user
-        ? { id: user.id, name: user.full_name, email: user.email }
-        : { id: "guest-user", name: "Guest Seeker", email: "guest@example.com" };
-
       const result = SpaceGoStore.createBooking({
         space,
-        user: bookingUser,
+        user: { id: user.id, name: user.full_name, email: user.email },
         start_date: startIso,
         end_date: endIso,
         duration_type: durationType,
