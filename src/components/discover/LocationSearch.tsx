@@ -23,6 +23,8 @@ interface LocationSearchProps {
   /** Larger variant for the empty "where to?" state. */
   size?: "md" | "lg";
   autoFocus?: boolean;
+  /** Inside another <form>: render a plain container (forms can't nest). */
+  embedded?: boolean;
 }
 
 // One answer per session: once the server says no provider is configured,
@@ -37,6 +39,7 @@ export function LocationSearch({
   className,
   size = "md",
   autoFocus,
+  embedded = false,
 }: LocationSearchProps) {
   const uid = useId();
   const inputId = `${uid}-input`;
@@ -105,7 +108,7 @@ export function LocationSearch({
     onPick({ lat: s.lat, lng: s.lng, label: s.label, source: "place" });
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     const choice = active >= 0 ? suggestions[active] : suggestions[0];
     if (choice) pick(choice);
@@ -123,6 +126,9 @@ export function LocationSearch({
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((i) => Math.max(i - 1, -1));
+    } else if (e.key === "Enter" && embedded) {
+      // Don't submit the surrounding form; pick the place instead.
+      submit(e);
     } else if (e.key === "Escape") {
       setOpen(false);
       setActive(-1);
@@ -132,10 +138,11 @@ export function LocationSearch({
   const showList = open && query.length > 0 && (suggestions.length > 0 || loading);
   const locating = geoStatus === "locating";
   const tall = size === "lg";
+  const Wrapper = embedded ? "div" : "form";
 
   return (
     <div ref={wrapRef} className={cn("relative", className)}>
-      <form role="search" aria-label="Search by location" onSubmit={submit} className="flex gap-2">
+      <Wrapper role="search" aria-label="Search by location" onSubmit={embedded ? undefined : submit} className="flex gap-2">
         <div className="relative min-w-0 flex-1">
           <label htmlFor={inputId} className="sr-only">Area, neighbourhood or city</label>
           <Search
@@ -203,7 +210,7 @@ export function LocationSearch({
           )}
           <span className="hidden sm:inline">{locating ? "Locating…" : "Near me"}</span>
         </button>
-      </form>
+      </Wrapper>
 
       {showList && (
         <ul

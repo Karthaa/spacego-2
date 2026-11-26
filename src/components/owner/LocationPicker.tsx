@@ -125,6 +125,7 @@ export function LocationPicker({ value, onChange, errorId, error }: LocationPick
         Pin on the map <span className="text-danger" aria-hidden="true">*</span>
       </p>
       <LocationSearch
+        embedded
         value=""
         onPick={(c) => {
           mapRef.current?.easeTo({ center: [c.lng, c.lat], zoom: 15.5, duration: 400 });
