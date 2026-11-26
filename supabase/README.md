@@ -80,7 +80,10 @@ Run things in this order:
    `demo/demo_listings_staging.sql`.
 2. On production, the same migration, before PR #14 merges. The app's new
    types need it.
-3. Never run the demo script on production. It refuses to run there: it
+3. On staging and then production, `migrations/20261206_spacego_whole_venue_pricing.sql`
+   (halls and event venues are priced per booking, not per guest). It needs
+   20261205 first, and the app's price preview in PR #14 assumes it.
+4. Never run the demo script on production. It refuses to run there: it
    recognises production by the earlier step that took production's six
    made-up sample listings offline, which the test site never had.
 
