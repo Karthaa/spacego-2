@@ -41,7 +41,7 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   await page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
   await page.waitForTimeout(1500);
   check("detail page area map (RPC point)", (await page.locator("#location-heading").count()) === 1);
-  const resp = await page.goto(base + "/spaces/local-test-3", { waitUntil: "networkidle" });
+  await page.goto(base + "/spaces/local-test-3", { waitUntil: "networkidle" });
   await page.waitForTimeout(800);
   check("pending listing is not public", (await page.getByText("This space isn't available").count()) === 1);
   await ctx.close();
