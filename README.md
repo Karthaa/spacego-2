@@ -1,108 +1,126 @@
-# SpaceGo — Premium Workspace Marketplace & PropTech Platform
+# SpaceGo
 
-> **"Find the right space. Make every space work."**  
-> A demand-led platform connecting flexible workspace discovery, property activation, verification, and operations.
+**Find the right space.** SpaceGo is a marketplace for flexible spaces in
+Kochi: coworking desks, private offices, meeting and training rooms, studios,
+event spaces, auditoriums and parking. Guests search by area or "Near me",
+compare listings on a map, and request or instantly book. Hosts list and run
+their spaces, and admins review listings before they go live.
 
-SpaceGo combines the intuitive discovery of Airbnb, the sophisticated interface of Linear, the polished SaaS analytics of Stripe, and enterprise prop-tech discipline.
+| Site | URL | Notes |
+|---|---|---|
+| Test site (stage) | https://spacego-2-web-stage.orun-pool-9b971c2c.workers.dev | Carries labelled demo listings; not indexed by search engines |
+| Production | https://spacego-2-web-prod.orun-pool-9b971c2c.workers.dev | |
 
----
+## What it does
 
-## 🌟 Core Strategic Differentiators
+- **Search** (`/discover`, `/spaces`): by area, by radius, or from the
+  visitor's location, which is asked for only when they press "Near me". Maps
+  show an approximate point; the street address stays hidden unless the host
+  shows it or confirms a booking.
+- **Listings** (`/spaces/[id]`): photos, prices by the hour, day or month
+  (auditoriums and event spaces by the booking, parking by the vehicle),
+  amenities, the checks an admin actually recorded (a badge appears only for
+  what was checked), reviews from guests whose confirmed stay has ended, and
+  "Report this listing".
+- **Bookings:** request or instant book. The database refuses overlapping
+  bookings and keeps a history of every status change.
+- **Hosts** (`/owner`): listings (each reviewed by an admin before it is
+  published), photos and documents, availability, bookings, performance.
+- **Guests** (`/dashboard`): bookings, saved spaces, enquiries, profile.
+- **Admins** (`/admin`): listing review, verification checks, reports,
+  bookings, users, activation requests and demand insights.
+- **Property activation** (`/activation`): owners of idle space ask SpaceGo to
+  help turn it into a bookable workspace.
 
-1. **Demand-Backed Space Activation**: Rather than listing existing supply indiscriminately or recommending blind conversion CapEx, SpaceGo qualifies local customer demand signals first, calculates an explainable **100-Point Activation Score**, provides fit-out coordination, and stages launch.
-2. **Space Passport™ Verification**: Every listed workspace features a documented audit record verifying legal property authority, permitted commercial zoning, field-measured internet bandwidth (300+ Mbps redundant fiber), emergency power generator tests, and fire/life safety.
-3. **Double-Booking & Conflict-Proof Booking Engine**: Real-time server and client date-range verification ensures no overlapping pending or approved reservations can occur.
-4. **Three Stakeholder Portals**:
-   - **Space Seeker**: Browse spaces by task, view Space Passports, select dates and capacity, book with dynamic pricing, view QR entry passes, and submit unlisted workspace demand requests.
-   - **Property Owner (Host)**: Portfolio dashboard, add/edit listings with photo presets, review pending requests with 1-click approval/decline, manage calendar blocks, simulate unit economics (CapEx payback & net remittance), and track activation projects.
-   - **Administrator (Ops)**: Platform-wide GMV ledger, user management, workspace moderation, Demand Intelligence (zero-result searches & requested micro-markets), and 100-Point Activation Matrix scoring.
+## Tech stack
 
----
+| | |
+|---|---|
+| App | Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS 4 |
+| Backend | Supabase: Postgres with PostGIS, Auth, Storage |
+| Maps | MapLibre GL JS with OpenFreeMap tiles (MapTiler optional) |
+| Hosting | Cloudflare Workers, through OpenNext |
+| CI/CD | GitHub Actions: `ci.yml` (checks) and `orun.yml` (Orun deploys) |
+| Tests | Node's test runner, Playwright with axe-core, SQL test scripts |
 
-## 🛠️ Tech Stack
+How the pieces fit together, and where each permission is enforced, is in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS 4 with custom design tokens (Midnight Navy `#0B132B`, Warm Slate `#F8FAFC`, Refined Teal `#0D9488`)
-- **Icons**: Lucide React
-- **Validation**: Zod
-- **Database & Auth**: Supabase PostgreSQL & Supabase Auth (with immediate zero-friction resilient offline/demo fallback mode)
-- **Delight**: Canvas Confetti
+## Run it locally
 
----
+You need Node 22 (see `.nvmrc`) and npm.
 
-## 🚀 Quick Start
-
-### 1. Install Dependencies
 ```bash
-npm install
+npm ci
+npm run dev        # http://localhost:3000
 ```
 
-### 2. Run the Development Server
-```bash
-npm run dev
+With no Supabase settings the app runs in **demo mode**: sample listings kept
+in your browser, and no sign-in, so `/dashboard`, `/owner` and `/admin` don't
+work. To use a real backend, copy `.env.example` to `.env.local` and fill in
+the project URL and publishable key; use the staging project or your own,
+never production. Every variable is described in `.env.example`.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` / `npm start` | Production build, and serving it |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript, no output files |
+| `npm run test:unit` | Unit tests in `tests/unit/` (Node's built-in runner) |
+| `npm run test:e2e` | Playwright smoke, search and accessibility tests against a demo-mode production build. Run `npm run build` first. `PLAYWRIGHT_CHANNEL=chrome` uses an installed Chrome; otherwise run `npx playwright install chromium` once. |
+| `npm run build:worker` | The Cloudflare Worker, built the way the deploy pipeline builds it |
+| `npm run preview:worker` | Runs that Worker locally |
+
+The database tests in `supabase/tests/` run with `psql` against staging or a
+local copy. Each one runs in a transaction that is rolled back, so it leaves
+nothing behind. See [supabase/README.md](supabase/README.md).
+
+## Deploys
+
+[Orun](intent.yaml) runs the pipeline in `.github/workflows/orun.yml`:
+
+1. A pull request builds and checks the Worker for each environment. It
+   deploys nothing.
+2. A merge to `main` deploys the test site, smoke-tests it, then deploys
+   production. **Merging is deploying.**
+
+Database migrations are never run by the pipeline. Apply each one by hand in
+the Supabase SQL editor, staging first and then production, before the code
+that needs it merges; [supabase/README.md](supabase/README.md) has the order.
+
+Per-environment values (site URL, Supabase URL and publishable key) live in
+`intent.yaml`. They are public browser values; secrets never go there.
+
+## Project layout
+
+```
+src/app/              routes: public pages, auth, /dashboard, /owner, /admin, /api/geocode
+src/components/       UI, grouped by area
+src/context/          auth and data providers
+src/lib/              auth helpers, Supabase clients, data store, geo, pricing, security headers
+supabase/migrations/  forward-only database migrations
+supabase/tests/       SQL tests
+supabase/demo/        demo listings for the test site only
+e2e/                  Playwright tests
+tests/unit/           unit tests
+infra/stack/          Orun compositions for the Worker build and deploy
+tooling/              local Supabase stack, SQL bundler, Wrangler config renderer
+docs/                 architecture, design system, dated session reports
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to experience the platform.
+## Documentation
 
-### 3. Production Build
-```bash
-npm run build
-npm start
-```
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): data flow, auth, security layers, environments
+- [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md): design tokens and components
+- [supabase/README.md](supabase/README.md): backend setup, migrations and their order, auth settings
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to make and ship a change
+- [SECURITY.md](SECURITY.md): reporting a vulnerability, handling secrets
+- [docs/history/](docs/history/README.md): dated reports from earlier work sessions
 
----
+## License
 
-## 🎭 1-Click Demo Evaluation Accounts
-
-You can switch between any of the 3 platform personas anytime directly from the top navigation role switcher dropdown or the login screen:
-
-| Role | Name | Email | Default View |
-|---|---|---|---|
-| **Space Seeker (Customer)** | Alex Vance | `alex.seeker@spacego.io` | `/dashboard` |
-| **Property Owner (Host)** | Elena Rostova | `elena.owner@spacego.io` | `/owner` |
-| **Administrator (Ops)** | Marcus Sterling | `admin@spacego.io` | `/admin` |
-
----
-
-## 🗄️ Database Architecture & Migrations
-
-The production PostgreSQL migration is available at:
-`supabase/migrations/20261108_init.sql`
-
-Tables included:
-- `profiles`: Extends `auth.users` with role-based access (`seeker`, `owner`, `admin`).
-- `spaces`: Workspaces with categories, coordinates, pricing tiers, operating hours, and Space Passport metadata.
-- `space_images`: Image galleries with cover flags.
-- `bookings`: Reservations with atomic date validation and status lifecycle (`pending`, `approved`, `declined`, `cancelled`, `completed`).
-- `blocked_slots`: Host-reserved maintenance or blackout slots.
-- `favourites`: User saved workspace bookmarks.
-- `property_activation_requests`: Intake queue for idle properties with 100-point scoring.
-- `workspace_enquiries`: Direct demand submissions for unlisted spaces.
-- `demand_searches`: Demand intelligence logger recording micro-market queries and zero-result areas.
-- `notifications`: User and host notification system.
-
-### Connecting Live Supabase (Optional)
-Create a `.env.local` file:
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-Execute `supabase/migrations/20261108_init.sql` in your Supabase SQL Editor.
-
----
-
-## 📁 Key Routes
-
-- `/` — Premium Homepage with task-first search, Space Passport™ trust pillars, and activation showcase.
-- `/spaces` — Interactive Marketplace with filters (category, rate duration, capacity, amenities, verification tier), sorting, and grid/list view.
-- `/spaces/[id]` — Workspace Detail with photo gallery modal, Space Passport breakdown, and live conflict-checking booking panel.
-- `/activation` — Property Activation Service with 6-step workflow explanation and owner intake form.
-- `/activation/track` — Real-time activation request tracker with 100-point scoring matrix breakdown.
-- `/dashboard` — Seeker Customer Portal (upcoming bookings, digital QR entry passes, saved spaces, custom requests).
-- `/owner` — Host Portal (active listings, pending request approval queue, availability calendar, unit economics calculator).
-- `/owner/spaces/new` — Workspace Listing Creation Wizard.
-- `/admin` — Operations Console (global GMV ledger, user management, workspace moderation).
-- `/admin/activations` — Administrator 100-Point Activation Scorer and stage-gate controller.
-- `/admin/demand` — Demand Intelligence Dashboard (top searched locations, requested categories, zero-result unmet demand).
-- `/auth/login` & `/auth/register` — Authentication with 1-click test persona quick fill.
+All rights reserved by the owner. The code is public to read, but there is no
+open-source licence, so it may not be reused without permission.

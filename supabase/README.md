@@ -4,9 +4,16 @@ SpaceGo uses Supabase for two separate concerns:
 
 1. **Authentication and profiles** — Supabase Auth users plus the protected
    `public.profiles` table. This is the source of truth for sessions and roles.
-2. **App-state collections** — the seven `spacego_*` JSONB tables used by the
-   existing client store. These intentionally remain separate from the older
-   UUID/Auth `spaces` schema.
+2. **App data** — the `spacego_*` tables used by the client store (listings,
+   bookings and their history, reviews, reports, listing review events,
+   favourites, enquiries, activations, demand searches, notifications). Each
+   has row-level security; clients write only through RLS-guarded tables and
+   validated `SECURITY DEFINER` functions (see `docs/ARCHITECTURE.md`).
+
+The older UUID tables from `20261108_init.sql` (`spaces`, `bookings`,
+`space_images`, `blocked_slots`, `favourites`, `notifications`,
+`property_activation_requests`, `workspace_enquiries`, `demand_searches`) are
+unused by the app. `20261207` closes them to the API and keeps their rows.
 
 ## Environment variables
 
@@ -32,14 +39,26 @@ inlines `NEXT_PUBLIC_*` during `next build`.
 Run migrations manually in the Supabase SQL editor (or with the CLI) as the
 table owner. The application never executes migrations.
 
-Apply in this order on a project that does not have the schema yet:
+Every migration is forward-only. Apply them in filename order, staging first,
+then production, each as one transaction:
 
-1. `migrations/20261108_init.sql` — base `profiles`/`spaces` schema.
-2. `migrations/20261119_spacego_app_state.sql` — the seven `spacego_*` tables.
-3. `migrations/20261120_profiles_auth_hardening.sql` — additive auth hardening.
+| Migration | What it does | Staging | Production |
+|---|---|---|---|
+| `20261108_init.sql` | First schema: `profiles` and the older UUID tables | applied | applied |
+| `20261119_spacego_app_state.sql` | The first `spacego_*` tables | applied | applied |
+| `20261120_profiles_auth_hardening.sql` | Profiles, sign-up trigger, role protection | 25 Nov | 26 Nov |
+| `20261121_spacego_rls_hardening.sql` | RLS, guarded RPCs and the public view for the app tables | 25 Nov | 26 Nov |
+| `20261126` to `20261204` (nine files) | Location search, listing review, photos, address privacy, verification checks, reviews, booking integrity, reports, documents | 26 Nov | 26 Nov |
+| `20261205_spacego_new_types_and_demo_flag.sql` | Parking and auditorium types; `is_demo` flag | 26 Nov | 26 Nov |
+| `20261206_spacego_whole_venue_pricing.sql` | Halls and event venues priced per booking | 26 Nov | 26 Nov |
+| `20261207_spacego_security_hardening.sql` | Closes the unused older tables to the API; fixed `search_path` for the role-guard function | **not yet** | **not yet** |
 
-**Do not re-run `20261108_init.sql` on an existing project.** The hardening
-migration is additive and idempotent. It:
+The dates come from the session reports in `docs/history/` and the checks run
+when each was applied. `tooling/sql/bundle.mjs` can join several files into
+one transaction for the SQL editor.
+
+**Do not re-run `20261108_init.sql` on an existing project.** The auth
+hardening migration (`20261120`) is additive and idempotent. It:
 
 - Replaces `public.is_admin()` with a `SECURITY DEFINER` function that has a
   fixed empty `search_path`.
@@ -116,8 +135,9 @@ this change; a fresh run of the demo script already uses these locations.
   `user_metadata`.
 - `/owner` requires the `owner` role. `/admin` requires the `admin` role.
   Unauthorised users are redirected to their own portal.
-- The `spacego_*` tables still use permissive demo RLS. They are not a security
-  boundary for user data; do not store secrets there.
+- The `spacego_*` tables are protected by row-level security and guarded
+  functions (`20261121` onwards), which are the real security boundary: the
+  browser holds only the publishable key.
 
 ## Required Supabase Dashboard settings
 
@@ -150,16 +170,27 @@ Under **Authentication → Signing Keys**:
 - Orun **prod** → Supabase project `spacego-dev` (temporary until a dedicated
   production project exists)
 
-## Verification status
+## Tests
 
-The app-state tables have been deployed and exercised on stage and prod. The
-profile hardening migration has **not** been applied to either project as part
-of this change, so real end-to-end registration, profile creation, and role
-authorisation still require:
+Each file in `tests/` runs in one transaction and ends with `ROLLBACK`, so it is
+safe on staging (and production) and leaves nothing behind. Every check raises
+an exception on failure, and success prints a line ending "all checks passed".
 
-1. Applying `20261120_profiles_auth_hardening.sql` manually.
-2. Configuring the Dashboard URLs and email templates above.
-3. Testing with real staging accounts, including promoting one admin profile.
+```bash
+for f in supabase/tests/*.sql; do
+  psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f "$f" || break
+done
+```
 
-Until then, treat real authentication as implemented but not yet
-staging-verified.
+`security_hardening_test.sql` checks `20261207`: run it after applying that
+migration. It also warns about any `SECURITY DEFINER` function without a fixed
+`search_path` that was created outside these migrations.
+
+## Status
+
+Migrations through `20261206` are applied on staging and production (25 and
+26 Nov 2026, from the records in `docs/history/` and the checks run then).
+Whether each project's dashboard settings above (site URL, redirect URLs,
+email templates) are complete isn't recorded here, so check them before
+relying on email sign-up and password reset. `20261207` is written and tested
+on local copies only.
