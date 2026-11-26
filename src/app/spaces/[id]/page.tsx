@@ -23,6 +23,7 @@ import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { SafeImage } from "@/components/ui/SafeImage";
+import { SpaceLocationSection } from "@/components/discover/SpaceLocationSection";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
@@ -235,6 +236,8 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             <ReviewDetails space={space} />
+
+            <SpaceLocationSection space={space} />
 
             <section aria-labelledby="hours-heading">
               <h2 id="hours-heading" className="text-xl font-semibold text-ink">Opening hours and rules</h2>

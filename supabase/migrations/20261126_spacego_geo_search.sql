@@ -22,7 +22,11 @@
 --   - No data is modified or deleted. No policy is dropped or weakened.
 --   - No existing function or view is replaced.
 --
+-- Also adds public.spacego_public_space_point(id), the approximate point of
+-- one published listing, for the map on the listing page.
+--
 -- Rollback (manual, if ever needed):
+--   DROP FUNCTION IF EXISTS public.spacego_public_space_point(text);
 --   DROP FUNCTION IF EXISTS public.spacego_search_spaces(
 --     double precision, double precision, integer, text[], numeric, numeric,
 --     text, text[], integer, boolean, boolean, text, integer, integer);
@@ -71,8 +75,8 @@ ALTER TABLE public.spacego_spaces
   ADD COLUMN IF NOT EXISTS geo_public extensions.geography(Point, 4326)
   GENERATED ALWAYS AS (
     CASE
-      WHEN (data -> 'location' -> 'coordinates' ->> 'lat') ~ '^-?[0-9]{1,3}([.][0-9]{1,12})?$'
-       AND (data -> 'location' -> 'coordinates' ->> 'lng') ~ '^-?[0-9]{1,3}([.][0-9]{1,12})?$'
+      WHEN (data -> 'location' -> 'coordinates' ->> 'lat') ~ '^-?[0-9]{1,3}([.][0-9]{1,20})?$'
+       AND (data -> 'location' -> 'coordinates' ->> 'lng') ~ '^-?[0-9]{1,3}([.][0-9]{1,20})?$'
       THEN
         CASE
           WHEN abs((data -> 'location' -> 'coordinates' ->> 'lat')::numeric) <= 85
@@ -235,6 +239,32 @@ GRANT EXECUTE ON FUNCTION public.spacego_search_spaces(
   double precision, double precision, integer, text[], numeric, numeric,
   text, text[], integer, boolean, boolean, text, integer, integer
 ) TO anon, authenticated;
+
+-- ------------------------------------------------------------
+-- 3. Approximate point for one published listing (detail page map)
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.spacego_public_space_point(p_id text)
+RETURNS TABLE (approx_lat double precision, approx_lng double precision)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $fn$
+  SELECT
+    extensions.st_y(s.geo_public::extensions.geometry),
+    extensions.st_x(s.geo_public::extensions.geometry)
+  FROM public.spacego_spaces s
+  WHERE (s.id = p_id OR s.data ->> 'slug' = p_id)
+    AND s.data ->> 'status' = 'published'
+    AND s.geo_public IS NOT NULL
+  LIMIT 1;
+$fn$;
+
+COMMENT ON FUNCTION public.spacego_public_space_point(text) IS
+  'Approximate public point (0.005 degree grid) of one PUBLISHED listing, for the listing page map. Never the exact coordinates.';
+
+REVOKE ALL ON FUNCTION public.spacego_public_space_point(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.spacego_public_space_point(text) TO anon, authenticated;
 
 -- Ask PostgREST to pick up the new function.
 NOTIFY pgrst, 'reload schema';

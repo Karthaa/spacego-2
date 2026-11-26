@@ -7,6 +7,7 @@ import { Crosshair, LocateFixed, MapPinOff, RotateCw } from "lucide-react";
 import type { NearbySpace } from "@/lib/data/store";
 import { circlePolygon, radiusForBounds, zoomForRadius, type SearchCenter } from "@/lib/geo";
 import { useResolvedTheme } from "@/lib/theme";
+import { FALLBACK_MAP_STYLE as FALLBACK_STYLE, MAP_STYLE_OVERRIDE as STYLE_OVERRIDE, mapStyleUrl as styleUrl } from "@/lib/geo/mapStyle";
 import { cn, formatCurrency } from "@/lib/utils";
 import { headlinePrice } from "@/components/common/SpaceCard";
 
@@ -18,20 +19,6 @@ import { headlinePrice } from "@/components/common/SpaceCard";
  * NEXT_PUBLIC_MAP_STYLE_URL. Markers are real <button>s so they are keyboard
  * and screen-reader reachable. All points are approximate public locations.
  */
-
-const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-const STYLE_OVERRIDE = process.env.NEXT_PUBLIC_MAP_STYLE_URL;
-
-function styleUrl(theme: "light" | "dark"): string {
-  if (STYLE_OVERRIDE) return STYLE_OVERRIDE;
-  if (MAPTILER_KEY) {
-    const id = theme === "dark" ? "dataviz-dark" : "dataviz";
-    return `https://api.maptiler.com/maps/${id}/style.json?key=${encodeURIComponent(MAPTILER_KEY)}`;
-  }
-  return `https://tiles.openfreemap.org/styles/${theme === "dark" ? "dark" : "positron"}`;
-}
-
-const FALLBACK_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 export interface DiscoverMapProps {
   items: NearbySpace[];

@@ -156,6 +156,14 @@ BEGIN
     NULL;
   END;
 
+  -- Single-listing point: approximate for published, nothing for drafts.
+  SELECT * INTO v_row FROM public.spacego_public_space_point('zz-geo-test-pub-1');
+  IF v_row.approx_lat IS NULL OR abs(v_row.approx_lat - 9.98) > 1e-9 THEN
+    RAISE EXCEPTION 'public point wrong: %', v_row.approx_lat;
+  END IF;
+  SELECT count(*) INTO v_count FROM public.spacego_public_space_point('zz-geo-test-draft');
+  IF v_count <> 0 THEN RAISE EXCEPTION 'draft listing point exposed'; END IF;
+
   -- anon still cannot read the base table directly.
   BEGIN
     PERFORM 1 FROM public.spacego_spaces LIMIT 1;

@@ -726,6 +726,31 @@ export const SpaceGoStore = {
     };
   },
 
+  /**
+   * Approximate public point of one published listing, or null when it has
+   * no usable location (or location search isn't enabled in the database).
+   */
+  getPublicPoint: async (id: string): Promise<StoreResult<LatLng | null>> => {
+    if (!remoteMode()) {
+      const space = SpaceGoStore.getSpaceById(id);
+      const c = space?.location?.coordinates;
+      if (!space || space.status !== "published" || !c || !isValidLatLng(c.lat, c.lng)) {
+        return { ok: true, data: null };
+      }
+      return { ok: true, data: approximatePoint(c) };
+    }
+    const result = await callRpc<{ approx_lat: number; approx_lng: number }[]>(REMOTE_RPCS.publicSpacePoint, {
+      p_id: id,
+    });
+    if (!result.ok) {
+      if (/missing the required function/i.test(result.error)) return { ok: true, data: null };
+      return result;
+    }
+    const row = result.data?.[0];
+    if (!row || !isValidLatLng(Number(row.approx_lat), Number(row.approx_lng))) return { ok: true, data: null };
+    return { ok: true, data: { lat: Number(row.approx_lat), lng: Number(row.approx_lng) } };
+  },
+
   getSpaceById: (id: string): Space | undefined => {
     return SpaceGoStore.getSpaces().find((s) => s.id === id || s.slug === id);
   },
