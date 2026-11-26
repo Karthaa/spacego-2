@@ -51,7 +51,7 @@ Nothing was pushed, merged, deployed or applied to staging or production.
 
 ## What needs you
 
-See `docs/MORNING_APPROVALS.md`:
+See `docs/history/MORNING_APPROVALS.md`:
 
 1. Revoke the Supabase token you pasted.
 2. Push the branch from the bundle.
@@ -60,7 +60,7 @@ See `docs/MORNING_APPROVALS.md`:
 
 ## What isn't done
 
-See section 15 of `docs/IMPLEMENTATION_REPORT.md`. In short:
+See section 15 of `docs/history/IMPLEMENTATION_REPORT.md`. In short:
 
 - the 9-step wizard, with availability and blackout dates,
 - the remaining checks and host profile fields,
