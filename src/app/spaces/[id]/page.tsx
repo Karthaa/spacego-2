@@ -621,8 +621,8 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
           <p className="flex items-start gap-2 text-sm text-ink-muted">
             <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             {space.instant_book
-              ? "Instant Book: confirmed as soon as SpaceGo checks the dates are free."
-              : "The host reviews your request before it's confirmed. The final price is calculated by SpaceGo when you book."}
+              ? "Instant Book: confirmed as soon as SpaceGo checks the dates are free. No payment is taken on SpaceGo."
+              : "The host reviews your request before it's confirmed. The final price is calculated by SpaceGo when you book. No payment is taken on SpaceGo."}
           </p>
         </form>
       </aside>
