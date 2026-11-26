@@ -7,10 +7,9 @@ import { Space, SpaceImage, SpaceLocation, SpacePricing, WorkspaceCategory } fro
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
-import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
 import dynamic from "next/dynamic";
 import { isValidLatLng, type LatLng } from "@/lib/geo";
+import { PhotoUploader } from "./PhotoUploader";
 
 const LocationPicker = dynamic(() => import("./LocationPicker"), {
   ssr: false,
@@ -78,24 +77,6 @@ const AVAILABLE_AMENITIES = [
   "On-site Parking",
 ];
 
-const IMAGE_PRESETS = [
-  {
-    label: "Open workspace",
-    url: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    label: "Private office",
-    url: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    label: "Boardroom",
-    url: "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=1200&q=80",
-  },
-  {
-    label: "Studio",
-    url: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=1200&q=80",
-  },
-];
 
 const optionalPrice = z
   .number({ error: "Enter a number." })
@@ -143,7 +124,8 @@ type FieldKey =
   | "pricing.monthly"
   | "pricing"
   | "openTime"
-  | "closeTime";
+  | "closeTime"
+  | "images";
 
 /** Order used to move focus to the first invalid field. */
 const FIELD_ORDER: FieldKey[] = [
@@ -160,6 +142,7 @@ const FIELD_ORDER: FieldKey[] = [
   "pricing",
   "openTime",
   "closeTime",
+  "images",
 ];
 
 type FieldErrors = Partial<Record<FieldKey, string>>;
@@ -202,8 +185,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
 
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initial?.amenities ?? DEFAULT_AMENITIES);
 
-  const initialCoverUrl = initial ? (initial.images.find((img) => img.is_cover) ?? initial.images[0])?.url : undefined;
-  const [selectedImage, setSelectedImage] = useState(initialCoverUrl ?? IMAGE_PRESETS[0].url);
+  const [images, setImages] = useState<SpaceImage[]>(initial?.images ?? []);
 
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -214,10 +196,6 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
     return [...AVAILABLE_AMENITIES, ...extra];
   }, [initial]);
 
-  const imageOptions = useMemo(() => {
-    if (!initialCoverUrl || IMAGE_PRESETS.some((p) => p.url === initialCoverUrl)) return IMAGE_PRESETS;
-    return [{ label: "Current photo", url: initialCoverUrl }, ...IMAGE_PRESETS];
-  }, [initialCoverUrl]);
 
   const validate = () => {
     const parsed = spaceFormSchema.safeParse({
@@ -238,7 +216,8 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
 
     const errors: FieldErrors = {};
     if (!pin) errors.coordinates = "Place the pin on your building so guests can find the space.";
-    if (parsed.success && !pin) return { data: null, errors };
+    if (images.length === 0) errors.images = "Add at least one photo of the space.";
+    if (parsed.success && (!pin || images.length === 0)) return { data: null, errors };
     if (parsed.success) return { data: parsed.data, errors: {} as FieldErrors };
 
     for (const issue of parsed.error.issues) {
@@ -258,15 +237,6 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
     );
   };
 
-  const buildImages = (): SpaceImage[] => {
-    const cover: SpaceImage = { url: selectedImage, caption: "Main space", is_cover: true };
-    if (!initial) return [cover];
-    if (selectedImage === initialCoverUrl) return initial.images;
-    return [
-      cover,
-      ...initial.images.filter((img) => img.url !== selectedImage).map((img) => ({ ...img, is_cover: false })),
-    ];
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,7 +251,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
       if (first === "coordinates") el?.scrollIntoView({ block: "center" });
       return;
     }
-    if (!pin) return;
+    if (!pin || images.length === 0) return;
 
     const values: SpaceFormValues = {
       title: data.title,
@@ -311,7 +281,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
         days: initial?.operating_hours.days ?? DEFAULT_DAYS,
       },
       house_rules: initial?.house_rules ?? DEFAULT_HOUSE_RULES,
-      images: buildImages(),
+      images: images.map((img, i) => ({ ...img, caption: img.caption || `${data.title} photo ${i + 1}`, is_cover: i === 0 })),
       // New listings start as drafts; SpaceGo reviews them before they go live.
       status: mode === "edit" && initial ? initial.status : "draft",
       instant_book: instantBook,
@@ -573,36 +543,9 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
         </fieldset>
       </Card>
 
-      {/* Photo */}
+      {/* Photos */}
       <Card>
-        <fieldset>
-          <legend className="text-lg font-semibold text-ink">Cover photo</legend>
-          <p className="mt-1 text-sm text-ink-muted">Choose the photo that best matches your space.</p>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {imageOptions.map((img) => {
-              const selected = selectedImage === img.url;
-              return (
-                <button
-                  key={img.url}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setSelectedImage(img.url)}
-                  className={cn(
-                    "overflow-hidden rounded-md border text-left transition-colors",
-                    selected ? "border-accent ring-2 ring-accent" : "border-line hover:border-line-strong"
-                  )}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="h-28 w-full object-cover" />
-                  <span className="flex items-center justify-between gap-2 bg-surface px-3 py-2 text-sm font-medium text-ink">
-                    {img.label}
-                    {selected && <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <PhotoUploader id={fieldId("images")} images={images} onChange={setImages} error={errors.images} />
       </Card>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">

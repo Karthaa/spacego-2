@@ -71,6 +71,31 @@ function getClient(): Supabase | null {
   return client;
 }
 
+/** Upload to a public Storage bucket and return the file's public URL. */
+export async function uploadPublicFile(
+  bucket: string,
+  path: string,
+  body: Blob,
+  contentType: string
+): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType, upsert: false });
+    if (error) {
+      return {
+        ok: false,
+        error: /row-level security|unauthorized|403/i.test(error.message)
+          ? "Only host accounts can upload listing photos."
+          : `Upload failed: ${error.message}`,
+      };
+    }
+    return { ok: true, data: supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? `Upload failed: ${error.message}` : "Upload failed." };
+  }
+}
+
 export function isRemoteEnabled(): boolean {
   return isSupabaseConfigured();
 }
