@@ -102,6 +102,7 @@ export function Navbar() {
   };
 
   const navLinks = [
+    { href: "/discover", label: "Near me", active: pathname.startsWith("/discover") },
     { href: "/spaces", label: "Find a space", active: pathname.startsWith("/spaces") },
     { href: "/#how-it-works", label: "How it works", active: false },
     { href: "/activation", label: "For property owners", active: pathname.startsWith("/activation") },

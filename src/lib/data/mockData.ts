@@ -41,6 +41,136 @@ export const INITIAL_PROFILES: UserProfile[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Kochi sample listings (local demo mode only)
+// ---------------------------------------------------------------------------
+// These exist so location search and the map have a realistic cluster to show
+// when no database is configured. They are never written to Supabase, carry no
+// ratings, reviews or verification, and say they are samples in their text.
+
+const img = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=80`;
+
+interface DemoSeed {
+  id: string;
+  title: string;
+  category: Space["category"];
+  area: string;
+  lat: number;
+  lng: number;
+  capacity: number;
+  sqft: number;
+  pricing: Omit<Space["pricing"], "currency">;
+  amenities: string[];
+  photos: string[];
+  instant?: boolean;
+  created: string;
+}
+
+const KOCHI_SEEDS: DemoSeed[] = [
+  {
+    id: "demo-kochi-1", title: "Infopark Focus Desks", category: "coworking", area: "Kakkanad",
+    lat: 10.0093, lng: 76.3612, capacity: 40, sqft: 4200,
+    pricing: { hourly: 120, daily: 450, monthly: 6500 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Coffee & tea", "Parking"],
+    photos: ["photo-1497366216548-37526070297c", "photo-1524758631624-e2822e304c36"], instant: true, created: "2026-11-20T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-2", title: "Edappally Boardroom", category: "meeting_room", area: "Edappally",
+    lat: 10.0258, lng: 76.3084, capacity: 12, sqft: 520,
+    pricing: { hourly: 650, daily: 4200 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Display screen", "Whiteboard"],
+    photos: ["photo-1577495508048-b635879837f1", "photo-1517502884422-41eaead166d4"], created: "2026-11-18T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-3", title: "MG Road Private Office", category: "private_office", area: "MG Road, Ernakulam",
+    lat: 9.9719, lng: 76.2853, capacity: 8, sqft: 900,
+    pricing: { daily: 2400, monthly: 38000 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Lockable storage", "Reception"],
+    photos: ["photo-1497366811353-6870744d04b2", "photo-1497215842964-222b430dc094"], created: "2026-11-15T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-4", title: "Panampilly Content Studio", category: "studio", area: "Panampilly Nagar",
+    lat: 9.9601, lng: 76.2957, capacity: 6, sqft: 650,
+    pricing: { hourly: 900, daily: 6000 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Soundproofing", "Lighting kit"],
+    photos: ["photo-1598488035139-bdbb2231ce04", "photo-1516321318423-f06f85e504b3"], instant: true, created: "2026-11-12T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-5", title: "Kaloor Training Hall", category: "training_room", area: "Kaloor",
+    lat: 9.9978, lng: 76.2923, capacity: 36, sqft: 1500,
+    pricing: { hourly: 800, daily: 5500 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Projector", "Parking"],
+    photos: ["photo-1505373877841-8d25f7d46678", "photo-1540575467063-178a50c2df87"], created: "2026-11-10T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-6", title: "Fort Kochi Heritage Desks", category: "coworking", area: "Fort Kochi",
+    lat: 9.9662, lng: 76.2424, capacity: 18, sqft: 1600,
+    pricing: { hourly: 100, daily: 400, monthly: 5800 },
+    amenities: ["High-speed Wi-Fi", "Coffee & tea", "Quiet zone", "Air conditioning"],
+    photos: ["photo-1522071820081-009f0129c71c", "photo-1497215728101-856f4ea42174"], instant: true, created: "2026-11-08T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-7", title: "Vyttila Hub Coworking", category: "coworking", area: "Vyttila",
+    lat: 9.9676, lng: 76.3206, capacity: 30, sqft: 2800,
+    pricing: { hourly: 110, daily: 420, monthly: 6000 },
+    amenities: ["High-speed Wi-Fi", "Power backup", "Air conditioning", "Parking", "Printer"],
+    photos: ["photo-1527192491265-7e15c55b1ed2", "photo-1497366754035-f200968a6e72"], created: "2026-11-05T09:00:00Z",
+  },
+  {
+    id: "demo-kochi-8", title: "Palarivattom Meeting Pod", category: "meeting_room", area: "Palarivattom",
+    lat: 10.0039, lng: 76.3078, capacity: 4, sqft: 180,
+    pricing: { hourly: 350 },
+    amenities: ["High-speed Wi-Fi", "Air conditioning", "Display screen"],
+    photos: ["photo-1517048676732-d65bc937f952"], instant: true, created: "2026-11-02T09:00:00Z",
+  },
+];
+
+export const DEMO_KOCHI_SPACES: Space[] = KOCHI_SEEDS.map((seed) => ({
+  id: seed.id,
+  title: seed.title,
+  slug: seed.id,
+  category: seed.category,
+  headline: `Sample listing in ${seed.area} for the local demo`,
+  description:
+    "Sample listing for SpaceGo's local demo mode. It is not a real workspace and cannot be booked for real. It exists so location search and the map can be tried without a database.",
+  location: {
+    city: "Kochi",
+    address: `Sample address, ${seed.area}`,
+    state: "Kerala",
+    country: "India",
+    coordinates: { lat: seed.lat, lng: seed.lng },
+    landmark: seed.area,
+  },
+  capacity: seed.capacity,
+  square_feet: seed.sqft,
+  pricing: { ...seed.pricing, currency: "INR" },
+  amenities: seed.amenities,
+  operating_hours: { open: "09:00", close: "19:00", days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] },
+  house_rules: [],
+  verification_level: "listed",
+  passport: {
+    identity_verified: false,
+    property_authority_verified: false,
+    permitted_use_confirmed: false,
+    connectivity_tested_mbps: 0,
+    power_backup_tested: false,
+    fire_safety_inspected: false,
+    inspected_by: "",
+    inspected_at: "",
+    renewal_date: "",
+    notes: "",
+  },
+  images: seed.photos.map((photo, i) => ({ url: img(photo), caption: `${seed.title} (sample photo)`, is_cover: i === 0 })),
+  owner_id: "user-owner-1",
+  owner_name: "Demo host",
+  owner_avatar: "",
+  status: "published",
+  rating: 0,
+  review_count: 0,
+  instant_book: Boolean(seed.instant),
+  created_at: seed.created,
+}));
+
 export const INITIAL_SPACES: Space[] = [
   {
     id: "space-1",
@@ -537,6 +667,7 @@ export const INITIAL_SPACES: Space[] = [
     instant_book: false,
     created_at: "2026-01-18T09:40:00Z",
   },
+  ...DEMO_KOCHI_SPACES,
 ];
 
 export const INITIAL_BOOKINGS: Booking[] = [

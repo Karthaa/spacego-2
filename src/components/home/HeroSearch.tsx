@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { LocateFixed, MapPin, Search, Users } from "lucide-react";
 import { SpaceGoStore } from "@/lib/data/store";
 import { CATEGORIES } from "@/lib/categories";
 import type { Space, WorkspaceCategory } from "@/types";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { fieldClasses } from "@/components/ui/Input";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { cn } from "@/lib/utils";
+import { matchKnownPlaces } from "@/lib/geo/places";
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=80";
@@ -46,6 +48,17 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
         seats: seats ? Number(seats) : undefined,
         resultCount: countMatches(spaces, location, category, Number(seats) || 0),
       });
+    }
+
+    // A recognised area goes to the location search (list + map); anything
+    // else keeps the text search across all listings.
+    const place = location.trim().length >= 3 ? matchKnownPlaces(location, 1)[0] : undefined;
+    if (place) {
+      const geo = new URLSearchParams({ lat: place.lat.toFixed(5), lng: place.lng.toFixed(5), near: place.label });
+      if (category !== "all") geo.set("cat", category);
+      if (seats) geo.set("seats", seats);
+      router.push(`/discover?${geo.toString()}`);
+      return;
     }
 
     router.push(`/spaces${params.toString() ? `?${params.toString()}` : ""}`);
@@ -141,6 +154,15 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
             Search
           </Button>
         </form>
+        <p className="mt-4 text-sm text-photo-ink/90">
+          <Link
+            href="/discover"
+            className="inline-flex min-h-11 items-center gap-2 rounded-sm font-medium text-photo-ink underline-offset-4 hover:underline"
+          >
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+            Find spaces near you on a map
+          </Link>
+        </p>
       </div>
     </section>
   );

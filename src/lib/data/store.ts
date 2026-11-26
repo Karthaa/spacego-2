@@ -34,6 +34,14 @@ import {
   setFavouriteRow,
   updateSpaceRow,
 } from "./remote";
+import {
+  approximatePoint,
+  haversineMeters,
+  isValidLatLng,
+  MAX_RADIUS_M,
+  roundDistance,
+  type LatLng,
+} from "@/lib/geo";
 
 /**
  * SpaceGo data store.
@@ -51,6 +59,103 @@ import {
  */
 
 export type StoreResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+export type NearbySort = "distance" | "price_asc" | "price_desc" | "newest";
+export type PriceUnit = "hourly" | "daily" | "monthly";
+
+export interface NearbySearchParams {
+  center: LatLng;
+  radiusM: number;
+  categories?: WorkspaceCategory[];
+  priceUnit?: PriceUnit | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  amenities?: string[];
+  minCapacity?: number | null;
+  verifiedOnly?: boolean;
+  instantOnly?: boolean;
+  sort?: NearbySort;
+  limit?: number;
+  offset?: number;
+}
+
+export interface NearbySpace {
+  space: Space;
+  /** Approximate public point (never the exact address). */
+  point: LatLng;
+  /** Straight-line distance from the search centre, rounded to 100 m. */
+  distanceM: number;
+}
+
+export interface NearbySearchResult {
+  items: NearbySpace[];
+  total: number;
+  /** "server": PostGIS RPC. "demo": local sample data, filtered in the browser. */
+  source: "server" | "demo";
+}
+
+interface SearchRpcRow {
+  id: string;
+  data: Partial<Space> & { id: string };
+  approx_lat: number;
+  approx_lng: number;
+  distance_m: number;
+  total_count: number;
+}
+
+function nearbyPrice(space: Space, unit: PriceUnit | null | undefined): number | null {
+  if (unit) return space.pricing[unit] ?? null;
+  return space.pricing.daily ?? space.pricing.hourly ?? space.pricing.monthly ?? null;
+}
+
+const VERIFIED_LEVELS = new Set(["checked", "ready", "pro"]);
+
+/** Demo-mode search: the same rules as spacego_search_spaces, in the browser. */
+function searchLocal(spaces: Space[], p: NearbySearchParams): NearbySearchResult {
+  const radius = Math.min(Math.max(p.radiusM, 250), MAX_RADIUS_M);
+  const limit = Math.min(Math.max(p.limit ?? 24, 1), 50);
+  const offset = Math.max(p.offset ?? 0, 0);
+  const sort = p.sort ?? "distance";
+
+  const matches: (NearbySpace & { price: number | null })[] = [];
+  for (const space of spaces) {
+    if (space.status !== "published") continue;
+    const c = space.location?.coordinates;
+    if (!c || !isValidLatLng(c.lat, c.lng)) continue;
+    const point = approximatePoint(c);
+    const dist = haversineMeters(p.center, point);
+    if (dist > radius) continue;
+    if (p.categories?.length && !p.categories.includes(space.category)) continue;
+    if (p.amenities?.length && !p.amenities.every((a) => space.amenities.includes(a))) continue;
+    if (p.minCapacity && space.capacity < p.minCapacity) continue;
+    if (p.verifiedOnly && !VERIFIED_LEVELS.has(space.verification_level)) continue;
+    if (p.instantOnly && !space.instant_book) continue;
+    const price = nearbyPrice(space, p.priceUnit);
+    if (p.priceUnit && price == null) continue;
+    if (p.minPrice != null && (price == null || price < p.minPrice)) continue;
+    if (p.maxPrice != null && (price == null || price > p.maxPrice)) continue;
+    matches.push({ space, point, distanceM: roundDistance(dist), price });
+  }
+
+  const byNum = (a: number | null, b: number | null, dir: 1 | -1) =>
+    a == null ? 1 : b == null ? -1 : (a - b) * dir;
+  matches.sort((a, b) => {
+    let d = 0;
+    if (sort === "price_asc") d = byNum(a.price, b.price, 1);
+    else if (sort === "price_desc") d = byNum(a.price, b.price, -1);
+    else if (sort === "newest") d = (b.space.created_at ?? "").localeCompare(a.space.created_at ?? "");
+    return d || a.distanceM - b.distanceM || a.space.id.localeCompare(b.space.id);
+  });
+
+  return {
+    items: matches.slice(offset, offset + limit).map(({ space, point, distanceM }) => ({ space, point, distanceM })),
+    total: matches.length,
+    source: "demo",
+  };
+}
+
+export const NEARBY_NOT_ENABLED =
+  "Location search isn't switched on for this database yet. Browse all spaces instead, or try again later.";
 
 export interface StoreViewer {
   id: string;
@@ -570,6 +675,55 @@ export const SpaceGoStore = {
   /** Published spaces only — use for public discovery screens. */
   getPublishedSpaces: (): Space[] => {
     return SpaceGoStore.getSpaces().filter((s) => s.status === "published");
+  },
+
+  /**
+   * Published spaces near a point. Remote mode calls the PostGIS RPC; local
+   * demo mode filters the sample data with the same rules. Never falls back
+   * to sample data when a real database is configured.
+   */
+  searchNearby: async (params: NearbySearchParams): Promise<StoreResult<NearbySearchResult>> => {
+    if (!remoteMode()) {
+      return { ok: true, data: searchLocal(SpaceGoStore.getSpaces(), params) };
+    }
+
+    const result = await callRpc<SearchRpcRow[]>(REMOTE_RPCS.searchSpaces, {
+      p_lat: params.center.lat,
+      p_lng: params.center.lng,
+      p_radius_m: Math.round(Math.min(Math.max(params.radiusM, 250), MAX_RADIUS_M)),
+      p_categories: params.categories?.length ? params.categories : null,
+      p_min_price: params.minPrice ?? null,
+      p_max_price: params.maxPrice ?? null,
+      p_price_unit: params.priceUnit ?? null,
+      p_amenities: params.amenities?.length ? params.amenities : null,
+      p_min_capacity: params.minCapacity ?? null,
+      p_verified_only: Boolean(params.verifiedOnly),
+      p_instant_only: Boolean(params.instantOnly),
+      p_sort: params.sort ?? "distance",
+      p_limit: params.limit ?? 24,
+      p_offset: params.offset ?? 0,
+    });
+
+    if (!result.ok) {
+      if (/missing the required function/i.test(result.error)) {
+        return { ok: false, error: NEARBY_NOT_ENABLED };
+      }
+      return result;
+    }
+
+    const rows = result.data ?? [];
+    return {
+      ok: true,
+      data: {
+        items: rows.map((row) => ({
+          space: normalizeSpace({ ...row.data, id: row.id }),
+          point: { lat: Number(row.approx_lat), lng: Number(row.approx_lng) },
+          distanceM: Number(row.distance_m) || 0,
+        })),
+        total: rows.length > 0 ? Number(rows[0].total_count) || rows.length : 0,
+        source: "server",
+      },
+    };
   },
 
   getSpaceById: (id: string): Space | undefined => {

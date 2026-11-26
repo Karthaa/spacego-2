@@ -43,6 +43,7 @@ export const REMOTE_RPCS = {
   logDemand: "spacego_log_demand",
   demandAnalytics: "spacego_demand_analytics",
   markNotificationRead: "spacego_mark_notification_read",
+  searchSpaces: "spacego_search_spaces",
 } as const;
 
 export type RemoteResult<T> =

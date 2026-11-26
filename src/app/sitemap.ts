@@ -22,6 +22,7 @@ type Entry = {
 // excluded here and disallowed in robots.ts.
 const PUBLIC_ROUTES: Entry[] = [
   { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/discover", changeFrequency: "daily", priority: 0.9 },
   { path: "/spaces", changeFrequency: "daily", priority: 0.9 },
   { path: "/activation", changeFrequency: "monthly", priority: 0.7 },
   { path: "/activation/track", changeFrequency: "monthly", priority: 0.4 },
