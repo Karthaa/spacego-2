@@ -66,4 +66,24 @@ out.push(`anon address RPC: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (ba
   r = await owner.c.from("spacego_spaces").update({ data: { ...row.data, verification_level: "pro", passport: { ...row.data.passport, identity_verified: true, inspected_at: "2026-11-26" } } }).eq("id", "local-test-2").select("id,data").single();
   out.push(`owner self-awarded badge via REST: level now ${r.data?.data?.verification_level ?? r.error?.code}`);
 }
+
+// Reviews (20261201): only through the RPC, only after a confirmed stay has ended.
+r = await seeker.c.from("spacego_space_reviews").insert({ booking_id: "x", space_id: "local-test-1", author_id: seeker.id, rating: 5, body: "Direct insert that should not work." }).select("id");
+out.push(`seeker inserts a review directly: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+{
+  const start = new Date(Date.now() + (60 + Math.floor(Math.random() * 600)) * 86400000);
+  start.setUTCHours(4, 30, 0, 0);
+  const bk = await seeker.c.rpc("spacego_create_booking", {
+    p_space_id: "local-test-1", p_start_date: start.toISOString(), p_end_date: new Date(start.getTime() + 2 * 3600000).toISOString(),
+    p_duration_type: "hourly", p_duration_units: 2, p_seats: 1,
+  });
+  if (bk.error) throw bk.error;
+  r = await seeker.c.rpc("spacego_submit_review", { p_booking_id: bk.data.id, p_rating: 5, p_body: "Reviewing before the visit has happened." });
+  out.push(`seeker reviews a booking that hasn't ended: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+  r = await owner.c.rpc("spacego_submit_review", { p_booking_id: bk.data.id, p_rating: 5, p_body: "Host reviewing their own space here." });
+  out.push(`host reviews their own space via a guest's booking: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+  await seeker.c.rpc("spacego_update_booking_status", { p_booking_id: bk.data.id, p_new_status: "cancelled" });
+}
+r = await anon.from("spacego_space_reviews").select("id");
+out.push(`anon reads the reviews table: ${r.error ? "BLOCKED " + r.error.code : r.data.length + " rows (bad)"}`);
 console.log(out.join("\n"));

@@ -16,6 +16,9 @@ import {
   ListingReviewDecision,
   ListingReviewState,
   SpaceAddress,
+  SpaceReview,
+  SpaceReviewSummary,
+  OwnReview,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -30,6 +33,7 @@ import {
   deleteSpaceRow,
   fetchFavouriteIds,
   fetchRows,
+  selectRows,
   insertSpaceRow,
   isRemoteEnabled as isSupabaseBackendEnabled,
   REMOTE_RPCS,
@@ -556,6 +560,31 @@ function addLocalNotification(
   setStored(NOTIFICATIONS_KEY, [newNotif, ...all]);
 }
 
+const REVIEWS_KEY = "spacego_reviews";
+
+/** Demo-mode review row (mirrors public.spacego_space_reviews). */
+interface LocalReview extends SpaceReview {
+  booking_id: string;
+  author_id: string;
+  status: "published" | "hidden";
+  moderation_reason: string | null;
+}
+
+function localReviews(): LocalReview[] {
+  return getStored<LocalReview[]>(REVIEWS_KEY, []);
+}
+
+/** A reviews view or RPC that isn't installed yet reads as "no reviews". */
+function reviewsNotInstalled(message: string): boolean {
+  return /does not exist|schema cache|missing the required/i.test(message);
+}
+
+/** Bookings a guest may review: confirmed and already ended. */
+export function canReviewBooking(booking: Booking, now = Date.now()): boolean {
+  const end = Date.parse(booking.end_date);
+  return (booking.status === "approved" || booking.status === "completed") && Number.isFinite(end) && end <= now;
+}
+
 // ---------------------------------------------------------------------------
 // Remote loading
 // ---------------------------------------------------------------------------
@@ -839,6 +868,175 @@ export const SpaceGoStore = {
         lng: hasPin ? lng : null,
       },
     };
+  },
+
+  /** Published reviews of a space and their average, newest first. */
+  getSpaceReviews: async (
+    spaceId: string
+  ): Promise<StoreResult<{ reviews: SpaceReview[]; summary: SpaceReviewSummary }>> => {
+    const empty = { reviews: [], summary: { review_count: 0, average_rating: null } };
+    if (!remoteMode()) {
+      const reviews = localReviews()
+        .filter((r) => r.space_id === spaceId && r.status === "published")
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+      return {
+        ok: true,
+        data: {
+          reviews,
+          summary: {
+            review_count: reviews.length,
+            average_rating: reviews.length ? Math.round((total / reviews.length) * 10) / 10 : null,
+          },
+        },
+      };
+    }
+    const [rows, summary] = await Promise.all([
+      selectRows<SpaceReview>(
+        "spacego_public_reviews",
+        "id,space_id,author_name,rating,body,host_response,host_responded_at,created_at",
+        { space_id: spaceId },
+        "created_at",
+        50
+      ),
+      selectRows<{ review_count: number; average_rating: number | string | null }>(
+        "spacego_public_review_summary",
+        "review_count,average_rating",
+        { space_id: spaceId }
+      ),
+    ]);
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: empty } : rows;
+    const s = summary.ok ? summary.data[0] : undefined;
+    return {
+      ok: true,
+      data: {
+        reviews: rows.data,
+        summary: s
+          ? { review_count: Number(s.review_count) || 0, average_rating: s.average_rating === null ? null : Number(s.average_rating) }
+          : { review_count: rows.data.length, average_rating: null },
+      },
+    };
+  },
+
+  /** The signed-in guest's own reviews (including any hidden by SpaceGo). */
+  getOwnReviews: async (): Promise<StoreResult<OwnReview[]>> => {
+    const who = requireViewer();
+    if (!who.ok) return { ok: true, data: [] };
+    if (!remoteMode()) {
+      return {
+        ok: true,
+        data: localReviews()
+          .filter((r) => r.author_id === who.data.id)
+          .map(({ id, booking_id, space_id, rating, status, moderation_reason }) => ({
+            id,
+            booking_id,
+            space_id,
+            rating,
+            status,
+            moderation_reason,
+          })),
+      };
+    }
+    const rows = await selectRows<OwnReview>(
+      "spacego_space_reviews",
+      "id,booking_id,space_id,rating,status,moderation_reason",
+      { author_id: who.data.id }
+    );
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: [] } : rows;
+    return rows;
+  },
+
+  /** Guest: review a confirmed booking that has ended. One review per booking. */
+  submitReview: async (bookingId: string, rating: number, body: string): Promise<StoreResult<string>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = body.trim();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return { ok: false, error: "Choose a rating from 1 to 5." };
+    if (text.length < 20 || text.length > 2000) return { ok: false, error: "Write between 20 and 2000 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<string>(REMOTE_RPCS.submitReview, { p_booking_id: bookingId, p_rating: rating, p_body: text });
+      if (!result.ok && reviewsNotInstalled(result.error)) {
+        return { ok: false, error: "Reviews aren't switched on yet. Please try again later." };
+      }
+      return result;
+    }
+    const booking = SpaceGoStore.getBookings().find((b) => b.id === bookingId && b.user_id === who.data.id);
+    if (!booking) return { ok: false, error: "Booking not found." };
+    if (!canReviewBooking(booking)) return { ok: false, error: "You can review this space once your booking has ended." };
+    const all = localReviews();
+    if (all.some((r) => r.booking_id === bookingId)) return { ok: false, error: "You have already reviewed this booking." };
+    const review: LocalReview = {
+      id: newLocalId("review"),
+      booking_id: bookingId,
+      space_id: booking.space_id,
+      author_id: who.data.id,
+      author_name: (booking.user_name || "Guest").trim().split(/\s+/)[0].slice(0, 40) || "Guest",
+      rating,
+      body: text,
+      host_response: null,
+      host_responded_at: null,
+      status: "published",
+      moderation_reason: null,
+      created_at: new Date().toISOString(),
+    };
+    setStored(REVIEWS_KEY, [review, ...all]);
+    const space = SpaceGoStore.getSpaceById(booking.space_id);
+    if (space?.owner_id) {
+      addLocalNotification({
+        user_id: space.owner_id,
+        title: "New review",
+        message: `${review.author_name} reviewed ${space.title} (${rating} of 5).`,
+        type: "system",
+        link: `/spaces/${space.id}`,
+      });
+    }
+    notify();
+    return { ok: true, data: review.id };
+  },
+
+  /** Host: add or edit the public response to a review of their space. */
+  respondToReview: async (reviewId: string, response: string): Promise<StoreResult<null>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = response.trim();
+    if (text.length < 1 || text.length > 2000) return { ok: false, error: "Write between 1 and 2000 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.respondToReview, { p_review_id: reviewId, p_response: text });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    const all = localReviews();
+    const review = all.find((r) => r.id === reviewId);
+    if (!review || SpaceGoStore.getSpaceById(review.space_id)?.owner_id !== who.data.id) {
+      return { ok: false, error: "Only the host of this space can respond." };
+    }
+    setStored(
+      REVIEWS_KEY,
+      all.map((r) => (r.id === reviewId ? { ...r, host_response: text, host_responded_at: new Date().toISOString() } : r))
+    );
+    notify();
+    return { ok: true, data: null };
+  },
+
+  /** Admin: hide a review (with a reason) or restore it. */
+  moderateReview: async (reviewId: string, action: "hide" | "restore", reason = ""): Promise<StoreResult<null>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    if (action === "hide" && reason.trim().length < 10) return { ok: false, error: "Give a reason of at least 10 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.moderateReview, { p_review_id: reviewId, p_action: action, p_reason: reason.trim() });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    if (who.data.role !== "admin") return { ok: false, error: "Only SpaceGo admins can moderate reviews." };
+    setStored(
+      REVIEWS_KEY,
+      localReviews().map((r) =>
+        r.id === reviewId
+          ? { ...r, status: action === "hide" ? "hidden" : "published", moderation_reason: action === "hide" ? reason.trim() : null }
+          : r
+      )
+    );
+    notify();
+    return { ok: true, data: null };
   },
 
   getSpaceById: (id: string): Space | undefined => {

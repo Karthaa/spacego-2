@@ -3,6 +3,7 @@
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 const STATE = process.env.STATE || "/tmp/spacego-local";
 const SHOTS = process.env.SHOTS || STATE;
 const base = process.env.BASE_URL || "http://localhost:3000";
@@ -202,6 +203,81 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   check("guest sees the badge", main.includes("Reviewed by SpaceGo"));
   check("no unrecorded checks shown", !main.includes("Fire safety equipment checked") && !main.includes("right to list"));
   await a.ctx.close();
+}
+
+// 7. Reviews: only after a confirmed stay has ended; host responds; admin hides.
+{
+  // Fixture: a stay that has already ended. The booking RPC refuses past
+  // dates, so this row is written directly into the LOCAL database.
+  const sql = `
+    INSERT INTO public.spacego_bookings (id, data)
+    SELECT 'local-past-1', jsonb_build_object(
+      'id', 'local-past-1', 'space_id', 'local-test-1', 'space_title', 'Infopark Focus Desks (local test)',
+      'space_image', '', 'space_location', 'Kochi, India', 'space_category', 'coworking',
+      'user_id', seeker.id::text, 'user_name', 'Test seeker', 'user_email', 'seeker@spacego.test',
+      'owner_id', s.data ->> 'owner_id', 'status', 'approved',
+      'start_date', to_jsonb(now() - interval '3 days'), 'end_date', to_jsonb(now() - interval '3 days' + interval '2 hours'),
+      'duration_type', 'hourly', 'duration_units', 2, 'seats', 1, 'total_price', 264, 'currency', 'INR',
+      'created_at', to_jsonb(now() - interval '10 days'))
+    FROM public.profiles seeker, public.spacego_spaces s
+    WHERE seeker.email = 'seeker@spacego.test' AND s.id = 'local-test-1'
+    ON CONFLICT (id) DO NOTHING;`;
+  execFileSync("psql", ["-v", "ON_ERROR_STOP=1", "-q", "-d", process.env.DB || "spacego_local", "-c", sql], { stdio: "inherit" });
+
+  const g = await newPage();
+  await login(g.page, "seeker");
+  await g.page.goto(base + "/dashboard/bookings", { waitUntil: "networkidle" });
+  await g.page.waitForTimeout(1500);
+  const row = g.page.locator("tr", { hasText: "local-past-1" });
+  await row.getByRole("button", { name: "Write a review" }).click();
+  const dlg = g.page.getByRole("dialog");
+  await dlg.getByRole("button", { name: "Post review" }).click();
+  check("review needs a rating", (await dlg.getByText("Choose a rating.").count()) === 1);
+  await dlg.getByRole("radio", { name: "4 stars" }).check({ force: true });
+  await dlg.getByLabel("Your review").fill("Quiet desks, fast Wi-Fi and the host helped with parking.");
+  await shot(g.page, "write-review");
+  await dlg.getByRole("button", { name: "Post review" }).click();
+  await g.page.getByText("You rated it 4 of 5").first().waitFor({ timeout: 8000 }).catch(() => {});
+  check("guest's booking shows their rating", (await row.getByText("You rated it 4 of 5").count()) === 1);
+  await g.ctx.close();
+
+  const a = await newPage();
+  await a.page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
+  await a.page.waitForTimeout(1200);
+  const reviews = a.page.locator("section[aria-labelledby=guest-reviews-heading]");
+  const text = (await reviews.innerText()).replace(/\s+/g, " ");
+  check("public listing shows the real review and average", /4\.0\s*·\s*1 review/.test(text) && text.includes("Quiet desks, fast Wi-Fi") && text.includes("Test"), text.slice(0, 160));
+  await a.ctx.close();
+
+  const o = await newPage();
+  await login(o.page, "owner");
+  await o.page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
+  await o.page.waitForTimeout(1200);
+  await o.page.getByRole("button", { name: "Respond" }).click();
+  await o.page.getByLabel("Your public response").fill("Thanks! Parking is free after 6 pm too.");
+  await o.page.getByRole("button", { name: "Post response" }).click();
+  await o.page.getByText("Response from the host").waitFor({ timeout: 8000 }).catch(() => {});
+  check("host response shown", (await o.page.getByText("Thanks! Parking is free after 6 pm too.").count()) === 1);
+  await shot(o.page, "review-response");
+  await o.ctx.close();
+
+  const ad = await newPage();
+  await login(ad.page, "admin");
+  await ad.page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
+  await ad.page.waitForTimeout(1200);
+  await ad.page.getByRole("button", { name: "Hide review" }).click();
+  await ad.page.getByLabel(/Why are you hiding this review/).fill("Test of moderation: hiding this review.");
+  await ad.page.locator("section[aria-labelledby=guest-reviews-heading] form").getByRole("button", { name: "Hide review" }).click();
+  await ad.page.getByText("No reviews yet.").waitFor({ timeout: 8000 }).catch(() => {});
+  check("admin hides the review", (await ad.page.getByText("No reviews yet.").count()) === 1);
+  await ad.ctx.close();
+
+  const g2 = await newPage();
+  await login(g2.page, "seeker");
+  await g2.page.goto(base + "/dashboard/bookings", { waitUntil: "networkidle" });
+  await g2.page.waitForTimeout(1500);
+  check("guest sees their review was hidden", (await g2.page.locator("tr", { hasText: "local-past-1" }).getByText("Review hidden by SpaceGo").count()) === 1);
+  await g2.ctx.close();
 }
 console.log(results.join("\n"));
 if (results.some((r) => !r.startsWith("PASS"))) process.exitCode = 1;

@@ -45,6 +45,9 @@ export const REMOTE_RPCS = {
   markNotificationRead: "spacego_mark_notification_read",
   searchSpaces: "spacego_search_spaces",
   publicSpacePoint: "spacego_public_space_point",
+  submitReview: "spacego_submit_review",
+  respondToReview: "spacego_respond_to_review",
+  moderateReview: "spacego_moderate_review",
   spaceAddress: "spacego_space_address",
   submitListingForReview: "spacego_submit_listing_for_review",
   reviewListing: "spacego_review_listing",
@@ -169,6 +172,32 @@ export async function fetchRows<T>(source: string): Promise<RemoteResult<T[]>> {
         .map((row) => (row as { data: T | null }).data)
         .filter((item): item is T => item !== null && typeof item === "object"),
     };
+  } catch (error) {
+    return failure(error, `reading ${source}`);
+  }
+}
+
+/**
+ * Read plain rows (not `{ id, data }`) with simple equality filters, newest
+ * first when `orderBy` is given. Used for the reviews tables and views.
+ */
+export async function selectRows<T>(
+  source: string,
+  columns: string,
+  filters: Record<string, string>,
+  orderBy?: string,
+  limit = 100
+): Promise<RemoteResult<T[]>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+
+  try {
+    let query = supabase.from(source).select(columns);
+    for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+    if (orderBy) query = query.order(orderBy, { ascending: false });
+    const { data, error } = await query.limit(limit);
+    if (error) return failure(error, `reading ${source}`);
+    return { ok: true, data: (data ?? []) as unknown as T[] };
   } catch (error) {
     return failure(error, `reading ${source}`);
   }

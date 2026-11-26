@@ -258,3 +258,31 @@ export interface BlockedSlot {
   end_date: string;
   reason: string;
 }
+
+/** A guest review, from a booking that was confirmed and has ended. */
+export interface SpaceReview {
+  id: string;
+  space_id: string;
+  /** First name only. */
+  author_name: string;
+  rating: number;
+  body: string;
+  host_response: string | null;
+  host_responded_at: string | null;
+  created_at: string;
+}
+
+export interface SpaceReviewSummary {
+  review_count: number;
+  average_rating: number | null;
+}
+
+/** The author's own view of a review they wrote (includes moderation state). */
+export interface OwnReview {
+  id: string;
+  booking_id: string;
+  space_id: string;
+  rating: number;
+  status: "published" | "hidden";
+  moderation_reason: string | null;
+}
