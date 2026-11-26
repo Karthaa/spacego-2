@@ -90,6 +90,11 @@ Run things in this order:
 To remove the demo listings later, run the commented block at the end of the
 script on its own.
 
+`demo/demo_locations_staging.sql` moves 21 demo listings from the centre of
+their area to their own building (and corrects IndiQube Paradise's area to
+Carnival Infopark, Kakkanad). It's only needed where the demo script ran before
+this change; a fresh run of the demo script already uses these locations.
+
 ## Authentication flow
 
 - Registration collects full name, email, password, and an optional phone and
