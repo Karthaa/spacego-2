@@ -12,6 +12,9 @@ import {
   ActivationScore,
   UserRole,
   WorkspaceCategory,
+  ListingReview,
+  ListingReviewDecision,
+  ListingReviewState,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -361,6 +364,36 @@ function optionalString(value: unknown): string | undefined {
  * owner_id, owner_email, coordinates and passport inspector fields, and emit
  * null for unset prices; fill safe defaults so the UI types hold.
  */
+const REVIEW_STATES: readonly ListingReviewState[] = [
+  "draft",
+  "pending",
+  "approved",
+  "changes_requested",
+  "rejected",
+  "suspended",
+];
+
+function normalizeReview(raw: unknown): ListingReview | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!REVIEW_STATES.includes(r.state as ListingReviewState)) return undefined;
+  return {
+    state: r.state as ListingReviewState,
+    reason: typeof r.reason === "string" ? r.reason : "",
+    submitted_at: typeof r.submitted_at === "string" ? r.submitted_at : "",
+    decided_at: typeof r.decided_at === "string" ? r.decided_at : "",
+  };
+}
+
+/**
+ * Effective review state, same rule as public.spacego_review_state: listings
+ * published before reviews existed count as approved.
+ */
+export function reviewStateOf(space: Pick<Space, "status" | "review">): ListingReviewState {
+  if (space.review) return space.review.state;
+  return space.status === "published" ? "approved" : "draft";
+}
+
 function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
   const location: Partial<Space["location"]> = raw.location ?? {};
   const pricing: Partial<Space["pricing"]> = raw.pricing ?? {};
@@ -423,6 +456,7 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
     owner_avatar: stringOr(raw.owner_avatar, ""),
     owner_email: optionalString(raw.owner_email),
     status: raw.status ?? "published",
+    review: normalizeReview(raw.review),
     rating: numberOr(Number(raw.rating), 0),
     review_count: numberOr(Number(raw.review_count), 0),
     instant_book: Boolean(raw.instant_book),
@@ -879,6 +913,81 @@ export const SpaceGoStore = {
     setStored(SPACES_KEY, spaces);
     notify();
     return { ok: true, data: updatedSpace };
+  },
+
+  /** Owner: send a draft (or a listing with requested changes) to SpaceGo for review. */
+  submitForReview: async (id: string): Promise<StoreResult<Space>> => {
+    const current = SpaceGoStore.getSpaces().find((s) => s.id === id);
+    if (!current) return { ok: false, error: "Listing not found." };
+    const state = reviewStateOf(current);
+    if (state === "pending") return { ok: true, data: current };
+    if (state !== "draft" && state !== "changes_requested") {
+      return { ok: false, error: "This listing can't be submitted for review." };
+    }
+
+    if (remoteMode()) {
+      const result = await callRpc<Partial<Space> & { id: string }>(REMOTE_RPCS.submitListingForReview, {
+        p_space_id: id,
+      });
+      if (!result.ok) return result;
+      const saved = normalizeSpace({ ...result.data, id });
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    if (current.images.length === 0) return { ok: false, error: "Add at least one photo before submitting." };
+    const c = current.location.coordinates;
+    if (!c || !isValidLatLng(c.lat, c.lng)) return { ok: false, error: "Set the location on the map before submitting." };
+    return SpaceGoStore.updateSpace(id, {
+      status: "draft",
+      review: { state: "pending", reason: "", submitted_at: new Date().toISOString(), decided_at: current.review?.decided_at ?? "" },
+    });
+  },
+
+  /** Admin: approve, request changes, reject or suspend a listing. */
+  reviewListing: async (
+    id: string,
+    decision: ListingReviewDecision,
+    reason: string
+  ): Promise<StoreResult<Space>> => {
+    const current = SpaceGoStore.getSpaces().find((s) => s.id === id);
+    if (!current) return { ok: false, error: "Listing not found." };
+    const trimmed = reason.trim();
+    if (decision !== "approve" && trimmed.length < 10) {
+      return { ok: false, error: "Give the host a reason (at least 10 characters)." };
+    }
+
+    if (remoteMode()) {
+      const result = await callRpc<Partial<Space> & { id: string }>(REMOTE_RPCS.reviewListing, {
+        p_space_id: id,
+        p_decision: decision,
+        p_reason: trimmed || null,
+      });
+      if (!result.ok) return result;
+      const saved = normalizeSpace({ ...result.data, id });
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    const to: ListingReviewState =
+      decision === "approve"
+        ? "approved"
+        : decision === "request_changes"
+          ? "changes_requested"
+          : decision === "reject"
+            ? "rejected"
+            : "suspended";
+    return SpaceGoStore.updateSpace(id, {
+      status: to === "approved" ? "published" : "draft",
+      review: {
+        state: to,
+        reason: trimmed,
+        submitted_at: current.review?.submitted_at ?? "",
+        decided_at: new Date().toISOString(),
+      },
+    });
   },
 
   /**

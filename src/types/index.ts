@@ -88,11 +88,30 @@ export interface Space {
   owner_avatar: string;
   owner_email?: string;
   status: "published" | "draft" | "under_review" | "archived";
+  /** SpaceGo listing review. Owners see their own; never in the public view. */
+  review?: ListingReview;
   rating: number;
   review_count: number;
   instant_book: boolean;
   created_at: string;
 }
+
+export type ListingReviewState =
+  | "draft"
+  | "pending"
+  | "approved"
+  | "changes_requested"
+  | "rejected"
+  | "suspended";
+
+export interface ListingReview {
+  state: ListingReviewState;
+  reason?: string;
+  submitted_at?: string;
+  decided_at?: string;
+}
+
+export type ListingReviewDecision = "approve" | "request_changes" | "reject" | "suspend";
 
 export type BookingStatus =
   | "pending"

@@ -4,9 +4,10 @@ import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { SpaceGoStore } from "@/lib/data/store";
+import { SpaceGoStore, reviewStateOf } from "@/lib/data/store";
+import { ListingReviewNote, ListingStatusBadge } from "@/components/owner/ListingReviewStatus";
 import { Space } from "@/types";
-import { Badge, VerificationBadge } from "@/components/ui/Badge";
+import { VerificationBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,21 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { categoryNoun } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
-import { Building2, Eye, MapPin, Pencil, Plus, Trash2, Users } from "lucide-react";
-
-function SpaceStatusBadge({ status }: { status: Space["status"] }) {
-  switch (status) {
-    case "published":
-      return <Badge variant="success">Published</Badge>;
-    case "under_review":
-      return <Badge variant="warning">Under review</Badge>;
-    case "archived":
-      return <Badge variant="neutral">Archived</Badge>;
-    case "draft":
-    default:
-      return <Badge variant="neutral">Draft</Badge>;
-  }
-}
+import { Building2, Eye, MapPin, Pencil, Plus, Send, Trash2, Users } from "lucide-react";
 
 function spaceRate(space: Space): string | null {
   if (space.pricing.daily) return `${formatCurrency(space.pricing.daily, space.pricing.currency)} / day`;
@@ -67,6 +54,18 @@ export default function OwnerPropertiesPage() {
     );
   };
 
+  const handleSubmitForReview = async (id: string) => {
+    if (busySpaceId) return;
+    setBusySpaceId(id);
+    const result = await SpaceGoStore.submitForReview(id);
+    setBusySpaceId(null);
+    if (!result.ok) {
+      error("Could not submit for review", result.error);
+      return;
+    }
+    success("Submitted for review", "You'll get a notification when SpaceGo approves it or asks for changes.");
+  };
+
   const handleDelete = async (id: string) => {
     if (busySpaceId) return;
     if (!confirm("Remove this listing? People will no longer be able to find or book it.")) return;
@@ -91,7 +90,7 @@ export default function OwnerPropertiesPage() {
     <div className="space-y-6">
       <PageHeader
         title="My listings"
-        description="Publish, preview and remove the workspaces you list on SpaceGo."
+        description="Submit, preview and manage the workspaces you list on SpaceGo. New listings go live after SpaceGo approves them."
         actions={
           <Link href="/owner/spaces/new" className={buttonClasses()}>
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -137,7 +136,7 @@ export default function OwnerPropertiesPage() {
                     )}
                     <div className="min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <SpaceStatusBadge status={space.status} />
+                        <ListingStatusBadge space={space} />
                         <VerificationBadge level={space.verification_level} />
                       </div>
                       <h2 className="text-base font-medium text-ink">{space.title}</h2>
@@ -153,6 +152,7 @@ export default function OwnerPropertiesPage() {
                         </span>
                       </div>
                       <p className="text-sm font-medium text-ink">{rate ?? "No price set"}</p>
+                      <ListingReviewNote space={space} />
                     </div>
                   </div>
 
@@ -172,15 +172,29 @@ export default function OwnerPropertiesPage() {
                       <Pencil className="h-4 w-4" aria-hidden="true" />
                       Edit
                     </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleStatus(space.id, space.status)}
-                      disabled={busySpaceId !== null}
-                      isLoading={isBusy}
-                    >
-                      {space.status === "published" ? "Unpublish" : "Publish"}
-                    </Button>
+                    {reviewStateOf(space) === "approved" && space.status !== "archived" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleStatus(space.id, space.status)}
+                        disabled={busySpaceId !== null}
+                        isLoading={isBusy}
+                      >
+                        {space.status === "published" ? "Unpublish" : "Publish"}
+                      </Button>
+                    )}
+                    {(reviewStateOf(space) === "draft" || reviewStateOf(space) === "changes_requested") &&
+                      space.status !== "archived" && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleSubmitForReview(space.id)}
+                          disabled={busySpaceId !== null}
+                          isLoading={isBusy}
+                        >
+                          <Send className="h-4 w-4" aria-hidden="true" />
+                          {reviewStateOf(space) === "changes_requested" ? "Resubmit" : "Submit for review"}
+                        </Button>
+                      )}
                     <Button
                       variant="ghost"
                       size="icon"

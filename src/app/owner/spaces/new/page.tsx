@@ -34,7 +34,16 @@ export default function NewWorkspaceListingPage() {
       return { ok: false, error: result.error };
     }
 
-    success("Listing published", `${result.data.title} is now live on SpaceGo.`);
+    // Saved as a draft; now ask SpaceGo to review it.
+    const submitted = await SpaceGoStore.submitForReview(result.data.id);
+    if (!submitted.ok) {
+      error("Saved as a draft", `${submitted.error} You can submit it for review from My listings.`);
+    } else {
+      success(
+        "Submitted for review",
+        `${result.data.title} goes live once SpaceGo approves it. You'll get a notification either way.`
+      );
+    }
     router.push("/owner/properties");
     return { ok: true };
   };
@@ -52,19 +61,20 @@ export default function NewWorkspaceListingPage() {
         <PageHeader
           className="mt-1"
           title="Add a workspace"
-          description="Describe your space, set prices and choose a photo. The listing is published as soon as you submit."
+          description="Describe your space, pin it on the map and set prices. SpaceGo reviews every new listing before it goes live."
         />
       </div>
 
       <div className="flex gap-3 rounded-lg border border-line bg-surface-muted p-4 text-sm text-ink-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
         <p>
-          New listings appear as <span className="font-medium text-ink">New listing</span>, without a review badge.
-          Review levels such as &ldquo;Reviewed by SpaceGo&rdquo; are set by the SpaceGo team, not when you publish.
+          After you submit, the SpaceGo team checks the listing and either approves it or tells you what to change.
+          Approved listings appear as <span className="font-medium text-ink">New listing</span>; review levels such as
+          &ldquo;Reviewed by SpaceGo&rdquo; are set separately by the team.
         </p>
       </div>
 
-      <SpaceForm mode="create" onSubmit={handleSubmit} submitLabel="Publish listing" />
+      <SpaceForm mode="create" onSubmit={handleSubmit} submitLabel="Submit for review" />
     </div>
   );
 }

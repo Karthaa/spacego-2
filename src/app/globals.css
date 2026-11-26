@@ -562,3 +562,19 @@ body {
     color: var(--color-ink-muted);
   }
 }
+
+/* Host location picker pin (exact position; only the host sees it). */
+.sg-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--color-accent);
+  border: 3px solid var(--color-surface);
+  box-shadow: var(--shadow-md);
+  transform: rotate(-45deg);
+  cursor: grab;
+}
+
+.sg-pin:active {
+  cursor: grabbing;
+}

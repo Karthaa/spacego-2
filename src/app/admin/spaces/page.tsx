@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { SpaceGoStore } from "@/lib/data/store";
-import { Space } from "@/types";
-import { Badge } from "@/components/ui/Badge";
+import { SpaceGoStore, reviewStateOf } from "@/lib/data/store";
+import { ListingReviewDecision, Space } from "@/types";
+import { ListingStatusBadge } from "@/components/owner/ListingReviewStatus";
+import { Modal } from "@/components/ui/Modal";
+import { Textarea } from "@/components/ui/Input";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
@@ -13,8 +15,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { categoryNoun } from "@/lib/categories";
-import { formatCurrency } from "@/lib/utils";
-import { Building2, ExternalLink } from "lucide-react";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { Building2, Check, ExternalLink, MapPin } from "lucide-react";
 
 const VERIFICATION_LABELS: Record<Space["verification_level"], string> = {
   listed: "New listing",
@@ -23,11 +25,22 @@ const VERIFICATION_LABELS: Record<Space["verification_level"], string> = {
   pro: "SpaceGo Pro",
 };
 
-const STATUS_BADGES: Record<Space["status"], { label: string; variant: "success" | "warning" | "neutral" }> = {
-  published: { label: "Published", variant: "success" },
-  draft: { label: "Draft", variant: "neutral" },
-  under_review: { label: "In review", variant: "warning" },
-  archived: { label: "Archived", variant: "neutral" },
+const DECISIONS: Record<Exclude<ListingReviewDecision, "approve">, { title: string; action: string; help: string }> = {
+  request_changes: {
+    title: "Ask the host for changes",
+    action: "Send request",
+    help: "The listing stays hidden. The host sees your note and can resubmit.",
+  },
+  reject: {
+    title: "Don't approve this listing",
+    action: "Reject listing",
+    help: "The listing stays hidden and can't be resubmitted. The host sees your reason.",
+  },
+  suspend: {
+    title: "Take this listing offline",
+    action: "Suspend listing",
+    help: "The listing is hidden from guests at once. The host sees your reason.",
+  },
 };
 
 const GRID_COLS =
@@ -68,6 +81,36 @@ export default function AdminSpacesPage() {
     success(next === "published" ? "Space published" : "Space unpublished", `The space is now ${next}.`);
   };
 
+  const [decision, setDecision] = useState<{ space: Space; kind: Exclude<ListingReviewDecision, "approve"> } | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const queue = useMemo(
+    () =>
+      spaces
+        .filter((s) => reviewStateOf(s) === "pending")
+        .sort((a, b) => (a.review?.submitted_at ?? "").localeCompare(b.review?.submitted_at ?? "")),
+    [spaces]
+  );
+
+  const decide = async (space: Space, kind: ListingReviewDecision, note = "") => {
+    setBusy(space.id);
+    const result = await SpaceGoStore.reviewListing(space.id, kind, note);
+    setBusy(null);
+    if (!result.ok) {
+      error("Could not save the decision", result.error);
+      return false;
+    }
+    const messages: Record<ListingReviewDecision, string> = {
+      approve: "Approved and live. The host has been notified.",
+      request_changes: "Changes requested. The host has been notified.",
+      reject: "Listing rejected. The host has been notified.",
+      suspend: "Listing suspended. The host has been notified.",
+    };
+    success(space.title, messages[kind]);
+    return true;
+  };
+
   const publishedCount = spaces.filter((s) => s.status === "published").length;
 
   return (
@@ -81,6 +124,68 @@ export default function AdminSpacesPage() {
         }
       />
 
+      <section aria-labelledby="queue-heading" className="space-y-3">
+        <h2 id="queue-heading" className="text-lg font-semibold text-ink">
+          Waiting for review <span className="text-ink-muted tabular-nums">({queue.length})</span>
+        </h2>
+        {queue.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line-strong bg-surface px-5 py-4 text-sm text-ink-muted">
+            Nothing to review. New and edited listings appear here when hosts submit them.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {queue.map((s) => (
+              <li key={s.id}>
+                <Card padding="sm" className="flex flex-col gap-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 gap-4">
+                    {s.images[0]?.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={s.images[0].url} alt="" className="h-20 w-20 shrink-0 rounded-md border border-line object-cover" />
+                    ) : (
+                      <div aria-hidden="true" className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink-subtle">
+                        <Building2 className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-base font-medium text-ink">{s.title}</p>
+                      <p className="text-sm text-ink-muted">
+                        {categoryNoun(s.category)} · {s.capacity} seats · {priceLabel(s)} · {s.images.length}{" "}
+                        {s.images.length === 1 ? "photo" : "photos"}
+                      </p>
+                      <p className="flex items-center gap-1 text-sm text-ink-muted">
+                        <MapPin className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+                        {[s.location.address, s.location.city, s.location.country].filter(Boolean).join(", ")}
+                      </p>
+                      <p className="text-sm text-ink-subtle">
+                        {s.owner_name || "Unknown host"}
+                        {s.review?.submitted_at ? <> · submitted {formatDateTime(s.review.submitted_at)}</> : null}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+                    <Link href={`/spaces/${s.id}`} target="_blank" className={buttonClasses({ variant: "ghost", size: "sm" })}>
+                      Open
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                    <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => { setReason(""); setDecision({ space: s, kind: "reject" }); }}>
+                      Reject
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => { setReason(""); setDecision({ space: s, kind: "request_changes" }); }}>
+                      Request changes
+                    </Button>
+                    <Button size="sm" disabled={busy !== null} isLoading={busy === s.id} onClick={() => decide(s, "approve")}>
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                      Approve
+                    </Button>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <h2 className="sr-only">All spaces</h2>
       {spaces.length === 0 ? (
         <EmptyState
           icon={<Building2 />}
@@ -104,7 +209,6 @@ export default function AdminSpacesPage() {
 
           <div role="rowgroup" className="divide-y divide-line">
             {spaces.map((s) => {
-              const status = STATUS_BADGES[s.status] ?? { label: s.status, variant: "neutral" as const };
               const cover = s.images[0]?.url;
               return (
                 <div
@@ -157,14 +261,24 @@ export default function AdminSpacesPage() {
                   </div>
 
                   <div role="cell" className="flex items-center justify-between gap-3 md:justify-start">
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleStatus(s.id, s.status)}
-                    >
-                      {s.status === "published" ? "Unpublish" : "Publish"}
-                    </Button>
+                    <ListingStatusBadge space={s} />
+                    {s.status === "published" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busy !== null}
+                        onClick={() => {
+                          setReason("");
+                          setDecision({ space: s, kind: "suspend" });
+                        }}
+                      >
+                        Suspend
+                      </Button>
+                    ) : reviewStateOf(s) === "approved" && s.status !== "archived" ? (
+                      <Button variant="outline" size="sm" onClick={() => handleToggleStatus(s.id, s.status)}>
+                        Publish
+                      </Button>
+                    ) : null}
                   </div>
 
                   <div role="cell" className="hidden md:block">
@@ -193,6 +307,49 @@ export default function AdminSpacesPage() {
           </div>
         </Card>
       )}
+
+      <Modal
+        isOpen={decision !== null}
+        onClose={() => setDecision(null)}
+        title={decision ? DECISIONS[decision.kind].title : ""}
+        description={decision ? `${decision.space.title}. ${DECISIONS[decision.kind].help}` : undefined}
+        maxWidth="md"
+      >
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!decision) return;
+            const ok = await decide(decision.space, decision.kind, reason);
+            if (ok) setDecision(null);
+          }}
+        >
+          <Textarea
+            label="Reason for the host"
+            required
+            minLength={10}
+            maxLength={1000}
+            rows={4}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Be specific, e.g. The photos show a different building from the address."
+            helperText="At least 10 characters. The host sees this exactly as written."
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setDecision(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant={decision?.kind === "request_changes" ? "primary" : "danger"}
+              disabled={reason.trim().length < 10}
+              isLoading={busy !== null}
+            >
+              {decision ? DECISIONS[decision.kind].action : ""}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,13 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Ca
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
+import dynamic from "next/dynamic";
+import { isValidLatLng, type LatLng } from "@/lib/geo";
+
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => <div className="h-96 rounded-lg skeleton-shimmer" aria-hidden="true" />,
+});
 
 /** The listing fields the form produces; the same shape `SpaceGoStore.addSpace` receives. */
 export interface SpaceFormValues {
@@ -37,7 +44,17 @@ export interface SpaceFormProps {
 
 const DEFAULT_HEADLINE = "Modern flexible workspace tailored for productivity.";
 const DEFAULT_DESCRIPTION = "Fully equipped workspace with high-speed internet and ergonomic amenities.";
-const DEFAULT_COORDINATES = { lat: 37.7749, lng: -122.4194 };
+// Older listings were saved with this placeholder point whatever their city.
+// Treat it as "not set" unless the listing really is in San Francisco.
+const LEGACY_PLACEHOLDER = { lat: 37.7749, lng: -122.4194 };
+
+function initialPin(space?: Space): LatLng | null {
+  const c = space?.location.coordinates;
+  if (!c || !isValidLatLng(c.lat, c.lng)) return null;
+  const isPlaceholder = c.lat === LEGACY_PLACEHOLDER.lat && c.lng === LEGACY_PLACEHOLDER.lng;
+  if (isPlaceholder && !/san francisco/i.test(space?.location.city ?? "")) return null;
+  return { lat: c.lat, lng: c.lng };
+}
 const DEFAULT_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const DEFAULT_HOUSE_RULES = ["Quiet focus maintained in open areas", "Clear personal items when leaving"];
 
@@ -118,6 +135,7 @@ type FieldKey =
   | "address"
   | "city"
   | "country"
+  | "coordinates"
   | "capacity"
   | "squareFeet"
   | "pricing.hourly"
@@ -133,6 +151,7 @@ const FIELD_ORDER: FieldKey[] = [
   "address",
   "city",
   "country",
+  "coordinates",
   "capacity",
   "squareFeet",
   "pricing.hourly",
@@ -163,15 +182,16 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
   const [headline, setHeadline] = useState(initial?.headline ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [address, setAddress] = useState(initial?.location.address ?? "");
-  const [city, setCity] = useState(initial?.location.city ?? "San Francisco");
-  const [country, setCountry] = useState(initial?.location.country ?? "United States");
+  const [city, setCity] = useState(initial?.location.city ?? "");
+  const [country, setCountry] = useState(initial?.location.country ?? "India");
+  const [pin, setPin] = useState<LatLng | null>(() => initialPin(initial));
   const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : "12");
   const [squareFeet, setSquareFeet] = useState(initial ? String(initial.square_feet) : "1400");
 
   // Pricing
-  const currency = initial?.pricing.currency ?? "USD";
-  const [hourlyPrice, setHourlyPrice] = useState(initial ? priceToString(initial.pricing.hourly) : "25");
-  const [dailyPrice, setDailyPrice] = useState(initial ? priceToString(initial.pricing.daily) : "120");
+  const currency = initial?.pricing.currency ?? "INR";
+  const [hourlyPrice, setHourlyPrice] = useState(initial ? priceToString(initial.pricing.hourly) : "");
+  const [dailyPrice, setDailyPrice] = useState(initial ? priceToString(initial.pricing.daily) : "");
   const [monthlyPrice, setMonthlyPrice] = useState(initial ? priceToString(initial.pricing.monthly) : "");
 
   // Operating hours
@@ -216,9 +236,11 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
       closeTime,
     });
 
+    const errors: FieldErrors = {};
+    if (!pin) errors.coordinates = "Place the pin on your building so guests can find the space.";
+    if (parsed.success && !pin) return { data: null, errors };
     if (parsed.success) return { data: parsed.data, errors: {} as FieldErrors };
 
-    const errors: FieldErrors = {};
     for (const issue of parsed.error.issues) {
       const key = issue.path.map(String).join(".") as FieldKey;
       if (!errors[key]) errors[key] = issue.message;
@@ -254,9 +276,12 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
     const { data, errors: nextErrors } = validate();
     if (!data) {
       const first = FIELD_ORDER.find((key) => nextErrors[key]);
-      if (first) document.getElementById(fieldId(first))?.focus();
+      const el = first ? document.getElementById(fieldId(first)) : null;
+      el?.focus();
+      if (first === "coordinates") el?.scrollIntoView({ block: "center" });
       return;
     }
+    if (!pin) return;
 
     const values: SpaceFormValues = {
       title: data.title,
@@ -268,7 +293,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
         city: data.city,
         address: data.address,
         country: data.country,
-        coordinates: initial?.location.coordinates ?? DEFAULT_COORDINATES,
+        coordinates: pin,
       },
       capacity: data.capacity,
       square_feet: data.squareFeet,
@@ -287,7 +312,8 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
       },
       house_rules: initial?.house_rules ?? DEFAULT_HOUSE_RULES,
       images: buildImages(),
-      status: mode === "edit" && initial ? initial.status : "published",
+      // New listings start as drafts; SpaceGo reviews them before they go live.
+      status: mode === "edit" && initial ? initial.status : "draft",
       instant_book: instantBook,
     };
 
@@ -368,7 +394,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
             label="Street address"
             required
             autoComplete="street-address"
-            placeholder="e.g. 100 Market Street, 3rd floor"
+            placeholder="e.g. 2nd floor, Carnival Infopark, Kakkanad"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             error={errors.address}
@@ -380,7 +406,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
               label="City"
               required
               autoComplete="address-level2"
-              placeholder="e.g. San Francisco"
+              placeholder="e.g. Kochi"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               error={errors.city}
@@ -390,10 +416,19 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
               label="Country"
               required
               autoComplete="country-name"
-              placeholder="e.g. United States"
+              placeholder="e.g. India"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               error={errors.country}
+            />
+          </div>
+
+          <div tabIndex={-1} id={fieldId("coordinates")} className="rounded-lg outline-none">
+            <LocationPicker
+              value={pin}
+              onChange={setPin}
+              errorId={`${fieldId("coordinates")}-msg`}
+              error={errors.coordinates}
             />
           </div>
 
