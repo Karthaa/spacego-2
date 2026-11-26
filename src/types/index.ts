@@ -286,3 +286,15 @@ export interface OwnReview {
   status: "published" | "hidden";
   moderation_reason: string | null;
 }
+
+export type ReportReason = "not_real" | "wrong_info" | "unsafe" | "scam" | "offensive" | "other";
+
+/** A report about a listing (reporters see their own; admins see all). */
+export interface ListingReport {
+  id: string;
+  space_id: string;
+  reason: ReportReason;
+  details: string;
+  status: "open" | "resolved" | "dismissed";
+  created_at: string;
+}

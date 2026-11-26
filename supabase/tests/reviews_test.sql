@@ -28,7 +28,7 @@ SELECT v.id, jsonb_build_object('id', v.id, 'space_id', 'zz-rv-space', 'user_id'
 FROM (VALUES
   ('zz-rv-past', '00000000-0000-4000-8000-0000000d0001', 'approved', interval '-3 days'),
   ('zz-rv-future', '00000000-0000-4000-8000-0000000d0001', 'approved', interval '3 days'),
-  ('zz-rv-pending', '00000000-0000-4000-8000-0000000d0001', 'pending', interval '-3 days'),
+  ('zz-rv-pending', '00000000-0000-4000-8000-0000000d0001', 'pending', interval '-4 days'),
   ('zz-rv-other', '00000000-0000-4000-8000-0000000d0002', 'approved', interval '-5 days')
 ) AS v(id, user_id, status, start_offset);
 

@@ -105,4 +105,12 @@ out.push(`anon reads the reviews table: ${r.error ? "BLOCKED " + r.error.code : 
   const other = await createClient(URL, ANON, { auth: { persistSession: false } }).from("spacego_booking_events").select("id").eq("booking_id", first.data.id);
   out.push(`anon reads booking history: ${other.error ? "BLOCKED " + other.error.code : other.data.length + " rows"}`);
 }
+
+// Reports (20261203)
+r = await anon.rpc("spacego_report_listing", { p_space_id: "local-test-1", p_reason: "scam", p_details: "" });
+out.push(`anon reports a listing: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+r = await owner.c.from("spacego_listing_reports").select("id,reporter_id");
+out.push(`host reads reports about them: ${r.error ? "BLOCKED " + r.error.code : r.data.length + " rows"}`);
+r = await seeker.c.rpc("spacego_resolve_report", { p_report_id: "00000000-0000-4000-8000-000000000000", p_status: "dismissed", p_note: "Not an admin" });
+out.push(`seeker resolves a report: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
 console.log(out.join("\n"));

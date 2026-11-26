@@ -279,6 +279,57 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   check("guest sees their review was hidden", (await g2.page.locator("tr", { hasText: "local-past-1" }).getByText("Review hidden by SpaceGo").count()) === 1);
   await g2.ctx.close();
 }
+
+// 8. Reports: guests report a listing; admins resolve it.
+{
+  const a = await newPage();
+  await a.page.goto(base + "/spaces/local-test-2", { waitUntil: "networkidle" });
+  await a.page.getByRole("button", { name: "Report this listing" }).click();
+  await a.page.waitForURL(/\/auth\/login/, { timeout: 8000 }).catch(() => {});
+  check("signed-out report goes to sign in", a.page.url().includes("/auth/login"));
+  await a.ctx.close();
+
+  const g = await newPage(390);
+  await login(g.page, "seeker");
+  await g.page.goto(base + "/spaces/local-test-2", { waitUntil: "networkidle" });
+  await g.page.waitForTimeout(800);
+  await g.page.getByRole("button", { name: "Report this listing" }).click();
+  const dlg = g.page.getByRole("dialog");
+  await dlg.getByLabel("Photos, price or details are wrong").check();
+  await dlg.getByLabel("Details (optional)").fill("The photos show a different building.");
+  await shot(g.page, "report-390");
+  await dlg.getByRole("button", { name: "Send report" }).click();
+  await g.page.getByText("Report sent").waitFor({ timeout: 8000 }).catch(() => {});
+  check("guest report sent", (await g.page.getByText("Report sent").count()) === 1);
+  await g.page.getByRole("button", { name: "Report this listing" }).click();
+  await dlg.getByLabel("It's unsafe").check();
+  await dlg.getByRole("button", { name: "Send report" }).click();
+  await g.page.getByText("You have already reported this listing").waitFor({ timeout: 8000 }).catch(() => {});
+  check("second open report refused", (await g.page.getByText("You have already reported this listing").count()) === 1);
+  await g.ctx.close();
+
+  const o = await newPage();
+  await login(o.page, "owner");
+  await o.page.goto(base + "/spaces/local-test-2", { waitUntil: "networkidle" });
+  await o.page.waitForTimeout(800);
+  check("host can't report their own listing", (await o.page.getByRole("button", { name: "Report this listing" }).count()) === 0);
+  await o.ctx.close();
+
+  const ad = await newPage();
+  await login(ad.page, "admin");
+  await ad.page.goto(base + "/admin/spaces", { waitUntil: "networkidle" });
+  await ad.page.waitForTimeout(1200);
+  const heading = async () => (await ad.page.locator("#reports-heading").innerText()).replace(/\s+/g, " ");
+  check("admin sees the report", (await heading()) === "Reported listings (1)" && (await ad.page.getByText("The photos show a different building.").count()) === 1, await heading());
+  await shot(ad.page, "admin-reports");
+  await ad.page.locator("section[aria-labelledby=reports-heading]").getByRole("button", { name: "Resolve" }).click();
+  await ad.page.getByLabel("What did you do?").fill("Asked the host to replace the photos.");
+  await ad.page.getByRole("button", { name: "Resolve report" }).click();
+  await ad.page.getByText("Report resolved").waitFor({ timeout: 8000 }).catch(() => {});
+  await ad.page.waitForTimeout(800);
+  check("report resolved and cleared", (await heading()) === "Reported listings (0)", await heading());
+  await ad.ctx.close();
+}
 console.log(results.join("\n"));
 if (results.some((r) => !r.startsWith("PASS"))) process.exitCode = 1;
 await browser.close();

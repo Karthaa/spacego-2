@@ -48,6 +48,8 @@ export const REMOTE_RPCS = {
   submitReview: "spacego_submit_review",
   respondToReview: "spacego_respond_to_review",
   moderateReview: "spacego_moderate_review",
+  reportListing: "spacego_report_listing",
+  resolveReport: "spacego_resolve_report",
   spaceAddress: "spacego_space_address",
   submitListingForReview: "spacego_submit_listing_for_review",
   reviewListing: "spacego_review_listing",

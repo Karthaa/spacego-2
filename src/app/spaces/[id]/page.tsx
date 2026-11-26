@@ -25,6 +25,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { SpaceLocationSection } from "@/components/discover/SpaceLocationSection";
 import { SpaceReviews } from "@/components/reviews/SpaceReviews";
+import { ReportListing } from "@/components/trust/ReportListing";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
@@ -291,6 +292,13 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
                 <p className="text-sm text-ink-muted">You can add questions for the host to your booking request.</p>
               </div>
             </section>
+
+            <div className="-mt-4">
+              <ReportListing
+                space={space}
+                onSignInRequired={() => router.push(`/auth/login?redirect=${encodeURIComponent(`/spaces/${space.id}`)}`)}
+              />
+            </div>
           </div>
 
           <div>

@@ -19,6 +19,8 @@ import {
   SpaceReview,
   SpaceReviewSummary,
   OwnReview,
+  ListingReport,
+  ReportReason,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -579,6 +581,12 @@ function reviewsNotInstalled(message: string): boolean {
   return /does not exist|schema cache|missing the required/i.test(message);
 }
 
+const REPORTS_KEY = "spacego_listing_reports";
+
+interface LocalReport extends ListingReport {
+  reporter_id: string;
+}
+
 /** Bookings a guest may review: confirmed and already ended. */
 export function canReviewBooking(booking: Booking, now = Date.now()): boolean {
   const end = Date.parse(booking.end_date);
@@ -1034,6 +1042,79 @@ export const SpaceGoStore = {
           ? { ...r, status: action === "hide" ? "hidden" : "published", moderation_reason: action === "hide" ? reason.trim() : null }
           : r
       )
+    );
+    notify();
+    return { ok: true, data: null };
+  },
+
+  /** Signed-in users: report a published listing to SpaceGo. */
+  reportListing: async (spaceId: string, reason: ReportReason, details: string): Promise<StoreResult<string>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = details.trim();
+    if (text.length > 2000) return { ok: false, error: "Keep the details under 2000 characters." };
+    if (reason === "other" && text.length < 10) return { ok: false, error: "Tell us what is wrong in at least 10 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<string>(REMOTE_RPCS.reportListing, { p_space_id: spaceId, p_reason: reason, p_details: text });
+      if (!result.ok && reviewsNotInstalled(result.error)) {
+        return { ok: false, error: "Reporting isn't switched on yet. Please try again later." };
+      }
+      return result;
+    }
+    const space = SpaceGoStore.getSpaceById(spaceId);
+    if (!space || space.status !== "published") return { ok: false, error: "Listing not found." };
+    if (space.owner_id === who.data.id) return { ok: false, error: "You can't report your own listing." };
+    const all = getStored<LocalReport[]>(REPORTS_KEY, []);
+    if (all.some((r) => r.space_id === spaceId && r.reporter_id === who.data.id && r.status === "open")) {
+      return { ok: false, error: "You have already reported this listing. SpaceGo is looking into it." };
+    }
+    const report: LocalReport = {
+      id: newLocalId("report"),
+      space_id: spaceId,
+      reporter_id: who.data.id,
+      reason,
+      details: text,
+      status: "open",
+      created_at: new Date().toISOString(),
+    };
+    setStored(REPORTS_KEY, [report, ...all]);
+    notify();
+    return { ok: true, data: report.id };
+  },
+
+  /** Admin: open reports, oldest first. */
+  getOpenReports: async (): Promise<StoreResult<ListingReport[]>> => {
+    if (!remoteMode()) {
+      return {
+        ok: true,
+        data: getStored<LocalReport[]>(REPORTS_KEY, [])
+          .filter((r) => r.status === "open")
+          .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+      };
+    }
+    const rows = await selectRows<ListingReport>(
+      "spacego_listing_reports",
+      "id,space_id,reason,details,status,created_at",
+      { status: "open" },
+      "created_at",
+      100
+    );
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: [] } : rows;
+    return { ok: true, data: [...rows.data].reverse() };
+  },
+
+  /** Admin: close a report with a note. */
+  resolveReport: async (id: string, status: "resolved" | "dismissed", note: string): Promise<StoreResult<null>> => {
+    const text = note.trim();
+    if (text.length < 5) return { ok: false, error: "Add a note of at least 5 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.resolveReport, { p_report_id: id, p_status: status, p_note: text });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    if (viewer?.role !== "admin") return { ok: false, error: "Only SpaceGo admins can resolve reports." };
+    setStored(
+      REPORTS_KEY,
+      getStored<LocalReport[]>(REPORTS_KEY, []).map((r) => (r.id === id ? { ...r, status } : r))
     );
     notify();
     return { ok: true, data: null };
