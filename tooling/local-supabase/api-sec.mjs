@@ -26,4 +26,33 @@ r = await anon.rpc("spacego_public_space_point", { p_id: pending.id });
 out.push(`anon point of unpublished listing: ${r.data?.length ?? r.error?.message} rows`);
 r = await anon.rpc("spacego_search_spaces", { p_lat: 9.98, p_lng: 76.3, p_radius_m: 50000 });
 out.push(`anon search leaks coordinates/owner_id: ${r.data.some((x) => x.data.owner_id || x.data.location.coordinates) ? "YES (bad)" : "no"}`);
+
+// Address privacy (20261129): street address only for the owner, admins and confirmed guests.
+r = await anon.from("spacego_public_spaces").select("id,data");
+out.push(`anon view leaks a hidden street address: ${r.data.some((x) => x.data.location.address_visibility !== "exact" && (x.data.location.address || x.data.location.landmark)) ? "YES (bad)" : "no"}`);
+r = await anon.rpc("spacego_space_address", { p_space_id: "local-test-2" });
+out.push(`anon address RPC: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+{
+  const start = new Date(Date.now() + (60 + Math.floor(Math.random() * 600)) * 86400000);
+  start.setUTCHours(4, 30, 0, 0);
+  const end = new Date(start.getTime() + 2 * 3600000);
+  const bk = await seeker.c.rpc("spacego_create_booking", {
+    p_space_id: "local-test-2", p_start_date: start.toISOString(), p_end_date: end.toISOString(),
+    p_duration_type: "hourly", p_duration_units: 2, p_seats: 2,
+  });
+  if (bk.error) throw bk.error;
+  r = await seeker.c.rpc("spacego_space_address", { p_space_id: "local-test-2" });
+  out.push(`seeker address with a pending request: ${r.data?.length ?? r.error?.message} rows`);
+  const ok = await owner.c.rpc("spacego_update_booking_status", { p_booking_id: bk.data.id, p_new_status: "approved" });
+  if (ok.error) throw ok.error;
+  r = await seeker.c.rpc("spacego_space_address", { p_space_id: "local-test-2" });
+  out.push(`seeker address after the host confirms: ${r.data?.[0]?.address ? "shown" : "missing (bad)"}`);
+  r = await seeker.c.rpc("spacego_space_address", { p_space_id: "local-test-3" });
+  out.push(`seeker address of a space they did not book: ${r.data?.length ?? r.error?.message} rows`);
+  // Leave nothing confirmed behind, so the check can run again.
+  const cancel = await seeker.c.rpc("spacego_update_booking_status", { p_booking_id: bk.data.id, p_new_status: "cancelled" });
+  if (cancel.error) throw cancel.error;
+  r = await seeker.c.rpc("spacego_space_address", { p_space_id: "local-test-2" });
+  out.push(`seeker address after cancelling: ${r.data?.length ?? r.error?.message} rows`);
+}
 console.log(out.join("\n"));

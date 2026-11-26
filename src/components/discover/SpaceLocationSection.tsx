@@ -27,7 +27,9 @@ export function SpaceLocationSection({ space }: { space: Space }) {
     };
   }, [space.id]);
 
-  const area = [space.location.landmark, space.location.city].filter(Boolean).join(", ") || space.location.city;
+  const exact = space.location.address_visibility === "exact";
+  const area =
+    [exact ? space.location.landmark : "", space.location.city].filter(Boolean).join(", ") || space.location.city;
   const point = state?.id === space.id ? state.point : null;
   const loading = state?.id !== space.id;
 
@@ -45,6 +47,11 @@ export function SpaceLocationSection({ space }: { space: Space }) {
         <span>
           {area}
           <span className="block text-sm">The shaded circle shows the approximate area, not the exact building.</span>
+          <span className="block text-sm">
+            {exact && space.location.address
+              ? `Address: ${space.location.address}`
+              : "The host shares the exact address once your booking is confirmed."}
+          </span>
         </span>
       </p>
       <div className="mt-4">

@@ -15,6 +15,7 @@ import {
   ListingReview,
   ListingReviewDecision,
   ListingReviewState,
+  SpaceAddress,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -416,6 +417,7 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
       country: stringOr(location.country, ""),
       postal_code: optionalString(location.postal_code),
       landmark: optionalString(location.landmark),
+      address_visibility: location.address_visibility === "exact" ? "exact" : "approximate",
       coordinates: {
         lat: numberOr(location.coordinates?.lat, 0),
         lng: numberOr(location.coordinates?.lng, 0),
@@ -783,6 +785,60 @@ export const SpaceGoStore = {
     const row = result.data?.[0];
     if (!row || !isValidLatLng(Number(row.approx_lat), Number(row.approx_lng))) return { ok: true, data: null };
     return { ok: true, data: { lat: Number(row.approx_lat), lng: Number(row.approx_lng) } };
+  },
+
+  /**
+   * Street address and exact pin of a space. The database only returns it to
+   * the owner, admins and guests with a confirmed (or completed) booking;
+   * everyone else gets null.
+   */
+  getSpaceAddress: async (spaceId: string, userId: string | null): Promise<StoreResult<SpaceAddress | null>> => {
+    if (!userId) return { ok: true, data: null };
+    if (!remoteMode()) {
+      const space = SpaceGoStore.getSpaceById(spaceId);
+      if (!space) return { ok: true, data: null };
+      const allowed =
+        space.owner_id === userId ||
+        SpaceGoStore.getBookings().some(
+          (b) => b.space_id === space.id && b.user_id === userId && (b.status === "approved" || b.status === "completed")
+        );
+      if (!allowed) return { ok: true, data: null };
+      const c = space.location.coordinates;
+      const hasPin = isValidLatLng(c.lat, c.lng);
+      return {
+        ok: true,
+        data: {
+          address: space.location.address,
+          landmark: space.location.landmark ?? "",
+          postal_code: space.location.postal_code ?? "",
+          city: space.location.city,
+          country: space.location.country,
+          lat: hasPin ? c.lat : null,
+          lng: hasPin ? c.lng : null,
+        },
+      };
+    }
+    const result = await callRpc<
+      { address: string; landmark: string; postal_code: string; city: string; country: string; lat: number | null; lng: number | null }[]
+    >(REMOTE_RPCS.spaceAddress, { p_space_id: spaceId });
+    if (!result.ok) return result;
+    const row = result.data?.[0];
+    if (!row) return { ok: true, data: null };
+    const lat = row.lat === null ? null : Number(row.lat);
+    const lng = row.lng === null ? null : Number(row.lng);
+    const hasPin = lat !== null && lng !== null && isValidLatLng(lat, lng);
+    return {
+      ok: true,
+      data: {
+        address: row.address ?? "",
+        landmark: row.landmark ?? "",
+        postal_code: row.postal_code ?? "",
+        city: row.city ?? "",
+        country: row.country ?? "",
+        lat: hasPin ? lat : null,
+        lng: hasPin ? lng : null,
+      },
+    };
   },
 
   getSpaceById: (id: string): Space | undefined => {

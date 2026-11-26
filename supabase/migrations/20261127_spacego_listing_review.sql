@@ -195,7 +195,10 @@ BEGIN
     OR NEW.data -> 'location' ->> 'address' IS DISTINCT FROM OLD.data -> 'location' ->> 'address'
     OR NEW.data -> 'location' ->> 'city' IS DISTINCT FROM OLD.data -> 'location' ->> 'city'
     OR NEW.data -> 'location' -> 'coordinates' IS DISTINCT FROM OLD.data -> 'location' -> 'coordinates'
-    OR NEW.data ->> 'capacity' IS DISTINCT FROM OLD.data ->> 'capacity';
+    OR NEW.data ->> 'capacity' IS DISTINCT FROM OLD.data ->> 'capacity'
+    -- Choosing to show the full street address before booking is reviewed too.
+    OR (NEW.data -> 'location' ->> 'address_visibility' = 'exact'
+        AND OLD.data -> 'location' ->> 'address_visibility' IS DISTINCT FROM 'exact');
 
   IF v_old_state = 'approved' AND v_key_changed THEN
     v_new_state := 'pending';

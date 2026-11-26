@@ -96,7 +96,10 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   const images = space.images.length > 0 ? space.images : [];
-  const place = [space.location.address, space.location.city, space.location.country].filter(Boolean).join(", ");
+  // The street address is public only when the host chose to show it; the
+  // database also strips it from public reads otherwise.
+  const streetAddress = space.location.address_visibility === "exact" ? space.location.address : "";
+  const place = [streetAddress, space.location.city, space.location.country].filter(Boolean).join(", ");
 
   const handleFavoriteToggle = async () => {
     if (!user) {

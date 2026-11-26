@@ -45,6 +45,7 @@ export const REMOTE_RPCS = {
   markNotificationRead: "spacego_mark_notification_read",
   searchSpaces: "spacego_search_spaces",
   publicSpacePoint: "spacego_public_space_point",
+  spaceAddress: "spacego_space_address",
   submitListingForReview: "spacego_submit_listing_for_review",
   reviewListing: "spacego_review_listing",
 } as const;

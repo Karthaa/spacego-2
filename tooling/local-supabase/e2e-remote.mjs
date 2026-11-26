@@ -1,6 +1,7 @@
 // End-to-end checks against the LOCAL backend: run seed.mjs first (fresh data),
 // start the app with the local env, then: BASE_URL=http://localhost:3000 node tooling/local-supabase/e2e-remote.mjs
 import { chromium } from "playwright";
+import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 const STATE = process.env.STATE || "/tmp/spacego-local";
 const SHOTS = process.env.SHOTS || STATE;
@@ -131,6 +132,45 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   await a.page.waitForTimeout(1500);
   check("approved new listing is discoverable", (await a.page.locator("main").innerText()).includes("Kaloor Quiet Room"));
   await a.ctx.close();
+}
+
+// 5. Address privacy: area only in public; the address after the host confirms.
+{
+  const { ctx, page } = await newPage();
+  await page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  const body = await page.locator("main").innerText();
+  check("public listing hides the street address", !body.includes("Test address, Kakkanad"));
+  check("public listing explains when the address is shared",
+    (await page.getByText("The host shares the exact address once your booking is confirmed.").count()) === 1);
+  await ctx.close();
+
+  // Instant-book space: the API confirms the booking straight away.
+  const ANON = fs.readFileSync(`${STATE}/anon_key`, "utf8");
+  const api = createClient("http://127.0.0.1:54321", ANON, { auth: { persistSession: false } });
+  await api.auth.signInWithPassword({ email: "seeker@spacego.test", password: creds.seeker });
+  const start = new Date(Date.now() + (60 + Math.floor(Math.random() * 600)) * 86400000);
+  start.setUTCHours(4, 30, 0, 0);
+  const bk = await api.rpc("spacego_create_booking", {
+    p_space_id: "local-test-1", p_start_date: start.toISOString(),
+    p_end_date: new Date(start.getTime() + 2 * 3600000).toISOString(),
+    p_duration_type: "hourly", p_duration_units: 2, p_seats: 1,
+  });
+  check("instant booking confirmed by the API", bk.data?.status === "approved", bk.error?.message ?? bk.data?.status);
+
+  const s = await newPage();
+  await login(s.page, "seeker");
+  await s.page.goto(base + "/dashboard/bookings", { waitUntil: "networkidle" });
+  await s.page.waitForTimeout(1500);
+  const row = s.page.locator("tr", { hasText: bk.data?.id ?? "none" });
+  await row.getByRole("button", { name: "Address" }).click();
+  await s.page.getByText("Test address, Kakkanad").waitFor({ timeout: 8000 }).catch(() => {});
+  check("confirmed guest sees the street address", (await s.page.getByText("Test address, Kakkanad").count()) === 1);
+  check("open-in-map link uses the exact pin",
+    /mlat=10\.009300&mlon=76\.361200/.test((await s.page.getByRole("link", { name: "Open in map" }).getAttribute("href")) ?? ""));
+  await shot(s.page, "booking-address");
+  await s.ctx.close();
+  if (bk.data?.id) await api.rpc("spacego_update_booking_status", { p_booking_id: bk.data.id, p_new_status: "cancelled" });
 }
 console.log(results.join("\n"));
 if (results.some((r) => !r.startsWith("PASS"))) process.exitCode = 1;

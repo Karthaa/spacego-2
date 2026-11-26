@@ -3,13 +3,27 @@
 import React, { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
-import { Space, SpaceImage, SpaceLocation, SpacePricing, WorkspaceCategory } from "@/types";
+import { AddressVisibility, Space, SpaceImage, SpaceLocation, SpacePricing, WorkspaceCategory } from "@/types";
+import { cn } from "@/lib/utils";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import dynamic from "next/dynamic";
 import { isValidLatLng, type LatLng } from "@/lib/geo";
 import { PhotoUploader } from "./PhotoUploader";
+
+const ADDRESS_VISIBILITY_OPTIONS: { value: AddressVisibility; title: string; description: string }[] = [
+  {
+    value: "approximate",
+    title: "Guests with a confirmed booking",
+    description: "The listing shows the area on a map. Recommended for homes and private buildings.",
+  },
+  {
+    value: "exact",
+    title: "Everyone",
+    description: "The street address is shown on the listing before booking.",
+  },
+];
 
 const LocationPicker = dynamic(() => import("./LocationPicker"), {
   ssr: false,
@@ -168,6 +182,9 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
   const [city, setCity] = useState(initial?.location.city ?? "");
   const [country, setCountry] = useState(initial?.location.country ?? "India");
   const [pin, setPin] = useState<LatLng | null>(() => initialPin(initial));
+  const [addressVisibility, setAddressVisibility] = useState<AddressVisibility>(
+    initial?.location.address_visibility === "exact" ? "exact" : "approximate"
+  );
   const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : "12");
   const [squareFeet, setSquareFeet] = useState(initial ? String(initial.square_feet) : "1400");
 
@@ -264,6 +281,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
         address: data.address,
         country: data.country,
         coordinates: pin,
+        address_visibility: addressVisibility,
       },
       capacity: data.capacity,
       square_feet: data.squareFeet,
@@ -401,6 +419,36 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
               error={errors.coordinates}
             />
           </div>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-ink">Who can see the street address?</legend>
+            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {ADDRESS_VISIBILITY_OPTIONS.map((option) => {
+                const selected = addressVisibility === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={cn(
+                      "flex min-h-11 cursor-pointer flex-col rounded-md border p-3 transition-colors",
+                      "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
+                      selected ? "border-accent bg-accent-soft" : "border-line-strong bg-surface hover:bg-surface-muted"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={`${baseId}-address-visibility`}
+                      value={option.value}
+                      checked={selected}
+                      onChange={() => setAddressVisibility(option.value)}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-semibold text-ink">{option.title}</span>
+                    <span className="mt-0.5 text-sm text-ink-muted">{option.description}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input

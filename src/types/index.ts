@@ -32,6 +32,25 @@ export interface SpaceLocation {
     lng: number;
   };
   landmark?: string;
+  /**
+   * "exact": the host shows the street address before booking.
+   * "approximate" (default): only the area is public; the street address is
+   * shared with a guest once their booking is confirmed.
+   */
+  address_visibility?: AddressVisibility;
+}
+
+export type AddressVisibility = "exact" | "approximate";
+
+/** Street address and exact pin, for the owner, admins and confirmed guests. */
+export interface SpaceAddress {
+  address: string;
+  landmark: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface SpacePricing {

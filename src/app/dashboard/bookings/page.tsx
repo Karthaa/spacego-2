@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { SpaceGoStore } from "@/lib/data/store";
-import { Booking, BookingStatus } from "@/types";
+import { Booking, BookingStatus, SpaceAddress } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { PageHeader, FilterTabs } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CalendarCheck, MapPin, KeyRound, ExternalLink, Info } from "lucide-react";
+import { CalendarCheck, MapPin, KeyRound, ExternalLink, Info, Navigation } from "lucide-react";
 
 type FilterTab = "all" | BookingStatus;
 
@@ -43,6 +43,7 @@ export default function SeekerBookingsPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [addressBooking, setAddressBooking] = useState<Booking | null>(null);
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
@@ -88,6 +89,13 @@ export default function SeekerBookingsPage() {
         <Button variant="outline" size="sm" onClick={() => openPass(b)}>
           <KeyRound className="h-4 w-4" aria-hidden="true" />
           Access code
+        </Button>
+      )}
+
+      {(b.status === "approved" || b.status === "completed") && (
+        <Button variant="outline" size="sm" onClick={() => setAddressBooking(b)}>
+          <Navigation className="h-4 w-4" aria-hidden="true" />
+          Address
         </Button>
       )}
 
@@ -280,6 +288,14 @@ export default function SeekerBookingsPage() {
         </Modal>
       )}
 
+      {addressBooking && (
+        <BookingAddressModal
+          booking={addressBooking}
+          userId={user?.id ?? null}
+          onClose={() => setAddressBooking(null)}
+        />
+      )}
+
       {/* Cancellation confirmation */}
       {selectedBooking && isCancelConfirmOpen && (
         <Modal
@@ -311,5 +327,84 @@ export default function SeekerBookingsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Street address of a confirmed booking, fetched on demand from the database. */
+function BookingAddressModal({
+  booking,
+  userId,
+  onClose,
+}: {
+  booking: Booking;
+  userId: string | null;
+  onClose: () => void;
+}) {
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "ready"; address: SpaceAddress | null } | { status: "error"; message: string }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    SpaceGoStore.getSpaceAddress(booking.space_id, userId).then((result) => {
+      if (cancelled) return;
+      setState(result.ok ? { status: "ready", address: result.data } : { status: "error", message: result.error });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking.space_id, userId]);
+
+  const address = state.status === "ready" ? state.address : null;
+  const mapHref =
+    address && address.lat !== null && address.lng !== null
+      ? `https://www.openstreetmap.org/?mlat=${address.lat.toFixed(6)}&mlon=${address.lng.toFixed(6)}#map=18/${address.lat.toFixed(6)}/${address.lng.toFixed(6)}`
+      : null;
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Address"
+      description={`${booking.space_title} · ${formatDate(booking.start_date)}`}
+      maxWidth="sm"
+    >
+      <div className="space-y-5" aria-live="polite">
+        {state.status === "loading" && (
+          <div className="space-y-2" aria-hidden="true">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        )}
+        {state.status === "error" && (
+          <p className="text-sm text-danger">Could not load the address. {state.message}</p>
+        )}
+        {state.status === "ready" && !address && (
+          <p className="text-sm text-ink-muted">
+            The address isn&apos;t available for this booking. It is shared once the host confirms a booking.
+          </p>
+        )}
+        {address && (
+          <div className="rounded-lg border border-line bg-surface-muted p-4">
+            <p className="text-base font-medium text-ink">{address.address || "Street address not provided"}</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              {[address.city, address.postal_code, address.country].filter(Boolean).join(", ")}
+            </p>
+            {address.landmark && <p className="mt-2 text-sm text-ink-muted">Landmark: {address.landmark}</p>}
+          </div>
+        )}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Done
+          </Button>
+          {mapHref && (
+            <a href={mapHref} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "primary" })}>
+              Open in map
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            </a>
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -142,6 +142,18 @@ BEGIN
   UPDATE public.spacego_spaces SET data = data || '{"status":"draft"}' WHERE id = 'zz-review-1';
   UPDATE public.spacego_spaces SET data = data || '{"status":"published"}' WHERE id = 'zz-review-1';
 
+  -- Hiding the street address keeps it live; choosing to show it publicly is reviewed.
+  UPDATE public.spacego_spaces SET data = jsonb_set(data, '{location,address_visibility}', '"approximate"') WHERE id = 'zz-review-1';
+  SELECT data INTO v_data FROM public.spacego_spaces WHERE id = 'zz-review-1';
+  IF v_data ->> 'status' <> 'published' THEN RAISE EXCEPTION 'hiding the address unpublished the listing'; END IF;
+  UPDATE public.spacego_spaces SET data = jsonb_set(data, '{location,address_visibility}', '"exact"') WHERE id = 'zz-review-1';
+  SELECT data INTO v_data FROM public.spacego_spaces WHERE id = 'zz-review-1';
+  IF v_data ->> 'status' <> 'draft' OR v_data -> 'review' ->> 'state' <> 'pending' THEN
+    RAISE EXCEPTION 'showing the street address publicly skipped review';
+  END IF;
+  PERFORM pg_temp.act_as(admin_id);
+  PERFORM public.spacego_review_listing('zz-review-1', 'approve');
+
   -- Suspension: offline, and the owner cannot resubmit.
   PERFORM pg_temp.act_as(admin_id);
   v_data := public.spacego_review_listing('zz-review-1', 'suspend', 'Reported: the address does not exist.');
