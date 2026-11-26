@@ -55,4 +55,15 @@ out.push(`anon address RPC: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (ba
   r = await seeker.c.rpc("spacego_space_address", { p_space_id: "local-test-2" });
   out.push(`seeker address after cancelling: ${r.data?.length ?? r.error?.message} rows`);
 }
+
+// Verification checks (20261130): a badge needs recorded, dated checks, even for admins via the API.
+{
+  const admin = await login("admin");
+  const { data: row } = await admin.c.from("spacego_spaces").select("id,data").eq("id", "local-test-2").single();
+  const bare = { ...row.data, verification_level: "pro", passport: { ...row.data.passport, identity_verified: false, property_authority_verified: false, permitted_use_confirmed: false, power_backup_tested: false, fire_safety_inspected: false, connectivity_tested_mbps: 0 } };
+  r = await admin.c.from("spacego_spaces").update({ data: bare }).eq("id", "local-test-2").select("id");
+  out.push(`admin badge without checks via REST: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+  r = await owner.c.from("spacego_spaces").update({ data: { ...row.data, verification_level: "pro", passport: { ...row.data.passport, identity_verified: true, inspected_at: "2026-11-26" } } }).eq("id", "local-test-2").select("id,data").single();
+  out.push(`owner self-awarded badge via REST: level now ${r.data?.data?.verification_level ?? r.error?.code}`);
+}
 console.log(out.join("\n"));

@@ -413,7 +413,6 @@ function Gallery({
 
 /** Only shows facts an admin recorded during a SpaceGo review. */
 function ReviewDetails({ space }: { space: Space }) {
-  if (space.verification_level === "listed") return null;
   const p = space.passport;
   const facts = [
     p.connectivity_tested_mbps > 0 && `Internet speed measured at ${p.connectivity_tested_mbps} Mbps`,
@@ -421,13 +420,14 @@ function ReviewDetails({ space }: { space: Space }) {
     p.fire_safety_inspected && "Fire safety equipment checked",
     p.permitted_use_confirmed && "Use as a workspace confirmed with the owner",
     p.identity_verified && "Host identity checked",
+    p.property_authority_verified && "Host's right to list this space confirmed",
   ].filter(Boolean) as string[];
 
   if (facts.length === 0) return null;
 
   return (
     <section aria-labelledby="review-heading">
-      <h2 id="review-heading" className="text-xl font-semibold text-ink">SpaceGo review</h2>
+      <h2 id="review-heading" className="text-xl font-semibold text-ink">What SpaceGo checked</h2>
       <p className="mt-1 text-sm text-ink-muted">
         Recorded by the SpaceGo team{p.inspected_at ? ` on ${formatDate(p.inspected_at)}` : ""}. Conditions can change; confirm anything important with the host.
       </p>

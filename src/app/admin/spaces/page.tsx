@@ -3,27 +3,21 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
+import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore, reviewStateOf } from "@/lib/data/store";
 import { ListingReviewDecision, Space } from "@/types";
 import { ListingStatusBadge } from "@/components/owner/ListingReviewStatus";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Input";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { categoryNoun } from "@/lib/categories";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { Building2, Check, ExternalLink, MapPin } from "lucide-react";
-
-const VERIFICATION_LABELS: Record<Space["verification_level"], string> = {
-  listed: "New listing",
-  checked: "Reviewed by SpaceGo",
-  ready: "SpaceGo Ready",
-  pro: "SpaceGo Pro",
-};
+import { Building2, Check, ExternalLink, MapPin, ShieldCheck } from "lucide-react";
+import { TIER_LABELS, VerificationChecksModal, recordedChecks } from "@/components/admin/VerificationChecksModal";
 
 const DECISIONS: Record<Exclude<ListingReviewDecision, "approve">, { title: string; action: string; help: string }> = {
   request_changes: {
@@ -62,13 +56,21 @@ export default function AdminSpacesPage() {
     return SpaceGoStore.getSpaces();
   }, [dataVersion]);
 
-  const handleUpdateLevel = async (id: string, level: Space["verification_level"]) => {
-    const result = await SpaceGoStore.updateSpace(id, { verification_level: level });
+  const { user } = useAuth();
+  const [checksFor, setChecksFor] = useState<Space | null>(null);
+
+  const saveChecks = async (id: string, updates: Pick<Space, "passport" | "verification_level">) => {
+    const result = await SpaceGoStore.updateSpace(id, updates);
     if (!result.ok) {
-      error("Could not update verification tier", result.error);
-      return;
+      error("Could not save the checks", result.error);
+      return false;
     }
-    success("Verification tier updated", `Tier set to ${VERIFICATION_LABELS[level]}.`);
+    const n = recordedChecks(updates.passport);
+    success(
+      "Checks saved",
+      n === 0 ? "No checks recorded; the listing shows no badge." : `${n} ${n === 1 ? "check" : "checks"} recorded. Badge: ${TIER_LABELS[updates.verification_level]}.`
+    );
+    return true;
   };
 
   const handleToggleStatus = async (id: string, currentStatus: Space["status"]) => {
@@ -119,8 +121,8 @@ export default function AdminSpacesPage() {
         title="Spaces"
         description={
           spaces.length === 0
-            ? "Moderate listings and assign verification tiers."
-            : `${spaces.length} spaces, ${publishedCount} published. Assign verification tiers and control what guests can see.`
+            ? "Review listings and record what SpaceGo checked."
+            : `${spaces.length} spaces, ${publishedCount} published. Record what SpaceGo checked and control what guests can see.`
         }
       />
 
@@ -200,7 +202,7 @@ export default function AdminSpacesPage() {
           >
             <span role="columnheader">Space</span>
             <span role="columnheader">Host and location</span>
-            <span role="columnheader">Verification tier</span>
+            <span role="columnheader">SpaceGo checks</span>
             <span role="columnheader">Visibility</span>
             <span role="columnheader">
               <span className="sr-only">Open listing</span>
@@ -248,16 +250,20 @@ export default function AdminSpacesPage() {
                   </div>
 
                   <div role="cell">
-                    <Select
-                      aria-label={`Verification tier for ${s.title}`}
-                      value={s.verification_level}
-                      onChange={(e) => handleUpdateLevel(s.id, e.target.value as Space["verification_level"])}
-                    >
-                      <option value="listed">{VERIFICATION_LABELS.listed}</option>
-                      <option value="checked">{VERIFICATION_LABELS.checked}</option>
-                      <option value="ready">{VERIFICATION_LABELS.ready}</option>
-                      <option value="pro">{VERIFICATION_LABELS.pro}</option>
-                    </Select>
+<div className="flex items-center justify-between gap-3 md:block md:space-y-1.5">
+                      <p className="text-sm text-ink">
+                        {TIER_LABELS[s.verification_level]}
+                        <span className="block text-ink-subtle">
+                          {recordedChecks(s.passport) === 0
+                            ? "No checks recorded"
+                            : `${recordedChecks(s.passport)} ${recordedChecks(s.passport) === 1 ? "check" : "checks"}${s.passport.inspected_at ? `, ${s.passport.inspected_at.slice(0, 10)}` : ""}`}
+                        </span>
+                      </p>
+                      <Button variant="outline" size="sm" onClick={() => setChecksFor(s)} aria-label={`Record checks for ${s.title}`}>
+                        <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                        Record checks
+                      </Button>
+                    </div>
                   </div>
 
                   <div role="cell" className="flex items-center justify-between gap-3 md:justify-start">
@@ -306,6 +312,16 @@ export default function AdminSpacesPage() {
             })}
           </div>
         </Card>
+      )}
+
+      {checksFor && (
+        <VerificationChecksModal
+          key={checksFor.id}
+          space={checksFor}
+          inspector={user?.full_name || user?.email || "SpaceGo admin"}
+          onClose={() => setChecksFor(null)}
+          onSave={(updates) => saveChecks(checksFor.id, updates)}
+        />
       )}
 
       <Modal

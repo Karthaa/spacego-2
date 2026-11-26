@@ -172,6 +172,37 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   await s.ctx.close();
   if (bk.data?.id) await api.rpc("spacego_update_booking_status", { p_booking_id: bk.data.id, p_new_status: "cancelled" });
 }
+
+// 6. Admin records what SpaceGo checked; guests see exactly that.
+{
+  const { ctx, page } = await newPage();
+  await login(page, "admin");
+  await page.goto(base + "/admin/spaces", { waitUntil: "networkidle" });
+  await page.waitForTimeout(1000);
+  await page.getByRole("button", { name: "Record checks for Infopark Focus Desks (local test)" }).click();
+  const dialog = page.getByRole("dialog");
+  check("badge locked until a check is recorded", await dialog.getByLabel("Badge").isDisabled());
+  await dialog.getByLabel("Host identity checked").check();
+  await dialog.getByLabel("Internet speed measured (Mbps)").fill("150");
+  await dialog.getByLabel("Badge").selectOption("checked");
+  await dialog.getByRole("button", { name: "Save checks" }).click();
+  check("save refused until the admin confirms", (await dialog.getByText("Confirm that these checks actually happened.").count()) === 1);
+  await dialog.getByLabel(/I confirm these 2 checks actually happened/).check();
+  await shot(page, "admin-checks");
+  await dialog.getByRole("button", { name: "Save checks" }).click();
+  await page.getByText("Checks saved").waitFor({ timeout: 8000 }).catch(() => {});
+  check("checks saved", (await page.getByText("2 checks recorded. Badge: Reviewed by SpaceGo.").count()) === 1);
+  await ctx.close();
+
+  const a = await newPage();
+  await a.page.goto(base + "/spaces/local-test-1", { waitUntil: "networkidle" });
+  await a.page.waitForTimeout(1000);
+  const main = await a.page.locator("main").innerText();
+  check("guest sees the recorded checks", main.includes("What SpaceGo checked") && main.includes("Host identity checked") && main.includes("Internet speed measured at 150 Mbps"));
+  check("guest sees the badge", main.includes("Reviewed by SpaceGo"));
+  check("no unrecorded checks shown", !main.includes("Fire safety equipment checked") && !main.includes("right to list"));
+  await a.ctx.close();
+}
 console.log(results.join("\n"));
 if (results.some((r) => !r.startsWith("PASS"))) process.exitCode = 1;
 await browser.close();

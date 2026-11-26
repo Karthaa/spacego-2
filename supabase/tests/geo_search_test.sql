@@ -18,6 +18,7 @@ INSERT INTO public.spacego_spaces (id, data) VALUES
   ('zz-geo-test-pub-1', jsonb_build_object('square_feet', 500,
     'owner_id', '00000000-0000-4000-8000-00000000f001', 'id', 'zz-geo-test-pub-1', 'title', 'Geo test published A', 'slug', 'geo-test-a',
     'category', 'coworking', 'status', 'published', 'verification_level', 'checked',
+    'passport', jsonb_build_object('identity_verified', true, 'inspected_at', '2026-11-20'),
     'capacity', 20, 'instant_book', true, 'amenities', jsonb_build_array('Wi-Fi', 'Parking'),
     'pricing', jsonb_build_object('hourly', 150, 'daily', 600, 'currency', 'INR'),
     'location', jsonb_build_object('city', 'Kochi', 'address', '1 Test Road', 'country', 'India',
