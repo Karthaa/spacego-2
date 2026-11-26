@@ -5,6 +5,8 @@ import { AuthProvider } from "@/context/AuthContext";
 import { SpaceGoDataProvider } from "@/context/SpaceGoDataProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import { THEME_STORAGE_KEY } from "@/lib/theme-constants";
+import { isTestSite, siteUrl } from "@/lib/site";
+import { TestSiteBanner } from "@/components/navigation/TestSiteBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,24 +31,13 @@ const SITE_TITLE = "SpaceGo · Find and book flexible workspaces";
 const SITE_DESCRIPTION =
   "Find the right space. Search coworking desks, private offices, meeting rooms and studios, request a booking, and get confirmed by the host.";
 
-/** Absolute site origin for metadata URLs; falls back to the local dev server. */
-function resolveSiteUrl(): URL {
-  const fallback = "http://localhost:3000";
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!raw) return new URL(fallback);
-  try {
-    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-    return url.protocol === "http:" || url.protocol === "https:" ? url : new URL(fallback);
-  } catch {
-    return new URL(fallback);
-  }
-}
-
 // Icons and the default share image come from the app/favicon.ico,
 // app/icon.svg, app/apple-icon.tsx and app/opengraph-image.tsx file
 // conventions, so they are not repeated here.
 export const metadata: Metadata = {
-  metadataBase: resolveSiteUrl(),
+  metadataBase: siteUrl(),
+  // The test site carries demo listings: keep it out of search engines.
+  ...(isTestSite() ? { robots: { index: false, follow: false } } : {}),
   title: {
     template: "%s · SpaceGo",
     default: SITE_TITLE,
@@ -104,6 +95,7 @@ export default function RootLayout({
         >
           Skip to content
         </a>
+        <TestSiteBanner />
         <AuthProvider>
           <SpaceGoDataProvider>
             <ToastProvider>

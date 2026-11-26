@@ -64,6 +64,8 @@ interface DemoSeed {
   photos: string[];
   instant?: boolean;
   created: string;
+  /** Based on a real Kochi place that has not joined SpaceGo (shown as a demo listing). */
+  realPlace?: boolean;
 }
 
 const KOCHI_SEEDS: DemoSeed[] = [
@@ -123,6 +125,22 @@ const KOCHI_SEEDS: DemoSeed[] = [
     amenities: ["High-speed Wi-Fi", "Air conditioning", "Display screen"],
     photos: ["photo-1517048676732-d65bc937f952"], instant: true, created: "2026-11-02T09:00:00Z",
   },
+  // Demo listings based on real Kochi places. The places have not joined
+  // SpaceGo: prices, photos and details are samples (is_demo).
+  {
+    id: "demo-kochi-9", title: "Vyttila Mobility Hub parking", category: "parking", area: "Vyttila",
+    lat: 9.96847, lng: 76.32194, capacity: 120, sqft: 30000,
+    pricing: { hourly: 20, daily: 100, monthly: 1500 },
+    amenities: ["CCTV", "Two-wheeler bays", "Near bus terminal"],
+    photos: ["photo-1506521781263-d8422e82f27a"], created: "2026-11-01T09:00:00Z", realPlace: true,
+  },
+  {
+    id: "demo-kochi-10", title: "Ernakulam Town Hall", category: "auditorium", area: "Ernakulam North",
+    lat: 9.99121, lng: 76.28844, capacity: 800, sqft: 9000,
+    pricing: { daily: 25000 },
+    amenities: ["Stage", "Sound system", "Air conditioning", "Parking"],
+    photos: ["photo-1540575467063-178a50c2df87"], created: "2026-10-30T09:00:00Z", realPlace: true,
+  },
 ];
 
 export const DEMO_KOCHI_SPACES: Space[] = KOCHI_SEEDS.map((seed) => ({
@@ -130,9 +148,12 @@ export const DEMO_KOCHI_SPACES: Space[] = KOCHI_SEEDS.map((seed) => ({
   title: seed.title,
   slug: seed.id,
   category: seed.category,
-  headline: `Sample listing in ${seed.area} for the local demo`,
-  description:
-    "Sample listing for SpaceGo's local demo mode. It is not a real workspace and cannot be booked for real. It exists so location search and the map can be tried without a database.",
+  headline: seed.realPlace
+    ? `Demo listing based on a real place in ${seed.area}`
+    : `Sample listing in ${seed.area} for the local demo`,
+  description: seed.realPlace
+    ? "Demo listing for SpaceGo's local demo mode, based on a real Kochi place that has not joined SpaceGo. The photos, prices and details are samples and it cannot be booked for real."
+    : "Sample listing for SpaceGo's local demo mode. It is not a real workspace and cannot be booked for real. It exists so location search and the map can be tried without a database.",
   location: {
     city: "Kochi",
     address: `Sample address, ${seed.area}`,
@@ -168,6 +189,7 @@ export const DEMO_KOCHI_SPACES: Space[] = KOCHI_SEEDS.map((seed) => ({
   rating: 0,
   review_count: 0,
   instant_book: Boolean(seed.instant),
+  ...(seed.realPlace ? { is_demo: true } : {}),
   created_at: seed.created,
 }));
 

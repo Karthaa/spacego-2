@@ -14,7 +14,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { categoryNoun } from "@/lib/categories";
+import { capacityLabel, categoryNoun } from "@/lib/categories";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Building2, Check, ExternalLink, Flag, MapPin, ShieldCheck } from "lucide-react";
 import { reportReasonLabel } from "@/components/trust/ReportListing";
@@ -239,7 +239,7 @@ export default function AdminSpacesPage() {
                     <div className="min-w-0 space-y-1">
                       <p className="text-base font-medium text-ink">{s.title}</p>
                       <p className="text-sm text-ink-muted">
-                        {categoryNoun(s.category)} · {s.capacity} seats · {priceLabel(s)} · {s.images.length}{" "}
+                        {categoryNoun(s.category)} · {capacityLabel(s.category, s.capacity)} · {priceLabel(s)} · {s.images.length}{" "}
                         {s.images.length === 1 ? "photo" : "photos"}
                       </p>
                       <p className="flex items-center gap-1 text-sm text-ink-muted">
@@ -329,7 +329,7 @@ export default function AdminSpacesPage() {
                     <div className="min-w-0">
                       <p className="truncate text-base font-medium text-ink">{s.title}</p>
                       <p className="truncate text-sm text-ink-subtle">
-                        {categoryNoun(s.category)} · {s.capacity} seats · {priceLabel(s)}
+                        {categoryNoun(s.category)} · {capacityLabel(s.category, s.capacity)} · {priceLabel(s)}
                       </p>
                     </div>
                   </div>

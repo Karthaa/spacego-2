@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
-import { categoryNoun } from "@/lib/categories";
+import { capacityLabel, categoryNoun } from "@/lib/categories";
 import { formatCurrency } from "@/lib/utils";
 import { Building2, Eye, MapPin, Pencil, Plus, Send, Trash2, Users } from "lucide-react";
 
@@ -148,7 +148,7 @@ export default function OwnerPropertiesPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
-                          Up to {space.capacity} people
+                          {capacityLabel(space.category, space.capacity)}
                         </span>
                       </div>
                       <p className="text-sm font-medium text-ink">{rate ?? "No price set"}</p>

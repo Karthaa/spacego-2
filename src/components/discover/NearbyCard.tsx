@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Navigation, Users, X, Zap } from "lucide-react";
 import type { NearbySpace } from "@/lib/data/store";
 import { formatDistance } from "@/lib/geo";
-import { categoryNoun } from "@/lib/categories";
+import { capacityUnit, categoryNoun } from "@/lib/categories";
+import { isWholeVenue } from "@/lib/pricing";
 import { cn, formatCurrency } from "@/lib/utils";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { headlinePrice } from "@/components/common/SpaceCard";
@@ -70,7 +71,11 @@ export const NearbyCard = forwardRef<HTMLElement, NearbyCardProps>(function Near
           height={450}
           sizes={row ? "7rem" : "(min-width: 1280px) 22vw, (min-width: 1024px) 9rem, (min-width: 640px) 45vw, 100vw"}
         />
-        {space.instant_book && !row && (
+        {space.is_demo ? (
+          <span className="absolute left-2 top-2 inline-flex items-center rounded-full bg-[#ffffff]/95 px-2 py-0.5 text-xs font-semibold text-neutral-900 shadow-sm">
+            Demo
+          </span>
+        ) : space.instant_book && !row && (
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-sm bg-black/60 px-2 py-1 text-xs font-medium text-photo-ink lg:hidden xl:inline-flex">
             <Zap className="h-3.5 w-3.5" aria-hidden="true" />
             Instant Book
@@ -105,7 +110,7 @@ export const NearbyCard = forwardRef<HTMLElement, NearbyCardProps>(function Near
           <span className="inline-flex items-center gap-1">
             <Users className="h-3.5 w-3.5" aria-hidden="true" />
             {space.capacity}
-            <span className="sr-only">{space.capacity === 1 ? " person" : " people"}</span>
+            <span className="sr-only"> {capacityUnit(space.category, space.capacity)}</span>
           </span>
           {space.instant_book && (
             <span className={cn("items-center gap-1", row ? "inline-flex" : "hidden lg:inline-flex xl:hidden")}>
@@ -119,7 +124,7 @@ export const NearbyCard = forwardRef<HTMLElement, NearbyCardProps>(function Near
           {price ? (
             <>
               <span className="font-semibold tabular-nums">{formatCurrency(price.amount, space.pricing.currency)}</span>
-              <span className="text-ink-muted"> / {price.unit}</span>
+              <span className="text-ink-muted"> / {price.unit}{isWholeVenue(space.category) ? ", whole venue" : ""}</span>
             </>
           ) : (
             <span className="text-ink-muted">Price on request</span>

@@ -10,6 +10,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Ca
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import dynamic from "next/dynamic";
 import { isValidLatLng, type LatLng } from "@/lib/geo";
+import { CATEGORIES, capacityFieldLabel, categoryNoun } from "@/lib/categories";
 import { PhotoUploader } from "./PhotoUploader";
 import { DocumentUploader } from "./DocumentUploader";
 
@@ -109,10 +110,10 @@ const spaceFormSchema = z.object({
   city: z.string().trim().min(1, "Enter the city."),
   country: z.string().trim().min(1, "Enter the country."),
   capacity: z
-    .number({ error: "Enter how many people the space holds." })
-    .int("Use a whole number of people.")
-    .min(1, "The space must hold at least 1 person.")
-    .max(1_000_000, "Enter 1,000,000 people or fewer."),
+    .number({ error: "Enter how many people, seats or vehicles the space holds." })
+    .int("Use a whole number.")
+    .min(1, "The capacity must be at least 1.")
+    .max(1_000_000, "Enter 1,000,000 or fewer."),
   squareFeet: z
     .number({ error: "Enter the floor area." })
     .int("Use a whole number of square feet.")
@@ -348,12 +349,11 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
               value={category}
               onChange={(e) => setCategory(e.target.value as WorkspaceCategory)}
             >
-              <option value="coworking">Coworking desk</option>
-              <option value="private_office">Private office</option>
-              <option value="meeting_room">Meeting room</option>
-              <option value="training_room">Training room</option>
-              <option value="studio">Studio</option>
-              <option value="event_space">Event space</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {categoryNoun(c.id)}
+                </option>
+              ))}
             </Select>
           </div>
 
@@ -457,7 +457,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               id={fieldId("capacity")}
-              label="Maximum people"
+              label={capacityFieldLabel(category)}
               type="number"
               inputMode="numeric"
               min={1}

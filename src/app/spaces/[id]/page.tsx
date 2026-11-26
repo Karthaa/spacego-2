@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
-import { VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
+import { Badge, VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -30,7 +30,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { categoryNoun } from "@/lib/categories";
+import { capacityLabel, categoryNoun } from "@/lib/categories";
+import { bookingPrice, isWholeVenue } from "@/lib/pricing";
 import { Booking, Space } from "@/types";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
@@ -174,6 +175,16 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
+        {space.is_demo && (
+          <p
+            role="note"
+            className="mt-4 rounded-md border border-line bg-surface-muted px-4 py-3 text-sm text-ink-muted"
+          >
+            <strong className="font-semibold text-ink">Demo listing</strong> based on a real Kochi place, for trying
+            SpaceGo. The venue hasn&apos;t joined SpaceGo, so the photos, prices and details are samples.
+          </p>
+        )}
+
         {/* Gallery */}
         <Gallery images={images} title={space.title} onOpen={setGalleryIndex} />
 
@@ -188,7 +199,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
               <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-base text-ink-muted">
                 <li className="flex items-center gap-2">
                   <Users className="h-5 w-5" aria-hidden="true" />
-                  Up to {space.capacity} {space.capacity === 1 ? "person" : "people"}
+                  {capacityLabel(space.category, space.capacity)}
                 </li>
                 {space.square_feet > 0 && (
                   <li className="flex items-center gap-2">
@@ -211,16 +222,17 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
                 </li>
               </ul>
               <div className="mt-4">
-                <VerificationBadge level={space.verification_level} />
+                {/* Demo listings never show a verification badge or tier. */}
+                {space.is_demo ? <Badge variant="neutral">Demo</Badge> : <VerificationBadge level={space.verification_level} />}
               </div>
             </section>
 
             {(space.headline || space.description) && (
               <section aria-labelledby="about-heading">
                 <h2 id="about-heading" className="text-xl font-semibold text-ink">About this space</h2>
-                {space.headline && <p className="mt-3 text-base font-medium text-ink">{space.headline}</p>}
+                {space.headline && <p className="mt-3 break-words text-base font-medium text-ink">{space.headline}</p>}
                 {space.description && (
-                  <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-ink-muted">{space.description}</p>
+                  <p className="mt-2 whitespace-pre-line break-words text-base leading-relaxed text-ink-muted">{space.description}</p>
                 )}
               </section>
             )}
@@ -240,11 +252,11 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
               </section>
             )}
 
-            <ReviewDetails space={space} />
+            {!space.is_demo && <ReviewDetails space={space} />}
 
             <SpaceLocationSection space={space} />
 
-            <SpaceReviews space={space} />
+            {!space.is_demo && <SpaceReviews space={space} />}
 
             <section aria-labelledby="hours-heading">
               <h2 id="hours-heading" className="text-xl font-semibold text-ink">Opening hours and rules</h2>
@@ -474,10 +486,21 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
 
   const unitRate = space.pricing[durationType] ?? 0;
-  const perSeat = durationType !== "monthly";
-  const baseCost = unitRate * durationUnits * (perSeat ? seats : 1);
-  const serviceFee = Math.round(baseCost * 0.1);
-  const total = baseCost + serviceFee;
+  // Same rule as the database: halls and event venues are hired whole.
+  const wholeVenue = isWholeVenue(space.category);
+  // What a "seat" is for this type, in the price breakdown.
+  const seatNoun = (n: number) =>
+    space.category === "parking"
+      ? n === 1 ? "vehicle" : "vehicles"
+      : wholeVenue
+        ? n === 1 ? "guest" : "guests"
+        : n === 1 ? "person" : "people";
+  const {
+    base: baseCost,
+    fee: serviceFee,
+    total,
+    perSeat,
+  } = bookingPrice(space.category, durationType, unitRate, durationUnits, seats);
   const currency = space.pricing.currency;
   const label = DURATION_LABEL[durationType];
 
@@ -547,7 +570,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
         <h2 id="booking-heading" className="sr-only">Book this space</h2>
         <p className="text-ink">
           <span className="text-2xl font-semibold">{formatCurrency(unitRate, currency)}</span>
-          <span className="text-base text-ink-muted"> / {label.unit}{perSeat ? " per person" : ""}</span>
+          <span className="text-base text-ink-muted"> / {label.unit}{wholeVenue ? ", whole venue" : perSeat ? ` per ${seatNoun(1)}` : ""}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -586,7 +609,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
               onChange={(e) => setDurationUnits(Math.min(label.max, Math.max(1, Number(e.target.value) || 1)))}
             />
             <Input
-              label="People"
+              label={space.category === "parking" ? "Vehicles" : wholeVenue ? "Guests" : "People"}
               type="number"
               inputMode="numeric"
               min={1}
@@ -609,7 +632,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
             <div className="flex justify-between gap-4 text-ink-muted">
               <dt>
                 {formatCurrency(unitRate, currency)} &times; {durationUnits} {durationUnits === 1 ? label.unit : label.units}
-                {perSeat && <> &times; {seats} {seats === 1 ? "person" : "people"}</>}
+                {wholeVenue ? ", whole venue" : perSeat && <> &times; {seats} {seatNoun(seats)}</>}
               </dt>
               <dd className="text-ink">{formatCurrency(baseCost, currency)}</dd>
             </div>
@@ -635,6 +658,9 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
               ? "Instant Book: confirmed as soon as SpaceGo checks the dates are free. No payment is taken on SpaceGo."
               : "The host reviews your request before it's confirmed. The final price is calculated by SpaceGo when you book. No payment is taken on SpaceGo."}
           </p>
+          {space.is_demo && (
+            <p className="text-sm font-medium text-ink">Demo booking: nothing is sent to the venue.</p>
+          )}
         </form>
       </aside>
 

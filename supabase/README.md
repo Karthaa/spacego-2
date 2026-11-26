@@ -62,6 +62,34 @@ service role:
 UPDATE public.profiles SET role = 'admin' WHERE email = 'ops@example.com';
 ```
 
+## Demo listings (test site only)
+
+`demo/demo_listings_staging.sql` adds 39 demo listings to the test site
+(SpaceGo-Staging), each based on a real Kochi place: 27 coworking spaces,
+6 halls and 6 car parks. Every listing is marked `is_demo`. Its text says the
+venue hasn't joined SpaceGo, and its photos, prices and capacity are samples.
+None has a verification badge, rating or reviews. All are Instant Book, so the
+whole booking flow can be tried. The script also takes the six made-up sample
+listings offline on the test site. It runs as one transaction, and re-running
+it skips listings that already exist.
+
+Run things in this order:
+
+1. On staging, `migrations/20261205_spacego_new_types_and_demo_flag.sql` (adds
+   the parking and auditorium types and the `is_demo` flag), then
+   `demo/demo_listings_staging.sql`.
+2. On production, the same migration, before PR #14 merges. The app's new
+   types need it.
+3. On staging and then production, `migrations/20261206_spacego_whole_venue_pricing.sql`
+   (halls and event venues are priced per booking, not per guest). It needs
+   20261205 first, and the app's price preview in PR #14 assumes it.
+4. Never run the demo script on production. It refuses to run there: it
+   recognises production by the earlier step that took production's six
+   made-up sample listings offline, which the test site never had.
+
+To remove the demo listings later, run the commented block at the end of the
+script on its own.
+
 ## Authentication flow
 
 - Registration collects full name, email, password, and an optional phone and
