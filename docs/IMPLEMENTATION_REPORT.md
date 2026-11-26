@@ -197,8 +197,8 @@ view and RPCs from `20261121`. None of them deletes or rewrites existing rows.
 
 | Migration | Local test stack | Staging (`itbpynkutqdrxspazaxr`) | Production (`hxsstsfsqlzqhtfizbcq`) |
 |---|---|---|---|
-| `20261120_profiles_auth_hardening` | applied | applied by you on 25 Nov (post-apply checks not confirmed) | **not applied** |
-| `20261121_spacego_rls_hardening` | applied | applied by you on 25 Nov (post-apply checks not confirmed) | **not applied** |
+| `20261120_profiles_auth_hardening` | applied | applied by you on 25 Nov | applied 26 Nov, 11:25 IST (the fixed version from `493ff94`; main's older copy fails on production's `user_role` enum) |
+| `20261121_spacego_rls_hardening` | applied | applied by you on 25 Nov; checks 15.1 and 15.6 to 15.9 pass (26 Nov) | applied 26 Nov, 11:28 IST; checks 15.1, 15.5, 15.6 to 15.9 pass; row counts unchanged |
 | `20261126` to `20261204` (nine files) | applied from scratch, tests pass | not applied | not applied |
 
 The apply order and checks are in `docs/MORNING_APPROVALS.md`.
@@ -252,11 +252,13 @@ The apply order and checks are in `docs/MORNING_APPROVALS.md`.
 
 ## 16. Was staging deployed and verified?
 
-**No.**
+**Not for this branch's features.** Update, 26 Nov, 11:30 IST:
 
-- Nothing from this branch has been deployed or pushed. The sandbox can't reach GitHub for this repo, Supabase or Cloudflare.
-- The PC session that can push went idle at 17:40 UTC on 25 Nov.
-- Separately, PR #6 merged `feature/spacego-design-batch2` into `main` on 25 Nov. If the Orun workflow is on, that deploys to production. Whether it deployed, and whether production works without the `20261120`/`20261121` migrations, is **unverified**.
+- The branch is pushed and open as draft PR #11 (head `5451719`, the tested build). Its nine migrations are not applied anywhere.
+- PR #6 (merged to `main` on 25 Nov) **did** deploy to production at 16:37 IST. Production then showed no spaces, because its database lacked `20261120`/`20261121`.
+- On 26 Nov those two were applied to production (see section 11). All post-apply checks pass, row counts are unchanged, and the production site shows its 6 workspaces again with no console errors.
+- Production has **no admin account**. Its 6 spaces and other rows are demo data owned by placeholder ids (`user-owner-1`) with no profile, so they display, but only an admin can edit them and bookings on them are refused.
+- `main` still has the older `20261120`. Use the copy on this branch (or `feature/spacego-staging-fixes`) for any new project.
 
 ## Commits on this branch
 

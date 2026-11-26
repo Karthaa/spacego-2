@@ -1,7 +1,16 @@
 # Morning approvals (26 Nov 2026)
 
-These are the things that are waiting on you, in order. Nothing on this list
-has been done yet. Each step is safe to stop after.
+These are the things that were waiting on you, in order. Each step is safe to stop after.
+
+**Status, 26 Nov, 11:30 IST:** steps 1 to 3 are done, and the production part of
+step 5 is done for `20261120`/`20261121` only. What's left is step 4 (the nine new
+migrations on staging) and an admin account on production.
+
+- Step 1: token revoked.
+- Step 2: branch pushed; draft PR #11.
+- Step 3: PR #6 had deployed to production, which showed no spaces. Fixed by applying
+  `20261120` (the version on this branch, not main's older copy) and `20261121` to
+  production. All checks pass and the 6 spaces show again.
 
 ## 1. Revoke the Supabase access token you pasted in chat (2 minutes)
 
@@ -84,6 +93,5 @@ Still to do after that (from 25 Nov):
 
 ## 5. Production (`hxsstsfsqlzqhtfizbcq`): only after staging works, and only if you say so
 
-Apply the same files in the same order: `20261120`, `20261121`, then `20261126`
-through `20261204`. Then run the seven test files and check both buckets. Nothing
-has been applied to production by me.
+`20261120` and `20261121` were applied on 26 Nov. Later, apply `20261126`
+through `20261204` in the same order as on staging. Then run the seven test files and check both buckets.
