@@ -229,9 +229,9 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
             {(space.headline || space.description) && (
               <section aria-labelledby="about-heading">
                 <h2 id="about-heading" className="text-xl font-semibold text-ink">About this space</h2>
-                {space.headline && <p className="mt-3 text-base font-medium text-ink">{space.headline}</p>}
+                {space.headline && <p className="mt-3 break-words text-base font-medium text-ink">{space.headline}</p>}
                 {space.description && (
-                  <p className="mt-2 whitespace-pre-line text-base leading-relaxed text-ink-muted">{space.description}</p>
+                  <p className="mt-2 whitespace-pre-line break-words text-base leading-relaxed text-ink-muted">{space.description}</p>
                 )}
               </section>
             )}
@@ -486,6 +486,13 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
 
   const unitRate = space.pricing[durationType] ?? 0;
   const perSeat = durationType !== "monthly";
+  // What a "seat" is for this type, in the price breakdown.
+  const seatNoun = (n: number) =>
+    space.category === "parking"
+      ? n === 1 ? "vehicle" : "vehicles"
+      : space.category === "auditorium"
+        ? n === 1 ? "guest" : "guests"
+        : n === 1 ? "person" : "people";
   const baseCost = unitRate * durationUnits * (perSeat ? seats : 1);
   const serviceFee = Math.round(baseCost * 0.1);
   const total = baseCost + serviceFee;
@@ -558,7 +565,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
         <h2 id="booking-heading" className="sr-only">Book this space</h2>
         <p className="text-ink">
           <span className="text-2xl font-semibold">{formatCurrency(unitRate, currency)}</span>
-          <span className="text-base text-ink-muted"> / {label.unit}{perSeat ? " per person" : ""}</span>
+          <span className="text-base text-ink-muted"> / {label.unit}{perSeat ? ` per ${seatNoun(1)}` : ""}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -620,7 +627,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
             <div className="flex justify-between gap-4 text-ink-muted">
               <dt>
                 {formatCurrency(unitRate, currency)} &times; {durationUnits} {durationUnits === 1 ? label.unit : label.units}
-                {perSeat && <> &times; {seats} {seats === 1 ? "person" : "people"}</>}
+                {perSeat && <> &times; {seats} {seatNoun(seats)}</>}
               </dt>
               <dd className="text-ink">{formatCurrency(baseCost, currency)}</dd>
             </div>
