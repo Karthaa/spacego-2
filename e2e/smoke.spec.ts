@@ -60,7 +60,7 @@ test("unknown routes show the 404 page", async ({ page }) => {
   await expect(page.getByRole("link", { name: /home|spaces/i }).first()).toBeVisible();
 });
 
-const A11Y_PAGES = ["/", "/discover", "/spaces", "/spaces/space-1", "/activation", "/activation/track", "/auth/login", "/auth/register"];
+const A11Y_PAGES = ["/", "/discover", "/spaces", "/spaces/space-1", "/directory/kochi", "/activation", "/activation/track", "/auth/login", "/auth/register"];
 
 for (const path of A11Y_PAGES) {
   for (const theme of ["light", "dark"] as const) {
