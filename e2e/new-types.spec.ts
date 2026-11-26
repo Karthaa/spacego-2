@@ -46,6 +46,7 @@ test("demo listing page shows the demo note and no verification, rating or revie
     "The venue hasn't joined SpaceGo, so the photos, prices and details are samples."
   );
   await expect(page.getByText("800 seats")).toBeVisible();
+  await expect(page.getByText("Demo booking: nothing is sent to the venue.")).toBeVisible();
   const main = page.locator("main");
   await expect(main.getByText(/Reviewed by SpaceGo|SpaceGo Ready|SpaceGo Pro|New listing/)).toHaveCount(0);
   await expect(main.getByRole("heading", { name: /What SpaceGo checked|Reviews/i })).toHaveCount(0);
@@ -60,6 +61,7 @@ test("parking capacity reads as vehicles", async ({ page }) => {
 test("a regular listing is not marked as a demo", async ({ page }) => {
   await page.goto("/spaces/space-1");
   await expect(page.getByText(/Demo listing based on a real Kochi place/)).toHaveCount(0);
+  await expect(page.getByText("Demo booking: nothing is sent to the venue.")).toHaveCount(0);
 });
 
 test("footer links to the new types, and the local build has no test-site banner", async ({ page }) => {
