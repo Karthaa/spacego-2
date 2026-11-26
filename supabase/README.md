@@ -64,8 +64,8 @@ UPDATE public.profiles SET role = 'admin' WHERE email = 'ops@example.com';
 
 ## Demo listings (test site only)
 
-`demo/demo_listings_staging.sql` adds 39 demo listings to the test site
-(SpaceGo-Staging), each based on a real Kochi place: 27 coworking spaces,
+`demo/demo_listings_staging.sql` adds 51 demo listings to the test site
+(SpaceGo-Staging), each based on a real Kochi place: 39 coworking spaces,
 6 halls and 6 car parks. Every listing is marked `is_demo`. Its text says the
 venue hasn't joined SpaceGo, and its photos, prices and capacity are samples.
 None has a verification badge, rating or reviews. All are Instant Book, so the

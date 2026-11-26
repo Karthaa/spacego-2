@@ -1,5 +1,5 @@
 -- SpaceGo DEMO listings for the TEST site only (Supabase project SpaceGo-Staging).
--- 39 listings based on real Kochi places: 27 coworking spaces, 6 halls and
+-- 51 listings based on real Kochi places: 39 coworking spaces, 6 halls and
 -- 6 car parks. Each one is marked is_demo and says in its text that the venue hasn't joined
 -- SpaceGo. Photos, prices and capacity are samples. No verification badge, no rating, no reviews.
 -- All are Instant Book so a guest can try the whole booking flow on the test site.
@@ -146,6 +146,18 @@ FROM (VALUES
   ('demo-real-factorm', 'Factorm', 'coworking', 'October Road, Vyttila', 9.9676, 76.3206, 70, 4500, NULL, 450, 5000, 'photo-1504384308090-c894fdcc538d', 'photo-1517502884422-41eaead166d4', 'https://cofynd.com/coworking/kochi', '2026-11-22T09:00:00Z'),
   ('demo-real-workzo', 'Workzo', 'coworking', 'Tripunithura', 9.9451, 76.3486, 30, 2500, NULL, 500, 5999, 'photo-1497366216548-37526070297c', 'photo-1524758631624-e2822e304c36', 'https://cofynd.com/coworking/kochi', '2026-11-21T09:00:00Z'),
   ('demo-real-bee-worker', 'Bee Worker', 'coworking', 'Grande Tower, Pulinchode Junction, Aluva', 10.1076, 76.3516, 40, 3000, NULL, 550, 4000, 'photo-1522071820081-009f0129c71c', 'photo-1497215728101-856f4ea42174', 'https://cofynd.com/coworking/kochi', '2026-11-20T09:00:00Z'),
+  ('demo-real-spacelance', 'Spacelance', 'coworking', 'Valamkottil Towers, Judgemukku, Kakkanad', 10.0159, 76.3419, 50, 3500, NULL, 600, 6500, 'photo-1527192491265-7e15c55b1ed2', 'photo-1497366754035-f200968a6e72', 'https://cofynd.com/coworking/kochi', '2026-11-19T09:00:00Z'),
+  ('demo-real-greennest-business-centre', 'GreenNest Business Centre', 'coworking', 'Giri Nagar, Kadavanthra', 9.9663, 76.2989, 60, 4000, NULL, 450, 5990, 'photo-1497366811353-6870744d04b2', 'photo-1497215842964-222b430dc094', 'https://cofynd.com/coworking/greennest-business-centre-ernakulam-kochi', '2026-11-18T09:00:00Z'),
+  ('demo-real-dewspace', 'dewSpace', 'coworking', 'Paramara Road, Ernakulam North', 9.992, 76.288, 70, 4500, NULL, 500, NULL, 'photo-1504384308090-c894fdcc538d', 'photo-1517502884422-41eaead166d4', 'https://myhq.in/dedicated/coworking-space/dewspace-ernakulam', '2026-11-17T09:00:00Z'),
+  ('demo-real-ciasl-business-centre', 'CIASL Business Centre', 'coworking', 'CIAL Aeropark, Nedumbassery', 10.155, 76.39, 30, 2500, NULL, 550, 9999, 'photo-1497366216548-37526070297c', 'photo-1524758631624-e2822e304c36', 'https://myhq.in/dedicated/coworking-space/ciasl-business-centre-nedumbassery', '2026-11-16T09:00:00Z'),
+  ('demo-real-next57', 'Next57', 'coworking', 'Sahodaran Ayyappan Road', 9.9663, 76.2989, 40, 3000, NULL, 600, NULL, 'photo-1522071820081-009f0129c71c', 'photo-1497215728101-856f4ea42174', 'https://www.coworker.com/india/kochi/next57/review', '2026-11-15T09:00:00Z'),
+  ('demo-real-inq-cowork', 'InQ Cowork', 'coworking', 'InQ Tower, NH Bypass, Palarivattom', 10.0008, 76.3133, 50, 3500, NULL, 637, 7009, 'photo-1527192491265-7e15c55b1ed2', 'photo-1497366754035-f200968a6e72', 'https://www.coworkingcafe.com/coworking-property/in/kl/kochi/inq-kochi/', '2026-11-14T09:00:00Z'),
+  ('demo-real-wolfpack-workspaces', 'Wolfpack Workspaces', 'coworking', 'Iyyattil Junction, off MG Road', 9.9731, 76.285, 60, 4000, NULL, 600, 10200, 'photo-1497366811353-6870744d04b2', 'photo-1497215842964-222b430dc094', 'https://www.coworkingcafe.com/coworking-property/in/kl/kochi/wolfpack-iyyattil-junction', '2026-11-13T09:00:00Z'),
+  ('demo-real-clover-business-center', 'Clover Business Center', 'coworking', 'Asset Corridor, Ponekkara, Edappally', 10.0261, 76.3086, 70, 4500, NULL, 550, NULL, 'photo-1504384308090-c894fdcc538d', 'photo-1517502884422-41eaead166d4', 'https://myhq.in/dedicated/coworking-space/cloverbusiness-center-edappally', '2026-11-12T09:00:00Z'),
+  ('demo-real-spaces-66-mg-road', 'Spaces, 66 MG Road', 'coworking', 'Emgee Square, Padma Junction, MG Road', 9.979, 76.282, 30, 2500, NULL, 1390, NULL, 'photo-1497366216548-37526070297c', 'photo-1524758631624-e2822e304c36', 'https://www.spacesworks.com/en/in/7994', '2026-11-11T09:00:00Z'),
+  ('demo-real-regus-sl-plaza', 'Regus, SL Plaza', 'coworking', 'SL Plaza, Palarivattom', 10.0023, 76.3084, 40, 3000, NULL, 1390, NULL, 'photo-1522071820081-009f0129c71c', 'photo-1497215728101-856f4ea42174', 'https://www.regus.com/en/in/11389', '2026-11-10T09:00:00Z'),
+  ('demo-real-regus-nippon-q1-mall', 'Regus, Nippon Q1 Mall', 'coworking', 'Nippon Q1 Mall, NH 66, Vennala', 9.995, 76.314, 50, 3500, NULL, 2290, NULL, 'photo-1527192491265-7e15c55b1ed2', 'photo-1497366754035-f200968a6e72', 'https://www.regus.com/en/in/7695', '2026-11-09T09:00:00Z'),
+  ('demo-real-regus-upper-crest', 'Regus, Upper Crest', 'coworking', 'Upper Crest, Infopark Road, Kakkanad', 10.0122, 76.3555, 60, 4000, NULL, 1490, NULL, 'photo-1497366811353-6870744d04b2', 'photo-1497215842964-222b430dc094', 'https://www.regus.com/en/in/8537', '2026-11-08T09:00:00Z'),
   ('demo-real-fine-arts-hall', 'Fine Arts Hall', 'auditorium', 'Foreshore Road, Ernakulam', 9.96356, 76.28319, 700, 8400, 6000, 45000, NULL, 'photo-1505373877841-8d25f7d46678', 'photo-1540575467063-178a50c2df87', 'https://www.openstreetmap.org/?mlat=9.96356&mlon=76.28319#map=17/9.96356/76.28319', '2026-11-25T10:00:00Z'),
   ('demo-real-tdm-hall', 'TDM Hall', 'auditorium', 'Durbar Hall Road, Ernakulam', 9.96781, 76.28395, 500, 6000, 5000, 35000, NULL, 'photo-1540575467063-178a50c2df87', 'photo-1511578314322-379afb476865', 'https://www.openstreetmap.org/?mlat=9.96781&mlon=76.28395#map=17/9.96781/76.28395', '2026-11-24T10:00:00Z'),
   ('demo-real-ernakulam-town-hall', 'Ernakulam Town Hall', 'auditorium', 'Banerji Road, Ernakulam', 9.99121, 76.28844, 800, 9600, 6500, 50000, NULL, 'photo-1511578314322-379afb476865', 'photo-1505373877841-8d25f7d46678', 'https://www.openstreetmap.org/?mlat=9.99121&mlon=76.28844#map=17/9.99121/76.28844', '2026-11-23T10:00:00Z'),
@@ -190,8 +202,8 @@ BEGIN
 
   SELECT count(*) INTO v_public FROM public.spacego_public_spaces WHERE data ->> 'is_demo' = 'true';
   SELECT role::text INTO v_role FROM public.profiles WHERE id = '00000000-0000-4000-8000-00000000de01';
-  IF v_public < 39 THEN
-    RAISE EXCEPTION 'Expected at least 39 public demo listings, found %', v_public;
+  IF v_public < 51 THEN
+    RAISE EXCEPTION 'Expected at least 51 public demo listings, found %', v_public;
   END IF;
   IF v_role IS DISTINCT FROM 'owner' THEN
     RAISE EXCEPTION 'Demo host should be back to owner, is %', v_role;
