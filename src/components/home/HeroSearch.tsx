@@ -2,13 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Search, Users } from "lucide-react";
+import Link from "next/link";
+import { LocateFixed, MapPin, Search, Users } from "lucide-react";
 import { SpaceGoStore } from "@/lib/data/store";
 import { CATEGORIES } from "@/lib/categories";
 import type { Space, WorkspaceCategory } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { fieldClasses } from "@/components/ui/Input";
+import { SafeImage } from "@/components/ui/SafeImage";
 import { cn } from "@/lib/utils";
+import { matchKnownPlaces } from "@/lib/geo/places";
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=2000&q=80";
@@ -47,26 +50,42 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
       });
     }
 
+    // A recognised area goes to the location search (list + map); anything
+    // else keeps the text search across all listings.
+    const place = location.trim().length >= 3 ? matchKnownPlaces(location, 1)[0] : undefined;
+    if (place) {
+      const geo = new URLSearchParams({ lat: place.lat.toFixed(5), lng: place.lng.toFixed(5), near: place.label });
+      if (category !== "all") geo.set("cat", category);
+      if (seats) geo.set("seats", seats);
+      router.push(`/discover?${geo.toString()}`);
+      return;
+    }
+
     router.push(`/spaces${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
   const fieldLabel = "mb-1 block text-sm font-medium text-ink";
 
   return (
-    <section className="relative isolate overflow-hidden bg-black">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+    <section aria-labelledby="hero-heading" className="relative isolate overflow-hidden bg-black">
+      {/* Decorative background photo: the LCP element, so load it first. */}
+      <SafeImage
+        fill
         src={HERO_IMAGE}
         alt=""
-        className="absolute inset-0 -z-10 h-full w-full object-cover"
+        width={2000}
+        height={1333}
+        sizes="100vw"
+        loading="eager"
         fetchPriority="high"
+        wrapperClassName="-z-10"
       />
       {/* Flat scrim for legible text on the photo (no gradient). */}
       <div className="absolute inset-0 -z-10 bg-black/55" aria-hidden="true" />
 
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28 lg:px-8">
         <div className="max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-photo-ink sm:text-5xl">
+          <h1 id="hero-heading" className="text-4xl font-semibold tracking-tight text-photo-ink sm:text-5xl">
             Find the right space to work, meet and create
           </h1>
           <p className="mt-4 max-w-xl text-lg text-photo-ink/90">
@@ -135,6 +154,15 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
             Search
           </Button>
         </form>
+        <p className="mt-4 text-sm text-photo-ink/90">
+          <Link
+            href="/discover"
+            className="inline-flex min-h-11 items-center gap-2 rounded-sm font-medium text-photo-ink underline-offset-4 hover:underline"
+          >
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+            Find spaces near you on a map
+          </Link>
+        </p>
       </div>
     </section>
   );

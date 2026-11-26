@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -56,8 +56,6 @@ function ProfileForm({ user }: { user: UserProfile }) {
   const [fullName, setFullName] = useState(user.full_name ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
   const [companyName, setCompanyName] = useState(user.company_name ?? "");
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsNotifications, setSmsNotifications] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -81,8 +79,6 @@ function ProfileForm({ user }: { user: UserProfile }) {
       setIsSaving(false);
     }
   };
-
-  const checkboxClass = "mt-0.5 h-5 w-5 shrink-0 rounded-sm border-line-strong accent-accent";
 
   return (
     <div className="space-y-6">
@@ -134,45 +130,6 @@ function ProfileForm({ user }: { user: UserProfile }) {
               autoComplete="organization"
               leftIcon={<Building2 />}
             />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              These choices aren&apos;t saved to your account yet and reset when you leave this page.
-            </CardDescription>
-          </CardHeader>
-
-          <div className="space-y-2">
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3 hover:bg-surface-muted">
-              <input
-                type="checkbox"
-                checked={emailNotifications}
-                onChange={(e) => setEmailNotifications(e.target.checked)}
-                className={checkboxClass}
-              />
-              <span>
-                <span className="block text-base font-medium text-ink">Email updates</span>
-                <span className="block text-sm text-ink-muted">
-                  Booking confirmations and host replies by email.
-                </span>
-              </span>
-            </label>
-
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3 hover:bg-surface-muted">
-              <input
-                type="checkbox"
-                checked={smsNotifications}
-                onChange={(e) => setSmsNotifications(e.target.checked)}
-                className={checkboxClass}
-              />
-              <span>
-                <span className="block text-base font-medium text-ink">Text messages</span>
-                <span className="block text-sm text-ink-muted">Booking reminders by SMS.</span>
-              </span>
-            </label>
           </div>
         </Card>
 

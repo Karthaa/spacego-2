@@ -1,59 +1,37 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
+import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { buttonClasses } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Info } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
+import type { UserProfile } from "@/types";
+import { Building2, Info, Mail, Phone, User } from "lucide-react";
 
 export default function OwnerSettingsPage() {
   const { user } = useAuth();
-
-  const details: { label: string; value?: string }[] = [
-    { label: "Name", value: user?.full_name },
-    { label: "Email", value: user?.email },
-    { label: "Phone", value: user?.phone },
-    { label: "Company", value: user?.company_name },
-  ];
 
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Your host account details." />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Account</CardTitle>
-          <CardDescription>Guests see your name on your listings. Your email is used for booking updates.</CardDescription>
-        </CardHeader>
-
-        {user ? (
-          <dl className="divide-y divide-line border-t border-line">
-            {details.map((d) => (
-              <div key={d.label} className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-3 sm:gap-4">
-                <dt className="text-sm font-medium text-ink-muted">{d.label}</dt>
-                <dd className="break-words text-base text-ink sm:col-span-2">
-                  {d.value ? d.value : <span className="text-ink-subtle">Not added</span>}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <div className="space-y-3 border-t border-line pt-4" role="status" aria-label="Loading account details">
-            <Skeleton className="h-5 w-1/2" />
-            <Skeleton className="h-5 w-2/3" />
-            <Skeleton className="h-5 w-1/3" />
+      {user ? (
+        <OwnerProfileForm key={user.id} user={user} />
+      ) : (
+        <Card>
+          <div className="space-y-4" role="status" aria-label="Loading account details">
+            <Skeleton className="h-6 w-1/3" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {[1, 2, 3, 4].map((n) => (
+                <Skeleton key={n} className="h-11" />
+              ))}
+            </div>
           </div>
-        )}
-
-        <div className="mt-5">
-          <Link href="/dashboard/profile" className={buttonClasses({ variant: "outline" })}>
-            Edit profile
-          </Link>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -68,5 +46,104 @@ export default function OwnerSettingsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function OwnerProfileForm({ user }: { user: UserProfile }) {
+  const { updateProfile } = useAuth();
+  const { success, error } = useToast();
+
+  const [fullName, setFullName] = useState(user.full_name ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [companyName, setCompanyName] = useState(user.company_name ?? "");
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSaving) return;
+
+    if (!fullName.trim()) {
+      setNameError("Enter your full name.");
+      return;
+    }
+    setNameError(undefined);
+
+    setIsSaving(true);
+    try {
+      const result = await updateProfile({
+        full_name: fullName,
+        phone,
+        company_name: companyName,
+      });
+
+      if (result.error) {
+        error("Could not save your details", result.error);
+        return;
+      }
+
+      success("Account updated", "Your host details have been saved.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Account</CardTitle>
+        <CardDescription>Guests see your name on your listings. Your email is used for booking updates.</CardDescription>
+      </CardHeader>
+
+      <form onSubmit={handleSave} noValidate className="space-y-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Input
+            label="Full name"
+            required
+            value={fullName}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              if (nameError && e.target.value.trim()) setNameError(undefined);
+            }}
+            autoComplete="name"
+            leftIcon={<User />}
+            error={nameError}
+          />
+
+          <Input
+            label="Email address"
+            disabled
+            value={user.email}
+            helperText="Email can't be changed here."
+            leftIcon={<Mail />}
+          />
+
+          <Input
+            label="Phone number"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+1 555 000 0000"
+            autoComplete="tel"
+            leftIcon={<Phone />}
+          />
+
+          <Input
+            label="Company"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="Optional"
+            autoComplete="organization"
+            leftIcon={<Building2 />}
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" isLoading={isSaving}>
+            Save changes
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

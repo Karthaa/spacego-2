@@ -80,7 +80,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       <div
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 motion-safe:animate-overlay-in"
         aria-hidden="true"
         onClick={onClose}
       />
@@ -95,6 +95,9 @@ export function Modal({
         className={cn(
           "relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden border border-line bg-surface text-ink shadow-md focus:outline-none",
           "rounded-t-lg sm:rounded-lg",
+          // Enter motion: a bottom sheet rises on small screens, the centred
+          // dialog fades and scales slightly from sm up.
+          "motion-safe:animate-sheet-in motion-safe:sm:animate-dialog-in",
           maxWidth === "sm" && "sm:max-w-sm",
           maxWidth === "md" && "sm:max-w-md",
           maxWidth === "lg" && "sm:max-w-lg",

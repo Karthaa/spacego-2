@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, Suspense } from "react";
+import React, { useId, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LayoutGrid, List, MapPin, Search, SlidersHorizontal, X, Building2 } from "lucide-react";
@@ -54,11 +54,15 @@ export default function SpacesPage() {
 
 function SpacesFallback() {
   return (
-    <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-3 lg:px-8">
+    <main
+      id="main"
+      className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-3 lg:px-8"
+    >
+      <h1 className="sr-only">Find a workspace</h1>
       {[1, 2, 3].map((n) => (
         <SpaceCardSkeleton key={n} />
       ))}
-    </div>
+    </main>
   );
 }
 
@@ -202,6 +206,7 @@ function SpacesContent() {
             <div className="flex gap-2">
               <form
                 role="search"
+                aria-label="Search workspaces"
                 onSubmit={(e) => e.preventDefault()}
                 className="relative flex-1"
               >
@@ -219,7 +224,7 @@ function SpacesContent() {
                   <button
                     type="button"
                     onClick={() => setQuery("")}
-                    className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle hover:text-ink"
+                    className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-ink-subtle transition-colors hover:text-ink"
                     aria-label="Clear search"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
@@ -279,7 +284,7 @@ function SpacesContent() {
                   <button
                     type="button"
                     onClick={() => setFilters(EMPTY_FILTERS)}
-                    className="text-sm font-medium text-accent hover:underline"
+                    className="rounded-sm text-sm font-medium text-accent hover:underline"
                   >
                     Clear all
                   </button>
@@ -341,11 +346,14 @@ function SpacesContent() {
                         <button
                           type="button"
                           onClick={() => setQuery(place.split(",")[0])}
-                          className="flex h-10 items-center gap-2 rounded-full border border-line-strong px-4 text-sm text-ink hover:bg-surface-muted pointer-coarse:h-11"
+                          className="flex h-10 items-center gap-2 rounded-full border border-line-strong px-4 text-sm text-ink transition-colors hover:bg-surface-muted pointer-coarse:h-11"
                         >
                           <MapPin className="h-4 w-4 text-accent" aria-hidden="true" />
                           {place}
-                          <span className="text-ink-subtle">{count}</span>
+                          <span className="text-ink-muted">
+                            {count}
+                            <span className="sr-only"> {count === 1 ? "space" : "spaces"}</span>
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -467,6 +475,16 @@ function FilterPanel({
   onChange: React.Dispatch<React.SetStateAction<Filters>>;
   amenityOptions: string[];
 }) {
+  // The panel renders twice (desktop sidebar + mobile sheet), so ids must be
+  // unique per instance or the sheet's labels point at the hidden sidebar.
+  const uid = useId();
+  const ids = {
+    minPrice: `${uid}-min-price`,
+    maxPrice: `${uid}-max-price`,
+    minSeats: `${uid}-min-seats`,
+    verification: `${uid}-verification`,
+  };
+
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     onChange((f) => ({ ...f, [key]: value }));
 
@@ -484,7 +502,7 @@ function FilterPanel({
               aria-pressed={filters.duration === d}
               onClick={() => set("duration", d)}
               className={cn(
-                "h-11 rounded-md border text-sm font-medium capitalize transition-colors",
+                "h-11 rounded-md border text-sm font-medium transition-colors",
                 filters.duration === d
                   ? "border-accent bg-accent-soft text-accent-soft-ink"
                   : "border-line-strong bg-surface text-ink hover:bg-surface-muted"
@@ -500,9 +518,9 @@ function FilterPanel({
         <legend className={legend}>Price</legend>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label htmlFor="min-price" className="mb-1 block text-sm text-ink-muted">Min</label>
+            <label htmlFor={ids.minPrice} className="mb-1 block text-sm text-ink-muted">Min</label>
             <input
-              id="min-price"
+              id={ids.minPrice}
               type="number"
               inputMode="numeric"
               min={0}
@@ -513,9 +531,9 @@ function FilterPanel({
             />
           </div>
           <div>
-            <label htmlFor="max-price" className="mb-1 block text-sm text-ink-muted">Max</label>
+            <label htmlFor={ids.maxPrice} className="mb-1 block text-sm text-ink-muted">Max</label>
             <input
-              id="max-price"
+              id={ids.maxPrice}
               type="number"
               inputMode="numeric"
               min={0}
@@ -526,13 +544,13 @@ function FilterPanel({
             />
           </div>
         </div>
-        <p className="mt-1.5 text-sm text-ink-subtle">Compared against the daily rate, or hourly/monthly if no daily rate.</p>
+        <p className="mt-1.5 text-sm text-ink-muted">Compared against the daily rate, or hourly/monthly if no daily rate.</p>
       </fieldset>
 
       <div>
-        <label htmlFor="min-seats" className={cn(legend, "block")}>People</label>
+        <label htmlFor={ids.minSeats} className={cn(legend, "block")}>People</label>
         <input
-          id="min-seats"
+          id={ids.minSeats}
           type="number"
           inputMode="numeric"
           min={1}
@@ -544,9 +562,9 @@ function FilterPanel({
       </div>
 
       <div>
-        <label htmlFor="verification" className={cn(legend, "block")}>SpaceGo review</label>
+        <label htmlFor={ids.verification} className={cn(legend, "block")}>SpaceGo review</label>
         <select
-          id="verification"
+          id={ids.verification}
           value={filters.verification}
           onChange={(e) => set("verification", e.target.value as VerificationLevel | "all")}
           className={cn(fieldClasses, "h-11 cursor-pointer")}
@@ -595,9 +613,9 @@ function FilterPanel({
         </fieldset>
       )}
 
-      <p className="text-sm text-ink-subtle">
+      <p className="text-sm text-ink-muted">
         Looking to list a space instead?{" "}
-        <Link href="/owner/spaces/new" className="font-medium text-accent hover:underline">
+        <Link href="/owner/spaces/new" className="rounded-sm font-medium text-accent hover:underline">
           Become a host
         </Link>
       </p>

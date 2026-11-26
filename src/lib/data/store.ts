@@ -12,6 +12,17 @@ import {
   ActivationScore,
   UserRole,
   WorkspaceCategory,
+  ListingReview,
+  ListingReviewDecision,
+  ListingReviewState,
+  SpaceAddress,
+  SpaceReview,
+  SpaceReviewSummary,
+  OwnReview,
+  ListingReport,
+  ReportReason,
+  ListingDocument,
+  ListingDocumentKind,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -26,6 +37,7 @@ import {
   deleteSpaceRow,
   fetchFavouriteIds,
   fetchRows,
+  selectRows,
   insertSpaceRow,
   isRemoteEnabled as isSupabaseBackendEnabled,
   REMOTE_RPCS,
@@ -34,6 +46,14 @@ import {
   setFavouriteRow,
   updateSpaceRow,
 } from "./remote";
+import {
+  approximatePoint,
+  haversineMeters,
+  isValidLatLng,
+  MAX_RADIUS_M,
+  roundDistance,
+  type LatLng,
+} from "@/lib/geo";
 
 /**
  * SpaceGo data store.
@@ -51,6 +71,103 @@ import {
  */
 
 export type StoreResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+export type NearbySort = "distance" | "price_asc" | "price_desc" | "newest";
+export type PriceUnit = "hourly" | "daily" | "monthly";
+
+export interface NearbySearchParams {
+  center: LatLng;
+  radiusM: number;
+  categories?: WorkspaceCategory[];
+  priceUnit?: PriceUnit | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  amenities?: string[];
+  minCapacity?: number | null;
+  verifiedOnly?: boolean;
+  instantOnly?: boolean;
+  sort?: NearbySort;
+  limit?: number;
+  offset?: number;
+}
+
+export interface NearbySpace {
+  space: Space;
+  /** Approximate public point (never the exact address). */
+  point: LatLng;
+  /** Straight-line distance from the search centre, rounded to 100 m. */
+  distanceM: number;
+}
+
+export interface NearbySearchResult {
+  items: NearbySpace[];
+  total: number;
+  /** "server": PostGIS RPC. "demo": local sample data, filtered in the browser. */
+  source: "server" | "demo";
+}
+
+interface SearchRpcRow {
+  id: string;
+  data: Partial<Space> & { id: string };
+  approx_lat: number;
+  approx_lng: number;
+  distance_m: number;
+  total_count: number;
+}
+
+function nearbyPrice(space: Space, unit: PriceUnit | null | undefined): number | null {
+  if (unit) return space.pricing[unit] ?? null;
+  return space.pricing.daily ?? space.pricing.hourly ?? space.pricing.monthly ?? null;
+}
+
+const VERIFIED_LEVELS = new Set(["checked", "ready", "pro"]);
+
+/** Demo-mode search: the same rules as spacego_search_spaces, in the browser. */
+function searchLocal(spaces: Space[], p: NearbySearchParams): NearbySearchResult {
+  const radius = Math.min(Math.max(p.radiusM, 250), MAX_RADIUS_M);
+  const limit = Math.min(Math.max(p.limit ?? 24, 1), 50);
+  const offset = Math.max(p.offset ?? 0, 0);
+  const sort = p.sort ?? "distance";
+
+  const matches: (NearbySpace & { price: number | null })[] = [];
+  for (const space of spaces) {
+    if (space.status !== "published") continue;
+    const c = space.location?.coordinates;
+    if (!c || !isValidLatLng(c.lat, c.lng)) continue;
+    const point = approximatePoint(c);
+    const dist = haversineMeters(p.center, point);
+    if (dist > radius) continue;
+    if (p.categories?.length && !p.categories.includes(space.category)) continue;
+    if (p.amenities?.length && !p.amenities.every((a) => space.amenities.includes(a))) continue;
+    if (p.minCapacity && space.capacity < p.minCapacity) continue;
+    if (p.verifiedOnly && !VERIFIED_LEVELS.has(space.verification_level)) continue;
+    if (p.instantOnly && !space.instant_book) continue;
+    const price = nearbyPrice(space, p.priceUnit);
+    if (p.priceUnit && price == null) continue;
+    if (p.minPrice != null && (price == null || price < p.minPrice)) continue;
+    if (p.maxPrice != null && (price == null || price > p.maxPrice)) continue;
+    matches.push({ space, point, distanceM: roundDistance(dist), price });
+  }
+
+  const byNum = (a: number | null, b: number | null, dir: 1 | -1) =>
+    a == null ? 1 : b == null ? -1 : (a - b) * dir;
+  matches.sort((a, b) => {
+    let d = 0;
+    if (sort === "price_asc") d = byNum(a.price, b.price, 1);
+    else if (sort === "price_desc") d = byNum(a.price, b.price, -1);
+    else if (sort === "newest") d = (b.space.created_at ?? "").localeCompare(a.space.created_at ?? "");
+    return d || a.distanceM - b.distanceM || a.space.id.localeCompare(b.space.id);
+  });
+
+  return {
+    items: matches.slice(offset, offset + limit).map(({ space, point, distanceM }) => ({ space, point, distanceM })),
+    total: matches.length,
+    source: "demo",
+  };
+}
+
+export const NEARBY_NOT_ENABLED =
+  "Location search isn't switched on for this database yet. Browse all spaces instead, or try again later.";
 
 export interface StoreViewer {
   id: string;
@@ -256,6 +373,36 @@ function optionalString(value: unknown): string | undefined {
  * owner_id, owner_email, coordinates and passport inspector fields, and emit
  * null for unset prices; fill safe defaults so the UI types hold.
  */
+const REVIEW_STATES: readonly ListingReviewState[] = [
+  "draft",
+  "pending",
+  "approved",
+  "changes_requested",
+  "rejected",
+  "suspended",
+];
+
+function normalizeReview(raw: unknown): ListingReview | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  if (!REVIEW_STATES.includes(r.state as ListingReviewState)) return undefined;
+  return {
+    state: r.state as ListingReviewState,
+    reason: typeof r.reason === "string" ? r.reason : "",
+    submitted_at: typeof r.submitted_at === "string" ? r.submitted_at : "",
+    decided_at: typeof r.decided_at === "string" ? r.decided_at : "",
+  };
+}
+
+/**
+ * Effective review state, same rule as public.spacego_review_state: listings
+ * published before reviews existed count as approved.
+ */
+export function reviewStateOf(space: Pick<Space, "status" | "review">): ListingReviewState {
+  if (space.review) return space.review.state;
+  return space.status === "published" ? "approved" : "draft";
+}
+
 function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
   const location: Partial<Space["location"]> = raw.location ?? {};
   const pricing: Partial<Space["pricing"]> = raw.pricing ?? {};
@@ -278,6 +425,7 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
       country: stringOr(location.country, ""),
       postal_code: optionalString(location.postal_code),
       landmark: optionalString(location.landmark),
+      address_visibility: location.address_visibility === "exact" ? "exact" : "approximate",
       coordinates: {
         lat: numberOr(location.coordinates?.lat, 0),
         lng: numberOr(location.coordinates?.lng, 0),
@@ -318,6 +466,8 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
     owner_avatar: stringOr(raw.owner_avatar, ""),
     owner_email: optionalString(raw.owner_email),
     status: raw.status ?? "published",
+    review: normalizeReview(raw.review),
+    ...(Array.isArray(raw.documents) ? { documents: normalizeDocuments(raw.documents) } : {}),
     rating: numberOr(Number(raw.rating), 0),
     review_count: numberOr(Number(raw.review_count), 0),
     instant_book: Boolean(raw.instant_book),
@@ -413,6 +563,51 @@ function addLocalNotification(
     created_at: new Date().toISOString(),
   };
   setStored(NOTIFICATIONS_KEY, [newNotif, ...all]);
+}
+
+const REVIEWS_KEY = "spacego_reviews";
+
+/** Demo-mode review row (mirrors public.spacego_space_reviews). */
+interface LocalReview extends SpaceReview {
+  booking_id: string;
+  author_id: string;
+  status: "published" | "hidden";
+  moderation_reason: string | null;
+}
+
+function localReviews(): LocalReview[] {
+  return getStored<LocalReview[]>(REVIEWS_KEY, []);
+}
+
+/** A reviews view or RPC that isn't installed yet reads as "no reviews". */
+function reviewsNotInstalled(message: string): boolean {
+  return /does not exist|schema cache|missing the required/i.test(message);
+}
+
+const REPORTS_KEY = "spacego_listing_reports";
+
+interface LocalReport extends ListingReport {
+  reporter_id: string;
+}
+
+const DOCUMENT_KINDS: readonly ListingDocumentKind[] = ["ownership", "authority", "business_registration", "address_proof", "other"];
+
+function normalizeDocuments(raw: unknown[]): ListingDocument[] {
+  return raw
+    .filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+    .filter((d) => typeof d.path === "string" && d.path.length > 0)
+    .map((d) => ({
+      path: String(d.path),
+      kind: DOCUMENT_KINDS.includes(d.kind as ListingDocumentKind) ? (d.kind as ListingDocumentKind) : "other",
+      name: typeof d.name === "string" ? d.name.slice(0, 200) : "Document",
+      uploaded_at: typeof d.uploaded_at === "string" ? d.uploaded_at : "",
+    }));
+}
+
+/** Bookings a guest may review: confirmed and already ended. */
+export function canReviewBooking(booking: Booking, now = Date.now()): boolean {
+  const end = Date.parse(booking.end_date);
+  return (booking.status === "approved" || booking.status === "completed") && Number.isFinite(end) && end <= now;
 }
 
 // ---------------------------------------------------------------------------
@@ -572,6 +767,376 @@ export const SpaceGoStore = {
     return SpaceGoStore.getSpaces().filter((s) => s.status === "published");
   },
 
+  /**
+   * Published spaces near a point. Remote mode calls the PostGIS RPC; local
+   * demo mode filters the sample data with the same rules. Never falls back
+   * to sample data when a real database is configured.
+   */
+  searchNearby: async (params: NearbySearchParams): Promise<StoreResult<NearbySearchResult>> => {
+    if (!remoteMode()) {
+      return { ok: true, data: searchLocal(SpaceGoStore.getSpaces(), params) };
+    }
+
+    const result = await callRpc<SearchRpcRow[]>(REMOTE_RPCS.searchSpaces, {
+      p_lat: params.center.lat,
+      p_lng: params.center.lng,
+      p_radius_m: Math.round(Math.min(Math.max(params.radiusM, 250), MAX_RADIUS_M)),
+      p_categories: params.categories?.length ? params.categories : null,
+      p_min_price: params.minPrice ?? null,
+      p_max_price: params.maxPrice ?? null,
+      p_price_unit: params.priceUnit ?? null,
+      p_amenities: params.amenities?.length ? params.amenities : null,
+      p_min_capacity: params.minCapacity ?? null,
+      p_verified_only: Boolean(params.verifiedOnly),
+      p_instant_only: Boolean(params.instantOnly),
+      p_sort: params.sort ?? "distance",
+      p_limit: params.limit ?? 24,
+      p_offset: params.offset ?? 0,
+    });
+
+    if (!result.ok) {
+      if (/missing the required function/i.test(result.error)) {
+        return { ok: false, error: NEARBY_NOT_ENABLED };
+      }
+      return result;
+    }
+
+    const rows = result.data ?? [];
+    return {
+      ok: true,
+      data: {
+        items: rows.map((row) => ({
+          space: normalizeSpace({ ...row.data, id: row.id }),
+          point: { lat: Number(row.approx_lat), lng: Number(row.approx_lng) },
+          distanceM: Number(row.distance_m) || 0,
+        })),
+        total: rows.length > 0 ? Number(rows[0].total_count) || rows.length : 0,
+        source: "server",
+      },
+    };
+  },
+
+  /**
+   * Approximate public point of one published listing, or null when it has
+   * no usable location (or location search isn't enabled in the database).
+   */
+  getPublicPoint: async (id: string): Promise<StoreResult<LatLng | null>> => {
+    if (!remoteMode()) {
+      const space = SpaceGoStore.getSpaceById(id);
+      const c = space?.location?.coordinates;
+      if (!space || space.status !== "published" || !c || !isValidLatLng(c.lat, c.lng)) {
+        return { ok: true, data: null };
+      }
+      return { ok: true, data: approximatePoint(c) };
+    }
+    const result = await callRpc<{ approx_lat: number; approx_lng: number }[]>(REMOTE_RPCS.publicSpacePoint, {
+      p_id: id,
+    });
+    if (!result.ok) {
+      if (/missing the required function/i.test(result.error)) return { ok: true, data: null };
+      return result;
+    }
+    const row = result.data?.[0];
+    if (!row || !isValidLatLng(Number(row.approx_lat), Number(row.approx_lng))) return { ok: true, data: null };
+    return { ok: true, data: { lat: Number(row.approx_lat), lng: Number(row.approx_lng) } };
+  },
+
+  /**
+   * Street address and exact pin of a space. The database only returns it to
+   * the owner, admins and guests with a confirmed (or completed) booking;
+   * everyone else gets null.
+   */
+  getSpaceAddress: async (spaceId: string, userId: string | null): Promise<StoreResult<SpaceAddress | null>> => {
+    if (!userId) return { ok: true, data: null };
+    if (!remoteMode()) {
+      const space = SpaceGoStore.getSpaceById(spaceId);
+      if (!space) return { ok: true, data: null };
+      const allowed =
+        space.owner_id === userId ||
+        SpaceGoStore.getBookings().some(
+          (b) => b.space_id === space.id && b.user_id === userId && (b.status === "approved" || b.status === "completed")
+        );
+      if (!allowed) return { ok: true, data: null };
+      const c = space.location.coordinates;
+      const hasPin = isValidLatLng(c.lat, c.lng);
+      return {
+        ok: true,
+        data: {
+          address: space.location.address,
+          landmark: space.location.landmark ?? "",
+          postal_code: space.location.postal_code ?? "",
+          city: space.location.city,
+          country: space.location.country,
+          lat: hasPin ? c.lat : null,
+          lng: hasPin ? c.lng : null,
+        },
+      };
+    }
+    const result = await callRpc<
+      { address: string; landmark: string; postal_code: string; city: string; country: string; lat: number | null; lng: number | null }[]
+    >(REMOTE_RPCS.spaceAddress, { p_space_id: spaceId });
+    if (!result.ok) return result;
+    const row = result.data?.[0];
+    if (!row) return { ok: true, data: null };
+    const lat = row.lat === null ? null : Number(row.lat);
+    const lng = row.lng === null ? null : Number(row.lng);
+    const hasPin = lat !== null && lng !== null && isValidLatLng(lat, lng);
+    return {
+      ok: true,
+      data: {
+        address: row.address ?? "",
+        landmark: row.landmark ?? "",
+        postal_code: row.postal_code ?? "",
+        city: row.city ?? "",
+        country: row.country ?? "",
+        lat: hasPin ? lat : null,
+        lng: hasPin ? lng : null,
+      },
+    };
+  },
+
+  /** Published reviews of a space and their average, newest first. */
+  getSpaceReviews: async (
+    spaceId: string
+  ): Promise<StoreResult<{ reviews: SpaceReview[]; summary: SpaceReviewSummary }>> => {
+    const empty = { reviews: [], summary: { review_count: 0, average_rating: null } };
+    if (!remoteMode()) {
+      const reviews = localReviews()
+        .filter((r) => r.space_id === spaceId && r.status === "published")
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      const total = reviews.reduce((sum, r) => sum + r.rating, 0);
+      return {
+        ok: true,
+        data: {
+          reviews,
+          summary: {
+            review_count: reviews.length,
+            average_rating: reviews.length ? Math.round((total / reviews.length) * 10) / 10 : null,
+          },
+        },
+      };
+    }
+    const [rows, summary] = await Promise.all([
+      selectRows<SpaceReview>(
+        "spacego_public_reviews",
+        "id,space_id,author_name,rating,body,host_response,host_responded_at,created_at",
+        { space_id: spaceId },
+        "created_at",
+        50
+      ),
+      selectRows<{ review_count: number; average_rating: number | string | null }>(
+        "spacego_public_review_summary",
+        "review_count,average_rating",
+        { space_id: spaceId }
+      ),
+    ]);
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: empty } : rows;
+    const s = summary.ok ? summary.data[0] : undefined;
+    return {
+      ok: true,
+      data: {
+        reviews: rows.data,
+        summary: s
+          ? { review_count: Number(s.review_count) || 0, average_rating: s.average_rating === null ? null : Number(s.average_rating) }
+          : { review_count: rows.data.length, average_rating: null },
+      },
+    };
+  },
+
+  /** The signed-in guest's own reviews (including any hidden by SpaceGo). */
+  getOwnReviews: async (): Promise<StoreResult<OwnReview[]>> => {
+    const who = requireViewer();
+    if (!who.ok) return { ok: true, data: [] };
+    if (!remoteMode()) {
+      return {
+        ok: true,
+        data: localReviews()
+          .filter((r) => r.author_id === who.data.id)
+          .map(({ id, booking_id, space_id, rating, status, moderation_reason }) => ({
+            id,
+            booking_id,
+            space_id,
+            rating,
+            status,
+            moderation_reason,
+          })),
+      };
+    }
+    const rows = await selectRows<OwnReview>(
+      "spacego_space_reviews",
+      "id,booking_id,space_id,rating,status,moderation_reason",
+      { author_id: who.data.id }
+    );
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: [] } : rows;
+    return rows;
+  },
+
+  /** Guest: review a confirmed booking that has ended. One review per booking. */
+  submitReview: async (bookingId: string, rating: number, body: string): Promise<StoreResult<string>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = body.trim();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return { ok: false, error: "Choose a rating from 1 to 5." };
+    if (text.length < 20 || text.length > 2000) return { ok: false, error: "Write between 20 and 2000 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<string>(REMOTE_RPCS.submitReview, { p_booking_id: bookingId, p_rating: rating, p_body: text });
+      if (!result.ok && reviewsNotInstalled(result.error)) {
+        return { ok: false, error: "Reviews aren't switched on yet. Please try again later." };
+      }
+      return result;
+    }
+    const booking = SpaceGoStore.getBookings().find((b) => b.id === bookingId && b.user_id === who.data.id);
+    if (!booking) return { ok: false, error: "Booking not found." };
+    if (!canReviewBooking(booking)) return { ok: false, error: "You can review this space once your booking has ended." };
+    const all = localReviews();
+    if (all.some((r) => r.booking_id === bookingId)) return { ok: false, error: "You have already reviewed this booking." };
+    const review: LocalReview = {
+      id: newLocalId("review"),
+      booking_id: bookingId,
+      space_id: booking.space_id,
+      author_id: who.data.id,
+      author_name: (booking.user_name || "Guest").trim().split(/\s+/)[0].slice(0, 40) || "Guest",
+      rating,
+      body: text,
+      host_response: null,
+      host_responded_at: null,
+      status: "published",
+      moderation_reason: null,
+      created_at: new Date().toISOString(),
+    };
+    setStored(REVIEWS_KEY, [review, ...all]);
+    const space = SpaceGoStore.getSpaceById(booking.space_id);
+    if (space?.owner_id) {
+      addLocalNotification({
+        user_id: space.owner_id,
+        title: "New review",
+        message: `${review.author_name} reviewed ${space.title} (${rating} of 5).`,
+        type: "system",
+        link: `/spaces/${space.id}`,
+      });
+    }
+    notify();
+    return { ok: true, data: review.id };
+  },
+
+  /** Host: add or edit the public response to a review of their space. */
+  respondToReview: async (reviewId: string, response: string): Promise<StoreResult<null>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = response.trim();
+    if (text.length < 1 || text.length > 2000) return { ok: false, error: "Write between 1 and 2000 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.respondToReview, { p_review_id: reviewId, p_response: text });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    const all = localReviews();
+    const review = all.find((r) => r.id === reviewId);
+    if (!review || SpaceGoStore.getSpaceById(review.space_id)?.owner_id !== who.data.id) {
+      return { ok: false, error: "Only the host of this space can respond." };
+    }
+    setStored(
+      REVIEWS_KEY,
+      all.map((r) => (r.id === reviewId ? { ...r, host_response: text, host_responded_at: new Date().toISOString() } : r))
+    );
+    notify();
+    return { ok: true, data: null };
+  },
+
+  /** Admin: hide a review (with a reason) or restore it. */
+  moderateReview: async (reviewId: string, action: "hide" | "restore", reason = ""): Promise<StoreResult<null>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    if (action === "hide" && reason.trim().length < 10) return { ok: false, error: "Give a reason of at least 10 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.moderateReview, { p_review_id: reviewId, p_action: action, p_reason: reason.trim() });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    if (who.data.role !== "admin") return { ok: false, error: "Only SpaceGo admins can moderate reviews." };
+    setStored(
+      REVIEWS_KEY,
+      localReviews().map((r) =>
+        r.id === reviewId
+          ? { ...r, status: action === "hide" ? "hidden" : "published", moderation_reason: action === "hide" ? reason.trim() : null }
+          : r
+      )
+    );
+    notify();
+    return { ok: true, data: null };
+  },
+
+  /** Signed-in users: report a published listing to SpaceGo. */
+  reportListing: async (spaceId: string, reason: ReportReason, details: string): Promise<StoreResult<string>> => {
+    const who = requireViewer();
+    if (!who.ok) return who;
+    const text = details.trim();
+    if (text.length > 2000) return { ok: false, error: "Keep the details under 2000 characters." };
+    if (reason === "other" && text.length < 10) return { ok: false, error: "Tell us what is wrong in at least 10 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<string>(REMOTE_RPCS.reportListing, { p_space_id: spaceId, p_reason: reason, p_details: text });
+      if (!result.ok && reviewsNotInstalled(result.error)) {
+        return { ok: false, error: "Reporting isn't switched on yet. Please try again later." };
+      }
+      return result;
+    }
+    const space = SpaceGoStore.getSpaceById(spaceId);
+    if (!space || space.status !== "published") return { ok: false, error: "Listing not found." };
+    if (space.owner_id === who.data.id) return { ok: false, error: "You can't report your own listing." };
+    const all = getStored<LocalReport[]>(REPORTS_KEY, []);
+    if (all.some((r) => r.space_id === spaceId && r.reporter_id === who.data.id && r.status === "open")) {
+      return { ok: false, error: "You have already reported this listing. SpaceGo is looking into it." };
+    }
+    const report: LocalReport = {
+      id: newLocalId("report"),
+      space_id: spaceId,
+      reporter_id: who.data.id,
+      reason,
+      details: text,
+      status: "open",
+      created_at: new Date().toISOString(),
+    };
+    setStored(REPORTS_KEY, [report, ...all]);
+    notify();
+    return { ok: true, data: report.id };
+  },
+
+  /** Admin: open reports, oldest first. */
+  getOpenReports: async (): Promise<StoreResult<ListingReport[]>> => {
+    if (!remoteMode()) {
+      return {
+        ok: true,
+        data: getStored<LocalReport[]>(REPORTS_KEY, [])
+          .filter((r) => r.status === "open")
+          .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+      };
+    }
+    const rows = await selectRows<ListingReport>(
+      "spacego_listing_reports",
+      "id,space_id,reason,details,status,created_at",
+      { status: "open" },
+      "created_at",
+      100
+    );
+    if (!rows.ok) return reviewsNotInstalled(rows.error) ? { ok: true, data: [] } : rows;
+    return { ok: true, data: [...rows.data].reverse() };
+  },
+
+  /** Admin: close a report with a note. */
+  resolveReport: async (id: string, status: "resolved" | "dismissed", note: string): Promise<StoreResult<null>> => {
+    const text = note.trim();
+    if (text.length < 5) return { ok: false, error: "Add a note of at least 5 characters." };
+    if (remoteMode()) {
+      const result = await callRpc<null>(REMOTE_RPCS.resolveReport, { p_report_id: id, p_status: status, p_note: text });
+      return result.ok ? { ok: true, data: null } : result;
+    }
+    if (viewer?.role !== "admin") return { ok: false, error: "Only SpaceGo admins can resolve reports." };
+    setStored(
+      REPORTS_KEY,
+      getStored<LocalReport[]>(REPORTS_KEY, []).map((r) => (r.id === id ? { ...r, status } : r))
+    );
+    notify();
+    return { ok: true, data: null };
+  },
+
   getSpaceById: (id: string): Space | undefined => {
     return SpaceGoStore.getSpaces().find((s) => s.id === id || s.slug === id);
   },
@@ -640,6 +1205,7 @@ export const SpaceGoStore = {
           is_cover: true,
         },
       ],
+      ...(newSpaceData.documents?.length ? { documents: newSpaceData.documents } : {}),
       owner_id: owner.id,
       owner_name: owner.full_name,
       owner_avatar: owner.avatar_url || "",
@@ -700,6 +1266,81 @@ export const SpaceGoStore = {
     setStored(SPACES_KEY, spaces);
     notify();
     return { ok: true, data: updatedSpace };
+  },
+
+  /** Owner: send a draft (or a listing with requested changes) to SpaceGo for review. */
+  submitForReview: async (id: string): Promise<StoreResult<Space>> => {
+    const current = SpaceGoStore.getSpaces().find((s) => s.id === id);
+    if (!current) return { ok: false, error: "Listing not found." };
+    const state = reviewStateOf(current);
+    if (state === "pending") return { ok: true, data: current };
+    if (state !== "draft" && state !== "changes_requested") {
+      return { ok: false, error: "This listing can't be submitted for review." };
+    }
+
+    if (remoteMode()) {
+      const result = await callRpc<Partial<Space> & { id: string }>(REMOTE_RPCS.submitListingForReview, {
+        p_space_id: id,
+      });
+      if (!result.ok) return result;
+      const saved = normalizeSpace({ ...result.data, id });
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    if (current.images.length === 0) return { ok: false, error: "Add at least one photo before submitting." };
+    const c = current.location.coordinates;
+    if (!c || !isValidLatLng(c.lat, c.lng)) return { ok: false, error: "Set the location on the map before submitting." };
+    return SpaceGoStore.updateSpace(id, {
+      status: "draft",
+      review: { state: "pending", reason: "", submitted_at: new Date().toISOString(), decided_at: current.review?.decided_at ?? "" },
+    });
+  },
+
+  /** Admin: approve, request changes, reject or suspend a listing. */
+  reviewListing: async (
+    id: string,
+    decision: ListingReviewDecision,
+    reason: string
+  ): Promise<StoreResult<Space>> => {
+    const current = SpaceGoStore.getSpaces().find((s) => s.id === id);
+    if (!current) return { ok: false, error: "Listing not found." };
+    const trimmed = reason.trim();
+    if (decision !== "approve" && trimmed.length < 10) {
+      return { ok: false, error: "Give the host a reason (at least 10 characters)." };
+    }
+
+    if (remoteMode()) {
+      const result = await callRpc<Partial<Space> & { id: string }>(REMOTE_RPCS.reviewListing, {
+        p_space_id: id,
+        p_decision: decision,
+        p_reason: trimmed || null,
+      });
+      if (!result.ok) return result;
+      const saved = normalizeSpace({ ...result.data, id });
+      remoteState = { ...remoteState, spaces: upsertById(remoteState.spaces, saved) };
+      notify();
+      return { ok: true, data: saved };
+    }
+
+    const to: ListingReviewState =
+      decision === "approve"
+        ? "approved"
+        : decision === "request_changes"
+          ? "changes_requested"
+          : decision === "reject"
+            ? "rejected"
+            : "suspended";
+    return SpaceGoStore.updateSpace(id, {
+      status: to === "approved" ? "published" : "draft",
+      review: {
+        state: to,
+        reason: trimmed,
+        submitted_at: current.review?.submitted_at ?? "",
+        decided_at: new Date().toISOString(),
+      },
+    });
   },
 
   /**
@@ -814,6 +1455,21 @@ export const SpaceGoStore = {
       notify();
       void refreshNotifications();
       return { ok: true, data: booking };
+    }
+
+    // Mirrors the database rule: one open request per guest, space and time.
+    const start = Date.parse(bookingInput.start_date);
+    const end = Date.parse(bookingInput.end_date);
+    const duplicate = SpaceGoStore.getBookings().some(
+      (b) =>
+        b.user_id === bookingInput.user.id &&
+        b.space_id === bookingInput.space.id &&
+        (b.status === "pending" || b.status === "approved") &&
+        Date.parse(b.start_date) < end &&
+        Date.parse(b.end_date) > start
+    );
+    if (duplicate) {
+      return { ok: false, error: "You already have a request or booking for this space at this time" };
     }
 
     const id = `SPG-${new Date().getFullYear()}-${newLocalId("x").slice(2, 8).toUpperCase()}`;

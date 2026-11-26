@@ -43,6 +43,16 @@ export const REMOTE_RPCS = {
   logDemand: "spacego_log_demand",
   demandAnalytics: "spacego_demand_analytics",
   markNotificationRead: "spacego_mark_notification_read",
+  searchSpaces: "spacego_search_spaces",
+  publicSpacePoint: "spacego_public_space_point",
+  submitReview: "spacego_submit_review",
+  respondToReview: "spacego_respond_to_review",
+  moderateReview: "spacego_moderate_review",
+  reportListing: "spacego_report_listing",
+  resolveReport: "spacego_resolve_report",
+  spaceAddress: "spacego_space_address",
+  submitListingForReview: "spacego_submit_listing_for_review",
+  reviewListing: "spacego_review_listing",
 } as const;
 
 export type RemoteResult<T> =
@@ -65,6 +75,84 @@ function getClient(): Supabase | null {
   if (typeof window === "undefined") return null;
   if (!client) client = createClient();
   return client;
+}
+
+/** Upload to a private Storage bucket; returns the stored path. */
+export async function uploadPrivateFile(
+  bucket: string,
+  path: string,
+  body: Blob,
+  contentType: string
+): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType, upsert: false });
+    if (error) {
+      return {
+        ok: false,
+        error: /row-level security|unauthorized|403/i.test(error.message)
+          ? "Only host accounts can upload documents."
+          : `Upload failed: ${error.message}`,
+      };
+    }
+    return { ok: true, data: path };
+  } catch (error) {
+    return failure(error, `uploading to ${bucket}`);
+  }
+}
+
+/** A short-lived link to a private file the caller may read. */
+export async function createSignedFileUrl(bucket: string, path: string, seconds = 60): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, seconds);
+    if (error || !data?.signedUrl) {
+      return { ok: false, error: "You don't have access to this file, or it no longer exists." };
+    }
+    return { ok: true, data: data.signedUrl };
+  } catch (error) {
+    return failure(error, `signing a ${bucket} link`);
+  }
+}
+
+/** Delete a file the caller owns. */
+export async function removeStorageFile(bucket: string, path: string): Promise<RemoteResult<null>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).remove([path]);
+    if (error) return { ok: false, error: `Could not remove the file: ${error.message}` };
+    return { ok: true, data: null };
+  } catch (error) {
+    return failure(error, `removing from ${bucket}`);
+  }
+}
+
+/** Upload to a public Storage bucket and return the file's public URL. */
+export async function uploadPublicFile(
+  bucket: string,
+  path: string,
+  body: Blob,
+  contentType: string
+): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType, upsert: false });
+    if (error) {
+      return {
+        ok: false,
+        error: /row-level security|unauthorized|403/i.test(error.message)
+          ? "Only host accounts can upload listing photos."
+          : `Upload failed: ${error.message}`,
+      };
+    }
+    return { ok: true, data: supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? `Upload failed: ${error.message}` : "Upload failed." };
+  }
 }
 
 export function isRemoteEnabled(): boolean {
@@ -139,6 +227,32 @@ export async function fetchRows<T>(source: string): Promise<RemoteResult<T[]>> {
         .map((row) => (row as { data: T | null }).data)
         .filter((item): item is T => item !== null && typeof item === "object"),
     };
+  } catch (error) {
+    return failure(error, `reading ${source}`);
+  }
+}
+
+/**
+ * Read plain rows (not `{ id, data }`) with simple equality filters, newest
+ * first when `orderBy` is given. Used for the reviews tables and views.
+ */
+export async function selectRows<T>(
+  source: string,
+  columns: string,
+  filters: Record<string, string>,
+  orderBy?: string,
+  limit = 100
+): Promise<RemoteResult<T[]>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+
+  try {
+    let query = supabase.from(source).select(columns);
+    for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+    if (orderBy) query = query.order(orderBy, { ascending: false });
+    const { data, error } = await query.limit(limit);
+    if (error) return failure(error, `reading ${source}`);
+    return { ok: true, data: (data ?? []) as unknown as T[] };
   } catch (error) {
     return failure(error, `reading ${source}`);
   }

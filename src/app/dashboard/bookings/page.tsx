@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { SpaceGoStore } from "@/lib/data/store";
-import { Booking, BookingStatus } from "@/types";
+import { SpaceGoStore, canReviewBooking } from "@/lib/data/store";
+import { Booking, BookingStatus, OwnReview, SpaceAddress } from "@/types";
 import { BookingStatusBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -15,7 +15,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { PageHeader, FilterTabs } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CalendarCheck, MapPin, KeyRound, ExternalLink, Info } from "lucide-react";
+import { CalendarCheck, MapPin, KeyRound, ExternalLink, Info, Navigation, Star } from "lucide-react";
+import { Textarea } from "@/components/ui/Input";
 
 type FilterTab = "all" | BookingStatus;
 
@@ -43,6 +44,23 @@ export default function SeekerBookingsPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
+  const [addressBooking, setAddressBooking] = useState<Booking | null>(null);
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  // Fixed for the life of the page, so rendering stays pure.
+  const [now] = useState(() => Date.now());
+  const [ownReviews, setOwnReviews] = useState<OwnReview[]>([]);
+  const [reviewsVersion, setReviewsVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) return;
+    SpaceGoStore.getOwnReviews().then((result) => {
+      if (!cancelled && result.ok) setOwnReviews(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, dataVersion, reviewsVersion]);
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
@@ -91,7 +109,33 @@ export default function SeekerBookingsPage() {
         </Button>
       )}
 
-      {b.status !== "cancelled" && b.status !== "completed" && (
+      {canReviewBooking(b, now) &&
+        (() => {
+          const own = ownReviews.find((r) => r.booking_id === b.id);
+          if (own) {
+            return (
+              <span className="inline-flex items-center gap-1 text-sm text-ink-muted" title={own.moderation_reason ?? undefined}>
+                <Star className="h-4 w-4" aria-hidden="true" />
+                {own.status === "hidden" ? "Review hidden by SpaceGo" : `You rated it ${own.rating} of 5`}
+              </span>
+            );
+          }
+          return (
+            <Button variant="outline" size="sm" onClick={() => setReviewBooking(b)}>
+              <Star className="h-4 w-4" aria-hidden="true" />
+              Write a review
+            </Button>
+          );
+        })()}
+
+      {(b.status === "approved" || b.status === "completed") && (
+        <Button variant="outline" size="sm" onClick={() => setAddressBooking(b)}>
+          <Navigation className="h-4 w-4" aria-hidden="true" />
+          Address
+        </Button>
+      )}
+
+      {b.status !== "cancelled" && b.status !== "completed" && !(Date.parse(b.start_date) <= now) && (
         <Button
           variant="ghost"
           size="sm"
@@ -280,6 +324,27 @@ export default function SeekerBookingsPage() {
         </Modal>
       )}
 
+      {reviewBooking && (
+        <WriteReviewModal
+          booking={reviewBooking}
+          onClose={() => setReviewBooking(null)}
+          onDone={() => {
+            setReviewBooking(null);
+            setReviewsVersion((v) => v + 1);
+            success("Review posted", "Thanks. It's now on the listing page.");
+          }}
+          onError={(message) => error("Could not post your review", message)}
+        />
+      )}
+
+      {addressBooking && (
+        <BookingAddressModal
+          booking={addressBooking}
+          userId={user?.id ?? null}
+          onClose={() => setAddressBooking(null)}
+        />
+      )}
+
       {/* Cancellation confirmation */}
       {selectedBooking && isCancelConfirmOpen && (
         <Modal
@@ -311,5 +376,190 @@ export default function SeekerBookingsPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Street address of a confirmed booking, fetched on demand from the database. */
+function BookingAddressModal({
+  booking,
+  userId,
+  onClose,
+}: {
+  booking: Booking;
+  userId: string | null;
+  onClose: () => void;
+}) {
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "ready"; address: SpaceAddress | null } | { status: "error"; message: string }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    SpaceGoStore.getSpaceAddress(booking.space_id, userId).then((result) => {
+      if (cancelled) return;
+      setState(result.ok ? { status: "ready", address: result.data } : { status: "error", message: result.error });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking.space_id, userId]);
+
+  const address = state.status === "ready" ? state.address : null;
+  const mapHref =
+    address && address.lat !== null && address.lng !== null
+      ? `https://www.openstreetmap.org/?mlat=${address.lat.toFixed(6)}&mlon=${address.lng.toFixed(6)}#map=18/${address.lat.toFixed(6)}/${address.lng.toFixed(6)}`
+      : null;
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Address"
+      description={`${booking.space_title} · ${formatDate(booking.start_date)}`}
+      maxWidth="sm"
+    >
+      <div className="space-y-5" aria-live="polite">
+        {state.status === "loading" && (
+          <div className="space-y-2" aria-hidden="true">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        )}
+        {state.status === "error" && (
+          <p className="text-sm text-danger">Could not load the address. {state.message}</p>
+        )}
+        {state.status === "ready" && !address && (
+          <p className="text-sm text-ink-muted">
+            The address isn&apos;t available for this booking. It is shared once the host confirms a booking.
+          </p>
+        )}
+        {address && (
+          <div className="rounded-lg border border-line bg-surface-muted p-4">
+            <p className="text-base font-medium text-ink">{address.address || "Street address not provided"}</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              {[address.city, address.postal_code, address.country].filter(Boolean).join(", ")}
+            </p>
+            {address.landmark && <p className="mt-2 text-sm text-ink-muted">Landmark: {address.landmark}</p>}
+          </div>
+        )}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={onClose}>
+            Done
+          </Button>
+          {mapHref && (
+            <a href={mapHref} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: "primary" })}>
+              Open in map
+              <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            </a>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Guest: rate and review a confirmed booking that has ended. */
+function WriteReviewModal({
+  booking,
+  onClose,
+  onDone,
+  onError,
+}: {
+  booking: Booking;
+  onClose: () => void;
+  onDone: () => void;
+  onError: (message: string) => void;
+}) {
+  const [rating, setRating] = useState(0);
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState("");
+  const length = body.trim().length;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (rating < 1) {
+      setFormError("Choose a rating.");
+      return;
+    }
+    if (length < 20) {
+      setFormError("Write at least 20 characters about your visit.");
+      return;
+    }
+    setFormError("");
+    setBusy(true);
+    const result = await SpaceGoStore.submitReview(booking.id, rating, body);
+    setBusy(false);
+    if (!result.ok) {
+      onError(result.error);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Write a review"
+      description={`${booking.space_title} · ${formatDate(booking.start_date)}. Your first name, rating and review are shown on the listing.`}
+      maxWidth="md"
+    >
+      <form className="space-y-5" onSubmit={submit} noValidate>
+        <fieldset>
+          <legend className="text-sm font-medium text-ink">Your rating</legend>
+          <div className="mt-2 flex gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <label key={n} className="cursor-pointer rounded-md p-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring">
+                <input
+                  type="radio"
+                  name="review-rating"
+                  value={n}
+                  checked={rating === n}
+                  onChange={() => {
+                    setRating(n);
+                    setFormError("");
+                  }}
+                  className="sr-only"
+                />
+                <span className="sr-only">{n} {n === 1 ? "star" : "stars"}</span>
+                <Star
+                  aria-hidden="true"
+                  className={`h-8 w-8 transition-colors ${n <= rating ? "fill-current text-accent" : "text-line-strong hover:text-ink-subtle"}`}
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <Textarea
+          label="Your review"
+          rows={5}
+          maxLength={2000}
+          placeholder="What was the space like to work in? Wi-Fi, noise, comfort, the host…"
+          helperText={`${length} of 2000 characters (at least 20).`}
+          value={body}
+          onChange={(e) => {
+            setBody(e.target.value);
+            setFormError("");
+          }}
+        />
+
+        {formError && (
+          <p role="alert" className="text-sm font-medium text-danger">
+            {formError}
+          </p>
+        )}
+
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" isLoading={busy}>
+            Post review
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -20,6 +20,7 @@ import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { NotificationItem, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
+import { Logo as BrandLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -30,14 +31,8 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 rounded-md" aria-label="SpaceGo home">
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-ink"
-      >
-        <Building2 className="h-4.5 w-4.5" />
-      </span>
-      <span className="text-lg font-semibold tracking-tight text-ink">SpaceGo</span>
+    <Link href="/" className="flex items-center rounded-md" aria-label="SpaceGo home">
+      <BrandLogo size="md" />
     </Link>
   );
 }
@@ -107,6 +102,7 @@ export function Navbar() {
   };
 
   const navLinks = [
+    { href: "/discover", label: "Near me", active: pathname.startsWith("/discover") },
     { href: "/spaces", label: "Find a space", active: pathname.startsWith("/spaces") },
     { href: "/#how-it-works", label: "How it works", active: false },
     { href: "/activation", label: "For property owners", active: pathname.startsWith("/activation") },
@@ -121,14 +117,14 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between gap-4">
           <Logo />
 
-          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 aria-current={link.active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                  "flex h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors",
                   link.active ? "text-ink" : "text-ink-muted hover:bg-surface-muted hover:text-ink"
                 )}
               >
@@ -299,7 +295,7 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-11 w-11 items-center justify-center rounded-md text-ink hover:bg-surface-muted md:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-md text-ink hover:bg-surface-muted lg:hidden"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
@@ -311,7 +307,7 @@ export function Navbar() {
       </div>
 
       {mobileMenuOpen && (
-        <div id="mobile-menu" className="border-t border-line bg-surface md:hidden">
+        <div id="mobile-menu" className="border-t border-line bg-surface lg:hidden">
           <nav aria-label="Mobile" className="mx-auto max-w-7xl space-y-1 px-4 py-3 sm:px-6">
             {navLinks.map((link) => (
               <Link

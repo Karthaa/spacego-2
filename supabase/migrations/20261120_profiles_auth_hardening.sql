@@ -50,12 +50,17 @@ SET search_path = ''
 AS $$
 DECLARE
   requested_role text;
+  -- %TYPE follows the column, so this works whether profiles.role is TEXT
+  -- (20261108_init.sql) or a user_role enum (older projects such as staging).
+  -- PL/pgSQL assignment converts the validated text value to that type.
+  profile_role public.profiles.role%TYPE;
   display_name text;
 BEGIN
   requested_role := COALESCE(NEW.raw_user_meta_data ->> 'role', 'seeker');
   IF requested_role NOT IN ('seeker', 'owner') THEN
     requested_role := 'seeker';
   END IF;
+  profile_role := requested_role;
 
   display_name := NULLIF(btrim(COALESCE(NEW.raw_user_meta_data ->> 'full_name', '')), '');
   IF display_name IS NULL THEN
@@ -74,7 +79,7 @@ BEGIN
     NEW.id,
     COALESCE(NEW.email, ''),
     display_name,
-    requested_role,
+    profile_role,
     NULLIF(btrim(COALESCE(NEW.raw_user_meta_data ->> 'phone', '')), ''),
     NULLIF(btrim(COALESCE(NEW.raw_user_meta_data ->> 'company_name', '')), '')
   )
@@ -95,24 +100,40 @@ REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
 
 -- 3. Backfill profiles for auth users that predate the trigger --------------
 -- Idempotent: only inserts rows that are missing. Existing profiles, including
--- their roles, are never modified.
-INSERT INTO public.profiles (id, email, full_name, role)
-SELECT
-  u.id,
-  COALESCE(u.email, ''),
-  COALESCE(
-    NULLIF(btrim(COALESCE(u.raw_user_meta_data ->> 'full_name', '')), ''),
-    split_part(COALESCE(u.email, 'SpaceGo user'), '@', 1)
-  ),
-  CASE
-    WHEN u.raw_user_meta_data ->> 'role' IN ('seeker', 'owner')
-      THEN u.raw_user_meta_data ->> 'role'
-    ELSE 'seeker'
-  END
-FROM auth.users u
-LEFT JOIN public.profiles p ON p.id = u.id
-WHERE p.id IS NULL
-ON CONFLICT (id) DO NOTHING;
+-- their roles, are never modified. Written as a loop with a %TYPE variable so
+-- it works whether profiles.role is TEXT or an enum (a plain INSERT ... SELECT
+-- of a text expression into an enum column is rejected by Postgres).
+DO $backfill$
+DECLARE
+  u record;
+  profile_role public.profiles.role%TYPE;
+BEGIN
+  FOR u IN
+    SELECT au.id, au.email, au.raw_user_meta_data
+    FROM auth.users au
+    LEFT JOIN public.profiles p ON p.id = au.id
+    WHERE p.id IS NULL
+  LOOP
+    profile_role := CASE
+      WHEN u.raw_user_meta_data ->> 'role' IN ('seeker', 'owner')
+        THEN u.raw_user_meta_data ->> 'role'
+      ELSE 'seeker'
+    END;
+
+    INSERT INTO public.profiles (id, email, full_name, role)
+    VALUES (
+      u.id,
+      COALESCE(u.email, ''),
+      COALESCE(
+        NULLIF(btrim(COALESCE(u.raw_user_meta_data ->> 'full_name', '')), ''),
+        split_part(COALESCE(u.email, 'SpaceGo user'), '@', 1)
+      ),
+      profile_role
+    )
+    ON CONFLICT (id) DO NOTHING;
+  END LOOP;
+END
+$backfill$;
 
 -- 4. Keep updated_at accurate ----------------------------------------------
 CREATE OR REPLACE FUNCTION public.set_profiles_updated_at()
@@ -158,6 +179,11 @@ END $$;
 DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins full profile access" ON public.profiles;
+-- Policy names used by older project templates (e.g. staging). The first one
+-- let every signed-in user read every profile, including emails.
+DROP POLICY IF EXISTS "Public profiles are readable by authenticated users" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins have full access to profiles" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_select_own_or_admin" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 

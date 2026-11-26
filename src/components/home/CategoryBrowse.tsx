@@ -28,7 +28,7 @@ export function CategoryBrowse() {
             <li key={category.id}>
               <Link
                 href={`/spaces?category=${category.id}`}
-                className="flex h-full items-start gap-4 rounded-lg border border-line bg-surface p-5 transition-colors hover:border-line-strong hover:bg-surface-muted"
+                className="flex h-full items-start gap-4 rounded-lg border border-line bg-surface p-5 transition-colors duration-150 hover:border-line-strong hover:bg-surface-muted"
               >
                 <span
                   aria-hidden="true"

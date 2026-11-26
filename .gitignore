@@ -48,3 +48,9 @@ wrangler.jsonc
 .dev.vars*
 !.dev.vars.example
 **/.orun/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

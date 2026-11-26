@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+    <main id="main" className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex justify-center">
           <Logo />
@@ -83,6 +83,7 @@ export default function ResetPasswordPage() {
           </Card>
         ) : isLoading ? (
           <Card elevation="raised" padding="lg" className="mt-8">
+            <h1 className="sr-only">Choose a new password</h1>
             <p role="status" className="py-6 text-center text-base text-ink-muted">
               Checking your reset link…
             </p>

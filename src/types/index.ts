@@ -32,6 +32,25 @@ export interface SpaceLocation {
     lng: number;
   };
   landmark?: string;
+  /**
+   * "exact": the host shows the street address before booking.
+   * "approximate" (default): only the area is public; the street address is
+   * shared with a guest once their booking is confirmed.
+   */
+  address_visibility?: AddressVisibility;
+}
+
+export type AddressVisibility = "exact" | "approximate";
+
+/** Street address and exact pin, for the owner, admins and confirmed guests. */
+export interface SpaceAddress {
+  address: string;
+  landmark: string;
+  postal_code: string;
+  city: string;
+  country: string;
+  lat: number | null;
+  lng: number | null;
 }
 
 export interface SpacePricing {
@@ -88,11 +107,32 @@ export interface Space {
   owner_avatar: string;
   owner_email?: string;
   status: "published" | "draft" | "under_review" | "archived";
+  /** Private verification documents (host and admins only; never public). */
+  documents?: ListingDocument[];
+  /** SpaceGo listing review. Owners see their own; never in the public view. */
+  review?: ListingReview;
   rating: number;
   review_count: number;
   instant_book: boolean;
   created_at: string;
 }
+
+export type ListingReviewState =
+  | "draft"
+  | "pending"
+  | "approved"
+  | "changes_requested"
+  | "rejected"
+  | "suspended";
+
+export interface ListingReview {
+  state: ListingReviewState;
+  reason?: string;
+  submitted_at?: string;
+  decided_at?: string;
+}
+
+export type ListingReviewDecision = "approve" | "request_changes" | "reject" | "suspend";
 
 export type BookingStatus =
   | "pending"
@@ -219,4 +259,56 @@ export interface BlockedSlot {
   start_date: string;
   end_date: string;
   reason: string;
+}
+
+/** A guest review, from a booking that was confirmed and has ended. */
+export interface SpaceReview {
+  id: string;
+  space_id: string;
+  /** First name only. */
+  author_name: string;
+  rating: number;
+  body: string;
+  host_response: string | null;
+  host_responded_at: string | null;
+  created_at: string;
+}
+
+export interface SpaceReviewSummary {
+  review_count: number;
+  average_rating: number | null;
+}
+
+/** The author's own view of a review they wrote (includes moderation state). */
+export interface OwnReview {
+  id: string;
+  booking_id: string;
+  space_id: string;
+  rating: number;
+  status: "published" | "hidden";
+  moderation_reason: string | null;
+}
+
+export type ReportReason = "not_real" | "wrong_info" | "unsafe" | "scam" | "offensive" | "other";
+
+/** A report about a listing (reporters see their own; admins see all). */
+export interface ListingReport {
+  id: string;
+  space_id: string;
+  reason: ReportReason;
+  details: string;
+  status: "open" | "resolved" | "dismissed";
+  created_at: string;
+}
+
+export type ListingDocumentKind = "ownership" | "authority" | "business_registration" | "address_proof" | "other";
+
+/** A private verification document in the listing-documents bucket. */
+export interface ListingDocument {
+  /** Storage path: "<host uid>/<random>.<ext>". */
+  path: string;
+  kind: ListingDocumentKind;
+  /** The file name the host chose, for display. */
+  name: string;
+  uploaded_at: string;
 }
