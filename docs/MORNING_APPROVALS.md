@@ -45,13 +45,18 @@ Run each file in the Supabase SQL editor, in this order. **Check that the top ba
 SpaceGo-Staging first.** Each file is forward-only. None of them deletes or rewrites rows.
 If a file fails, nothing in it is applied.
 
-| Order | File | What it does | Check |
+| Order | File (`supabase/migrations/`) | What it does | Check |
 |---|---|---|---|
 | 0 | (already applied by you) `20261120`, `20261121` | Auth and RLS hardening | Run the section 15 queries at the end of `20261121` |
-| 1 | `supabase/migrations/20261126_spacego_geo_search.sql` | Enables PostGIS in `extensions`, adds the location search | Run `supabase/tests/geo_search_test.sql` |
-| 2 | `supabase/migrations/20261127_spacego_listing_review.sql` | Listing review and audit | Run `supabase/tests/listing_review_test.sql` |
-| 3 | `supabase/migrations/20261128_spacego_listing_photos.sql` | `listing-photos` bucket and upload rules | In Storage, the bucket exists |
-| 4 | `supabase/migrations/20261129_spacego_address_privacy.sql` | Hides street addresses until a booking is confirmed | Run `supabase/tests/address_privacy_test.sql` |
+| 1 | `20261126_spacego_geo_search.sql` | Enables PostGIS in `extensions`, adds the location search | Run `supabase/tests/geo_search_test.sql` |
+| 2 | `20261127_spacego_listing_review.sql` | Listing review and audit | Run `supabase/tests/listing_review_test.sql` |
+| 3 | `20261128_spacego_listing_photos.sql` | `listing-photos` bucket and upload rules | In Storage, the bucket exists and is public |
+| 4 | `20261129_spacego_address_privacy.sql` | Hides street addresses until a booking is confirmed | Run `supabase/tests/address_privacy_test.sql` |
+| 5 | `20261130_spacego_verification_checks.sql` | A badge needs recorded, dated checks; changes are audited | Run `supabase/tests/verification_checks_test.sql` |
+| 6 | `20261201_spacego_reviews.sql` | Reviews after a confirmed stay, host responses, moderation | Run `supabase/tests/reviews_test.sql` |
+| 7 | `20261202_spacego_booking_integrity.sql` | No duplicate requests; booking status history | Run `supabase/tests/booking_integrity_test.sql` |
+| 8 | `20261203_spacego_listing_reports.sql` | Report a listing; admins resolve | Run `supabase/tests/listing_reports_test.sql` |
+| 9 | `20261204_spacego_listing_documents.sql` | Private `listing-documents` bucket | In Storage, the bucket exists and is **not** public |
 
 Each test file runs in a single transaction and is rolled back at the end. It
 prints `... all checks passed` or stops with the failing check.
@@ -64,6 +69,10 @@ What changes for existing data:
   New listings and edits to key facts go through admin review.
 - **After step 4:** every existing listing hides its street address publicly until
   its host picks "Everyone" in the listing form, which sends it to review.
+- **After step 5:** listings that already show a badge keep it. The next time an admin
+  edits their badge or checks, the admin has to record at least one dated check.
+- **After step 7:** if staging already has two overlapping pending or confirmed
+  bookings by the same guest for the same space, they stay. Only new ones are refused.
 - **Not covered by these migrations:** the staging demo spaces keep whatever coordinates they have.
   Listings without a valid pin don't appear in location search.
 
@@ -75,6 +84,6 @@ Still to do after that (from 25 Nov):
 
 ## 5. Production (`hxsstsfsqlzqhtfizbcq`): only after staging works, and only if you say so
 
-Apply the same files in the same order: `20261120`, `20261121`, `20261126`,
-`20261127`, `20261128`, then `20261129`. Then run the three test files. Nothing
+Apply the same files in the same order: `20261120`, `20261121`, then `20261126`
+through `20261204`. Then run the seven test files and check both buckets. Nothing
 has been applied to production by me.
