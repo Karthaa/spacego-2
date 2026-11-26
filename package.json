@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:unit": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test \"tests/unit/*.test.mjs\"",
     "test:e2e": "playwright test",
     "build:worker": "npm run wire:fixture && npm run build && opennextjs-cloudflare build --skipBuild",
     "preview:worker": "npm run wire:fixture && opennextjs-cloudflare preview",

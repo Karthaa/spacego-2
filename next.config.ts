@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   // OpenNext bundles Next's standalone output into the Worker.
@@ -20,6 +21,12 @@ const nextConfig: NextConfig = {
         hostname: "**.supabase.co",
       },
     ],
+  },
+  // Security headers for every route (see src/lib/security-headers.ts).
+  // Evaluated at build time, so CSP_MODE and the NEXT_PUBLIC_* values come
+  // from the build environment.
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders(process.env) }];
   },
 };
 
