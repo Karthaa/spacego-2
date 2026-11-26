@@ -1,0 +1,28 @@
+// Security checks against the LOCAL backend (run after seed.mjs).
+import { createClient } from "@supabase/supabase-js";
+import fs from "node:fs";
+const STATE = process.env.STATE || "/tmp/spacego-local";
+const URL = "http://127.0.0.1:54321", ANON = fs.readFileSync(`${STATE}/anon_key`, "utf8");
+const creds = Object.fromEntries(fs.readFileSync(`${STATE}/creds`, "utf8").trim().split("\n").map((l) => l.split(":")));
+const login = async (who) => { const c = createClient(URL, ANON, { auth: { persistSession: false } }); const r = await c.auth.signInWithPassword({ email: `${who}@spacego.test`, password: creds[who] }); return { c, id: r.data.user.id }; };
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+const owner = await login("owner"), seeker = await login("seeker");
+const out = [];
+const name = `${owner.id}/photo_${Date.now().toString(36)}abcd.png`;
+let r = await owner.c.storage.from("listing-photos").upload(name, png, { contentType: "image/png" });
+out.push(`owner upload own folder: ${r.error ? "FAIL " + r.error.message : "ok"}`);
+r = await owner.c.storage.from("listing-photos").upload(`${seeker.id}/photo_xxxxxxxxxx.png`, png, { contentType: "image/png" });
+out.push(`owner upload into other folder: ${r.error ? "BLOCKED" : "ALLOWED (bad)"}`);
+r = await seeker.c.storage.from("listing-photos").upload(`${seeker.id}/photo_yyyyyyyyyy.png`, png, { contentType: "image/png" });
+out.push(`seeker upload: ${r.error ? "BLOCKED" : "ALLOWED (bad)"}`);
+const anon = createClient(URL, ANON, { auth: { persistSession: false } });
+r = await anon.storage.from("listing-photos").upload(`x/photo_zzzzzzzzzz.png`, png, { contentType: "image/png" });
+out.push(`anon upload: ${r.error ? "BLOCKED" : "ALLOWED (bad)"}`);
+r = await owner.c.storage.from("listing-photos").upload(`${owner.id}/doc_aaaaaaaaaa.pdf`, Buffer.from("%PDF-1.4"), { contentType: "application/pdf" });
+out.push(`owner upload pdf: ${r.error ? "BLOCKED" : "ALLOWED (bad)"}`);
+const pub = anon.storage.from("listing-photos").getPublicUrl(name).data.publicUrl;
+const res = await fetch(pub);
+out.push(`public URL readable: ${res.status} ${res.headers.get("content-type")} (${pub.replace(/[0-9a-f-]{36}/, "<uid>")})`);
+r = await anon.storage.from("listing-photos").list(owner.id);
+out.push(`anon can list owner's folder: ${r.data?.length ? "YES (bad)" : "no"}`);
+console.log(out.join("\n"));
