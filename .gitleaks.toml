@@ -1,0 +1,9 @@
+# gitleaks settings for .github/workflows/ci.yml: the default rules, plus the
+# values below that are public on purpose. Add to this list only values that
+# are safe to publish; anything secret must be removed and rotated instead.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Supabase publishable keys: public browser keys by design, protected by RLS (intent.yaml)"
+regexes = ['''sb_publishable_[A-Za-z0-9_-]+''']
