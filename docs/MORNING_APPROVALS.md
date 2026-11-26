@@ -2,9 +2,10 @@
 
 These are the things that were waiting on you, in order. Each step is safe to stop after.
 
-**Status, 26 Nov, 11:30 IST:** steps 1 to 3 are done, and the production part of
-step 5 is done for `20261120`/`20261121` only. What's left is step 4 (the nine new
-migrations on staging) and an admin account on production.
+**Status, 26 Nov, 13:00 IST:** steps 1 to 5 are done. The nine new migrations were
+applied to staging and then production, each as one transaction, and all seven test
+files passed on both. What's left: merge PR #11 (which deploys staging, then
+production) and create an admin account on each project.
 
 - Step 1: token revoked.
 - Step 2: branch pushed; draft PR #11.
