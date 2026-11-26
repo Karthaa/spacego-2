@@ -31,6 +31,7 @@ import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { capacityLabel, categoryNoun } from "@/lib/categories";
+import { bookingPrice, isWholeVenue } from "@/lib/pricing";
 import { Booking, Space } from "@/types";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
@@ -485,17 +486,21 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
 
   const unitRate = space.pricing[durationType] ?? 0;
-  const perSeat = durationType !== "monthly";
+  // Same rule as the database: halls and event venues are hired whole.
+  const wholeVenue = isWholeVenue(space.category);
   // What a "seat" is for this type, in the price breakdown.
   const seatNoun = (n: number) =>
     space.category === "parking"
       ? n === 1 ? "vehicle" : "vehicles"
-      : space.category === "auditorium"
+      : wholeVenue
         ? n === 1 ? "guest" : "guests"
         : n === 1 ? "person" : "people";
-  const baseCost = unitRate * durationUnits * (perSeat ? seats : 1);
-  const serviceFee = Math.round(baseCost * 0.1);
-  const total = baseCost + serviceFee;
+  const {
+    base: baseCost,
+    fee: serviceFee,
+    total,
+    perSeat,
+  } = bookingPrice(space.category, durationType, unitRate, durationUnits, seats);
   const currency = space.pricing.currency;
   const label = DURATION_LABEL[durationType];
 
@@ -565,7 +570,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
         <h2 id="booking-heading" className="sr-only">Book this space</h2>
         <p className="text-ink">
           <span className="text-2xl font-semibold">{formatCurrency(unitRate, currency)}</span>
-          <span className="text-base text-ink-muted"> / {label.unit}{perSeat ? ` per ${seatNoun(1)}` : ""}</span>
+          <span className="text-base text-ink-muted"> / {label.unit}{wholeVenue ? ", whole venue" : perSeat ? ` per ${seatNoun(1)}` : ""}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
@@ -604,7 +609,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
               onChange={(e) => setDurationUnits(Math.min(label.max, Math.max(1, Number(e.target.value) || 1)))}
             />
             <Input
-              label={space.category === "parking" ? "Vehicles" : space.category === "auditorium" ? "Guests" : "People"}
+              label={space.category === "parking" ? "Vehicles" : wholeVenue ? "Guests" : "People"}
               type="number"
               inputMode="numeric"
               min={1}
@@ -627,7 +632,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
             <div className="flex justify-between gap-4 text-ink-muted">
               <dt>
                 {formatCurrency(unitRate, currency)} &times; {durationUnits} {durationUnits === 1 ? label.unit : label.units}
-                {perSeat && <> &times; {seats} {seatNoun(seats)}</>}
+                {wholeVenue ? ", whole venue" : perSeat && <> &times; {seats} {seatNoun(seats)}</>}
               </dt>
               <dd className="text-ink">{formatCurrency(baseCost, currency)}</dd>
             </div>

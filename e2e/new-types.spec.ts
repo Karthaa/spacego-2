@@ -72,3 +72,26 @@ test("footer links to the new types, and the local build has no test-site banner
   await expect(page.getByText("Demo site with sample listings")).toHaveCount(0);
   await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
 });
+
+// Prices match the database rule (spacego_create_booking): halls and event
+// venues are hired whole; parking is per vehicle; desks are per person.
+function totalRow(page: import("@playwright/test").Page) {
+  return page.locator("dl div", { hasText: "Estimated total" }).locator("dd");
+}
+
+test("a hall is priced for the whole venue, whatever the guest count", async ({ page }) => {
+  await page.goto("/spaces/demo-kochi-10"); // Ernakulam Town Hall: 25,000 a day
+  await expect(page.getByText("/ day, whole venue").first()).toBeVisible();
+  await page.getByRole("spinbutton", { name: "Guests" }).fill("200");
+  await expect(page.getByText(/× 1 day, whole venue/)).toBeVisible();
+  await expect(totalRow(page)).toHaveText("₹27,500"); // 25,000 + 10% fee, not x 200
+});
+
+test("parking is priced per vehicle", async ({ page }) => {
+  await page.goto("/spaces/demo-kochi-9"); // Vyttila Mobility Hub parking: 20 an hour
+  await page.getByLabel("Booking length").selectOption("hourly");
+  await page.getByRole("spinbutton", { name: "Hours" }).fill("3");
+  await page.getByRole("spinbutton", { name: "Vehicles" }).fill("2");
+  await expect(page.getByText(/× 3 hours × 2 vehicles/)).toBeVisible();
+  await expect(totalRow(page)).toHaveText("₹132"); // 20 x 3 x 2 = 120, + 12 fee
+});

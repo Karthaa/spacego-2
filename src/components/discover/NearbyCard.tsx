@@ -6,6 +6,7 @@ import { Navigation, Users, X, Zap } from "lucide-react";
 import type { NearbySpace } from "@/lib/data/store";
 import { formatDistance } from "@/lib/geo";
 import { capacityUnit, categoryNoun } from "@/lib/categories";
+import { isWholeVenue } from "@/lib/pricing";
 import { cn, formatCurrency } from "@/lib/utils";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { headlinePrice } from "@/components/common/SpaceCard";
@@ -123,7 +124,7 @@ export const NearbyCard = forwardRef<HTMLElement, NearbyCardProps>(function Near
           {price ? (
             <>
               <span className="font-semibold tabular-nums">{formatCurrency(price.amount, space.pricing.currency)}</span>
-              <span className="text-ink-muted"> / {price.unit}</span>
+              <span className="text-ink-muted"> / {price.unit}{isWholeVenue(space.category) ? ", whole venue" : ""}</span>
             </>
           ) : (
             <span className="text-ink-muted">Price on request</span>

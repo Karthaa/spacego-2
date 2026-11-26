@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
 import { capacityUnit, categoryNoun } from "@/lib/categories";
+import { isWholeVenue } from "@/lib/pricing";
 import { SafeImage } from "@/components/ui/SafeImage";
 
 const FALLBACK_IMAGE =
@@ -204,7 +205,7 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
             {price ? (
               <>
                 <span className="font-semibold tabular-nums">{formatCurrency(price.amount, space.pricing.currency)}</span>
-                <span className="text-sm text-ink-muted"> / {price.unit}</span>
+                <span className="text-sm text-ink-muted"> / {price.unit}{isWholeVenue(space.category) ? ", whole venue" : ""}</span>
               </>
             ) : (
               <span className="text-ink-muted">Price on request</span>
