@@ -74,7 +74,7 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   await page.waitForTimeout(500);
   check("pin required message", (await page.getByText("Place the pin on your building").count()) > 0);
   check("photo required message", (await page.getByText("Add at least one photo of the space.").count()) > 0);
-  await page.locator('input[type="file"]').setInputFiles(`${STATE}/test.png`);
+  await page.locator('input[type="file"][multiple]').setInputFiles(`${STATE}/test.png`);
   await page.waitForSelector('img[alt="Photo 1"]', { timeout: 15000 });
   const src = await page.locator('img[alt="Photo 1"]').getAttribute("src");
   check("photo uploaded to storage", /\/storage\/v1\/object\/public\/listing-photos\//.test(src ?? ""), (src ?? "").replace(/[0-9a-f-]{36}/, "<uid>"));
@@ -329,6 +329,45 @@ const shot = (page, name) => page.screenshot({ path: `${SHOTS}/remote-${name}.pn
   await ad.page.waitForTimeout(800);
   check("report resolved and cleared", (await heading()) === "Reported listings (0)", await heading());
   await ad.ctx.close();
+}
+
+// 9. Private documents: host uploads; only admins (and the host) can open them.
+{
+  if (!fs.existsSync(`${STATE}/lease.pdf`)) {
+    fs.writeFileSync(`${STATE}/lease.pdf`, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+  }
+  const o = await newPage();
+  await login(o.page, "owner");
+  await o.page.goto(base + "/owner/spaces/local-test-4/edit", { waitUntil: "networkidle" });
+  await o.page.waitForTimeout(1000);
+  await o.page.getByLabel("Type of document").selectOption("authority");
+  await o.page.locator('input[type="file"][accept^="application/pdf"]').setInputFiles(`${STATE}/lease.pdf`);
+  await o.page.getByText("lease.pdf uploaded").waitFor({ timeout: 10000 }).catch(() => {});
+  check("host uploads a private document", (await o.page.getByText("lease.pdf uploaded. Only you and the SpaceGo team can open it.").count()) === 1);
+  await shot(o.page, "owner-documents");
+  await o.page.getByRole("button", { name: "Save changes" }).click();
+  await o.page.waitForURL((u) => !u.pathname.endsWith("/edit"), { timeout: 10000 }).catch(() => {});
+  await o.ctx.close();
+
+  const { ctx, page } = await newPage();
+  await login(page, "admin");
+  await page.goto(base + "/admin/spaces", { waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  const card = page.locator('section[aria-labelledby="queue-heading"] li', { hasText: "Vyttila Hub Coworking" });
+  check("admin sees the document on the queued listing", (await card.getByText("Lease or letter of permission").count()) === 1);
+  const [popup] = await Promise.all([
+    page.waitForEvent("popup", { timeout: 10000 }),
+    card.getByRole("button", { name: "Open lease.pdf" }).click(),
+  ]);
+  await popup.waitForURL(/\/storage\/v1\/object\/sign\/listing-documents\//, { timeout: 10000 }).catch(() => {});
+  const signed = popup.url();
+  check("admin opens it through a signed link", /\/storage\/v1\/object\/sign\/listing-documents\/.+token=/.test(signed), signed.replace(/token=[^&]+/, "token=<redacted>").replace(/[0-9a-f-]{36}/, "<uid>"));
+  const res = await fetch(signed.replace("localhost", "127.0.0.1"));
+  check("signed link serves the file", res.status === 200, String(res.status));
+  const unsigned = signed.replace("/object/sign/", "/object/public/").replace(/\?.*$/, "");
+  const pub = await fetch(unsigned.replace("localhost", "127.0.0.1"));
+  check("no public URL for documents", pub.status !== 200, String(pub.status));
+  await ctx.close();
 }
 console.log(results.join("\n"));
 if (results.some((r) => !r.startsWith("PASS"))) process.exitCode = 1;

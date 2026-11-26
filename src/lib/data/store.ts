@@ -21,6 +21,8 @@ import {
   OwnReview,
   ListingReport,
   ReportReason,
+  ListingDocument,
+  ListingDocumentKind,
 } from "@/types";
 import {
   INITIAL_SPACES,
@@ -465,6 +467,7 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
     owner_email: optionalString(raw.owner_email),
     status: raw.status ?? "published",
     review: normalizeReview(raw.review),
+    ...(Array.isArray(raw.documents) ? { documents: normalizeDocuments(raw.documents) } : {}),
     rating: numberOr(Number(raw.rating), 0),
     review_count: numberOr(Number(raw.review_count), 0),
     instant_book: Boolean(raw.instant_book),
@@ -585,6 +588,20 @@ const REPORTS_KEY = "spacego_listing_reports";
 
 interface LocalReport extends ListingReport {
   reporter_id: string;
+}
+
+const DOCUMENT_KINDS: readonly ListingDocumentKind[] = ["ownership", "authority", "business_registration", "address_proof", "other"];
+
+function normalizeDocuments(raw: unknown[]): ListingDocument[] {
+  return raw
+    .filter((d): d is Record<string, unknown> => Boolean(d) && typeof d === "object")
+    .filter((d) => typeof d.path === "string" && d.path.length > 0)
+    .map((d) => ({
+      path: String(d.path),
+      kind: DOCUMENT_KINDS.includes(d.kind as ListingDocumentKind) ? (d.kind as ListingDocumentKind) : "other",
+      name: typeof d.name === "string" ? d.name.slice(0, 200) : "Document",
+      uploaded_at: typeof d.uploaded_at === "string" ? d.uploaded_at : "",
+    }));
 }
 
 /** Bookings a guest may review: confirmed and already ended. */
@@ -1188,6 +1205,7 @@ export const SpaceGoStore = {
           is_cover: true,
         },
       ],
+      ...(newSpaceData.documents?.length ? { documents: newSpaceData.documents } : {}),
       owner_id: owner.id,
       owner_name: owner.full_name,
       owner_avatar: owner.avatar_url || "",

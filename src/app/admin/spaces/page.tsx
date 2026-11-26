@@ -18,6 +18,7 @@ import { categoryNoun } from "@/lib/categories";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Building2, Check, ExternalLink, Flag, MapPin, ShieldCheck } from "lucide-react";
 import { reportReasonLabel } from "@/components/trust/ReportListing";
+import { DocumentLinks } from "@/components/trust/DocumentLinks";
 import { TIER_LABELS, VerificationChecksModal, recordedChecks } from "@/components/admin/VerificationChecksModal";
 
 const DECISIONS: Record<Exclude<ListingReviewDecision, "approve">, { title: string; action: string; help: string }> = {
@@ -249,6 +250,10 @@ export default function AdminSpacesPage() {
                         {s.owner_name || "Unknown host"}
                         {s.review?.submitted_at ? <> · submitted {formatDateTime(s.review.submitted_at)}</> : null}
                       </p>
+                      <div className="pt-1">
+                        <p className="text-sm font-medium text-ink">Private documents</p>
+                        <DocumentLinks documents={s.documents ?? []} />
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:shrink-0">

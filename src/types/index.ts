@@ -107,6 +107,8 @@ export interface Space {
   owner_avatar: string;
   owner_email?: string;
   status: "published" | "draft" | "under_review" | "archived";
+  /** Private verification documents (host and admins only; never public). */
+  documents?: ListingDocument[];
   /** SpaceGo listing review. Owners see their own; never in the public view. */
   review?: ListingReview;
   rating: number;
@@ -297,4 +299,16 @@ export interface ListingReport {
   details: string;
   status: "open" | "resolved" | "dismissed";
   created_at: string;
+}
+
+export type ListingDocumentKind = "ownership" | "authority" | "business_registration" | "address_proof" | "other";
+
+/** A private verification document in the listing-documents bucket. */
+export interface ListingDocument {
+  /** Storage path: "<host uid>/<random>.<ext>". */
+  path: string;
+  kind: ListingDocumentKind;
+  /** The file name the host chose, for display. */
+  name: string;
+  uploaded_at: string;
 }

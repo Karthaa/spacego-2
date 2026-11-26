@@ -50,6 +50,7 @@ export default function EditWorkspaceListingPage({ params }: { params: Promise<{
       operating_hours: values.operating_hours,
       house_rules: values.house_rules,
       images: values.images,
+      documents: values.documents,
       instant_book: values.instant_book,
     });
 

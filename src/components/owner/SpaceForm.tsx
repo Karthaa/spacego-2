@@ -3,7 +3,7 @@
 import React, { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
-import { AddressVisibility, Space, SpaceImage, SpaceLocation, SpacePricing, WorkspaceCategory } from "@/types";
+import { AddressVisibility, ListingDocument, Space, SpaceImage, SpaceLocation, SpacePricing, WorkspaceCategory } from "@/types";
 import { cn } from "@/lib/utils";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -11,6 +11,7 @@ import { Input, Select, Textarea } from "@/components/ui/Input";
 import dynamic from "next/dynamic";
 import { isValidLatLng, type LatLng } from "@/lib/geo";
 import { PhotoUploader } from "./PhotoUploader";
+import { DocumentUploader } from "./DocumentUploader";
 
 const ADDRESS_VISIBILITY_OPTIONS: { value: AddressVisibility; title: string; description: string }[] = [
   {
@@ -44,6 +45,7 @@ export interface SpaceFormValues {
   operating_hours: Space["operating_hours"];
   house_rules: string[];
   images: SpaceImage[];
+  documents: ListingDocument[];
   status: Space["status"];
   instant_book: boolean;
 }
@@ -203,6 +205,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(initial?.amenities ?? DEFAULT_AMENITIES);
 
   const [images, setImages] = useState<SpaceImage[]>(initial?.images ?? []);
+  const [documents, setDocuments] = useState<ListingDocument[]>(initial?.documents ?? []);
 
   const [hasTriedSubmit, setHasTriedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -300,6 +303,7 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
       },
       house_rules: initial?.house_rules ?? DEFAULT_HOUSE_RULES,
       images: images.map((img, i) => ({ ...img, caption: img.caption || `${data.title} photo ${i + 1}`, is_cover: i === 0 })),
+      documents,
       // New listings start as drafts; SpaceGo reviews them before they go live.
       status: mode === "edit" && initial ? initial.status : "draft",
       instant_book: instantBook,
@@ -594,6 +598,11 @@ export function SpaceForm({ initial, mode, onSubmit, submitLabel }: SpaceFormPro
       {/* Photos */}
       <Card>
         <PhotoUploader id={fieldId("images")} images={images} onChange={setImages} error={errors.images} />
+      </Card>
+
+      {/* Verification documents */}
+      <Card>
+        <DocumentUploader documents={documents} onChange={setDocuments} />
       </Card>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">

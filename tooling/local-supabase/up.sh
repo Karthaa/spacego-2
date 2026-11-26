@@ -68,7 +68,8 @@ echo "Waiting for Auth migrations..."; sleep 8
 # Supabase grants clients table privileges on storage (RLS does the limiting).
 "${PSQL[@]}" -d "$DB" -c "SELECT 1" >/dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *listing_photos*) continue ;; esac
+  # Storage migrations run after the Storage container has created its schema.
+  case "$f" in *listing_photos*|*listing_documents*) continue ;; esac
   echo "Applying $f"; "${PSQL[@]}" -d "$DB" -f "$f"
 done
 
@@ -85,7 +86,10 @@ docker run -d --name sg-storage --network host -v "$STATE/storage:/var/lib/stora
 echo "Waiting for Storage migrations..."; sleep 12
 "${PSQL[@]}" -d "$DB" -c "GRANT ALL ON ALL TABLES IN SCHEMA storage TO anon, authenticated, service_role" \
   -c "GRANT ALL ON ALL SEQUENCES IN SCHEMA storage TO anon, authenticated, service_role"
-"${PSQL[@]}" -d "$DB" -f supabase/migrations/20261128_spacego_listing_photos.sql
+for f in supabase/migrations/*listing_photos*.sql supabase/migrations/*listing_documents*.sql; do
+  echo "Applying $f"
+  "${PSQL[@]}" -d "$DB" -f "$f"
+done
 
 pkill -f "tooling/local-supabase/proxy.mjs" 2>/dev/null || true
 nohup node tooling/local-supabase/proxy.mjs > "$STATE/proxy.log" 2>&1 &

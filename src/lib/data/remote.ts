@@ -77,6 +77,59 @@ function getClient(): Supabase | null {
   return client;
 }
 
+/** Upload to a private Storage bucket; returns the stored path. */
+export async function uploadPrivateFile(
+  bucket: string,
+  path: string,
+  body: Blob,
+  contentType: string
+): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType, upsert: false });
+    if (error) {
+      return {
+        ok: false,
+        error: /row-level security|unauthorized|403/i.test(error.message)
+          ? "Only host accounts can upload documents."
+          : `Upload failed: ${error.message}`,
+      };
+    }
+    return { ok: true, data: path };
+  } catch (error) {
+    return failure(error, `uploading to ${bucket}`);
+  }
+}
+
+/** A short-lived link to a private file the caller may read. */
+export async function createSignedFileUrl(bucket: string, path: string, seconds = 60): Promise<RemoteResult<string>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, seconds);
+    if (error || !data?.signedUrl) {
+      return { ok: false, error: "You don't have access to this file, or it no longer exists." };
+    }
+    return { ok: true, data: data.signedUrl };
+  } catch (error) {
+    return failure(error, `signing a ${bucket} link`);
+  }
+}
+
+/** Delete a file the caller owns. */
+export async function removeStorageFile(bucket: string, path: string): Promise<RemoteResult<null>> {
+  const supabase = getClient();
+  if (!supabase) return NOT_CONFIGURED;
+  try {
+    const { error } = await supabase.storage.from(bucket).remove([path]);
+    if (error) return { ok: false, error: `Could not remove the file: ${error.message}` };
+    return { ok: true, data: null };
+  } catch (error) {
+    return failure(error, `removing from ${bucket}`);
+  }
+}
+
 /** Upload to a public Storage bucket and return the file's public URL. */
 export async function uploadPublicFile(
   bucket: string,

@@ -5,6 +5,7 @@ import { Space, SpacePassport } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
+import { DocumentLinks } from "@/components/trust/DocumentLinks";
 
 type BooleanCheck = "identity_verified" | "property_authority_verified" | "permitted_use_confirmed" | "power_backup_tested" | "fire_safety_inspected";
 
@@ -120,6 +121,13 @@ export function VerificationChecksModal({
       maxWidth="lg"
     >
       <form className="space-y-5" onSubmit={submit} noValidate>
+        <div className="rounded-md bg-surface-muted p-3">
+          <p className="text-sm font-medium text-ink">Documents from the host</p>
+          <div className="mt-1">
+            <DocumentLinks documents={space.documents ?? []} />
+          </div>
+        </div>
+
         <fieldset className="space-y-2">
           <legend className="sr-only">Checks</legend>
           {CHECKS.map((c) => (
