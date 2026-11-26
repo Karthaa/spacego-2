@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader, StatCard } from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { capacityLabel } from "@/lib/categories";
 import {
   ArrowRight,
   Building2,
@@ -266,7 +267,7 @@ export default function OwnerOverviewPage() {
                     </p>
                     <p className="flex items-center gap-1.5">
                       <Users className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
-                      Up to {space.capacity} people
+                      {capacityLabel(space.category, space.capacity)}
                     </p>
                   </div>
                   <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3">

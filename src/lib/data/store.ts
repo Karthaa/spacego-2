@@ -54,6 +54,7 @@ import {
   roundDistance,
   type LatLng,
 } from "@/lib/geo";
+import { CATEGORY_IDS } from "@/lib/categories";
 
 /**
  * SpaceGo data store.
@@ -214,14 +215,7 @@ export type ActivationInput = Omit<
 
 export type EnquiryInput = Omit<WorkspaceEnquiry, "id" | "status" | "created_at" | "user_id">;
 
-const WORKSPACE_CATEGORIES: readonly WorkspaceCategory[] = [
-  "coworking",
-  "private_office",
-  "meeting_room",
-  "training_room",
-  "studio",
-  "event_space",
-];
+const WORKSPACE_CATEGORIES: readonly WorkspaceCategory[] = CATEGORY_IDS;
 
 // Local demo storage keys. In remote mode these are never written, and any
 // copies left by older builds (which cached other users' rows) are removed.
@@ -404,6 +398,8 @@ export function reviewStateOf(space: Pick<Space, "status" | "review">): ListingR
 }
 
 function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
+  // Demo listings never carry a verification tier, rating or reviews.
+  const isDemo = raw.is_demo === true || String(raw.is_demo) === "true";
   const location: Partial<Space["location"]> = raw.location ?? {};
   const pricing: Partial<Space["pricing"]> = raw.pricing ?? {};
   const passport: Partial<Space["passport"]> = raw.passport ?? {};
@@ -447,7 +443,7 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
       days: Array.isArray(hours.days) ? hours.days : [],
     },
     house_rules: Array.isArray(raw.house_rules) ? raw.house_rules : [],
-    verification_level: raw.verification_level ?? "listed",
+    verification_level: isDemo ? "listed" : raw.verification_level ?? "listed",
     passport: {
       identity_verified: Boolean(passport.identity_verified),
       property_authority_verified: Boolean(passport.property_authority_verified),
@@ -468,9 +464,10 @@ function normalizeSpace(raw: Partial<Space> & { id: string }): Space {
     status: raw.status ?? "published",
     review: normalizeReview(raw.review),
     ...(Array.isArray(raw.documents) ? { documents: normalizeDocuments(raw.documents) } : {}),
-    rating: numberOr(Number(raw.rating), 0),
-    review_count: numberOr(Number(raw.review_count), 0),
+    rating: isDemo ? 0 : numberOr(Number(raw.rating), 0),
+    review_count: isDemo ? 0 : numberOr(Number(raw.review_count), 0),
     instant_book: Boolean(raw.instant_book),
+    ...(isDemo ? { is_demo: true } : {}),
     created_at: stringOr(raw.created_at, ""),
   };
 }

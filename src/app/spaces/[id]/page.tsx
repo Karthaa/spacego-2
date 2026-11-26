@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/navigation/Navbar";
 import { Footer } from "@/components/navigation/Footer";
-import { VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
+import { Badge, VerificationBadge, BookingStatusBadge } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -30,7 +30,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { categoryNoun } from "@/lib/categories";
+import { capacityLabel, categoryNoun } from "@/lib/categories";
 import { Booking, Space } from "@/types";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
@@ -174,6 +174,16 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
+        {space.is_demo && (
+          <p
+            role="note"
+            className="mt-4 rounded-md border border-line bg-surface-muted px-4 py-3 text-sm text-ink-muted"
+          >
+            <strong className="font-semibold text-ink">Demo listing</strong> based on a real Kochi place, for trying
+            SpaceGo. The venue hasn&apos;t joined SpaceGo, so the photos, prices and details are samples.
+          </p>
+        )}
+
         {/* Gallery */}
         <Gallery images={images} title={space.title} onOpen={setGalleryIndex} />
 
@@ -188,7 +198,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
               <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-base text-ink-muted">
                 <li className="flex items-center gap-2">
                   <Users className="h-5 w-5" aria-hidden="true" />
-                  Up to {space.capacity} {space.capacity === 1 ? "person" : "people"}
+                  {capacityLabel(space.category, space.capacity)}
                 </li>
                 {space.square_feet > 0 && (
                   <li className="flex items-center gap-2">
@@ -211,7 +221,8 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
                 </li>
               </ul>
               <div className="mt-4">
-                <VerificationBadge level={space.verification_level} />
+                {/* Demo listings never show a verification badge or tier. */}
+                {space.is_demo ? <Badge variant="neutral">Demo</Badge> : <VerificationBadge level={space.verification_level} />}
               </div>
             </section>
 
@@ -240,11 +251,11 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
               </section>
             )}
 
-            <ReviewDetails space={space} />
+            {!space.is_demo && <ReviewDetails space={space} />}
 
             <SpaceLocationSection space={space} />
 
-            <SpaceReviews space={space} />
+            {!space.is_demo && <SpaceReviews space={space} />}
 
             <section aria-labelledby="hours-heading">
               <h2 id="hours-heading" className="text-xl font-semibold text-ink">Opening hours and rules</h2>
@@ -586,7 +597,7 @@ function BookingPanel({ space, onSignInRequired }: { space: Space; onSignInRequi
               onChange={(e) => setDurationUnits(Math.min(label.max, Math.max(1, Number(e.target.value) || 1)))}
             />
             <Input
-              label="People"
+              label={space.category === "parking" ? "Vehicles" : space.category === "auditorium" ? "Guests" : "People"}
               type="number"
               inputMode="numeric"
               min={1}

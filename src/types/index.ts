@@ -17,7 +17,9 @@ export type WorkspaceCategory =
   | "meeting_room"
   | "training_room"
   | "studio"
-  | "event_space";
+  | "event_space"
+  | "auditorium"
+  | "parking";
 
 export type VerificationLevel = "listed" | "checked" | "ready" | "pro";
 
@@ -114,6 +116,12 @@ export interface Space {
   rating: number;
   review_count: number;
   instant_book: boolean;
+  /**
+   * Demo listing based on a real place that has not joined SpaceGo (test site
+   * only). Shown with a "Demo" pill and a note; never with a verification
+   * badge, tier, rating or reviews.
+   */
+  is_demo?: boolean;
   created_at: string;
 }
 

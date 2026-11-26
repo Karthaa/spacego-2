@@ -79,8 +79,8 @@ Two elevations: `shadow-sm` (hairline lift for cards on hover) and `shadow-md`
 - **Category rail**: a horizontally scrolling row of icon + label chips under the
   hero; each opens the search filtered to that type.
 - **Space card**: 4:3 photo (16 px radius) first. On the photo: one pill badge
-  top-left (Instant Book, or the SpaceGo verification tier) and a save button
-  top-right. Below: uppercase type eyebrow, title, place, capacity, and the price
+  top-left ("Demo" on demo listings, otherwise Instant Book) and a save button
+  top-right. Demo listings never show a verification tier, rating or reviews. Below: uppercase type eyebrow, title, place, capacity, and the price
   per unit in bold. The whole card is one link.
 - **Section header**: display-serif title, one muted sentence, optional "See
   all" link on the right.

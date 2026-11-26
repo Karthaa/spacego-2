@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Input, Textarea, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { WorkspaceCategory } from "@/types";
+import { CATEGORIES, categoryNoun } from "@/lib/categories";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/context/AuthContext";
@@ -134,19 +135,18 @@ export function DemandRequestModal({
             onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
           >
             <option value="all">Any type</option>
-            <option value="coworking">Coworking desks</option>
-            <option value="private_office">Private office</option>
-            <option value="meeting_room">Meeting room</option>
-            <option value="training_room">Training room</option>
-            <option value="studio">Studio</option>
-            <option value="event_space">Event space</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {categoryNoun(c.id)}
+              </option>
+            ))}
           </Select>
 
           <Input
-            label="Seats"
+            label={category === "parking" ? "Vehicles" : "Seats"}
             type="number"
             min={1}
-            max={200}
+            max={category === "auditorium" ? 10000 : 200}
             value={seats}
             onChange={(e) => setSeats(Number(e.target.value))}
             leftIcon={<Users aria-hidden="true" />}

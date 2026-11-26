@@ -12,6 +12,8 @@ const COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
       { href: "/spaces?category=training_room", label: "Training rooms" },
       { href: "/spaces?category=studio", label: "Studios" },
       { href: "/spaces?category=event_space", label: "Event spaces" },
+      { href: "/spaces?category=auditorium", label: "Auditoriums" },
+      { href: "/spaces?category=parking", label: "Parking" },
     ],
   },
   {

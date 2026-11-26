@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import { SpaceGoStore } from "@/lib/data/store";
 import { useSpaceGoVersion } from "@/context/SpaceGoDataProvider";
-import { categoryNoun } from "@/lib/categories";
+import { capacityUnit, categoryNoun } from "@/lib/categories";
 import { SafeImage } from "@/components/ui/SafeImage";
 
 const FALLBACK_IMAGE =
@@ -88,7 +88,8 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
     setImageIndex((prev) => (prev + delta + images.length) % images.length);
   };
 
-  const tier = TIER_LABEL[space.verification_level];
+  // Demo listings never show a verification tier.
+  const tier = space.is_demo ? undefined : TIER_LABEL[space.verification_level];
 
   return (
     <article
@@ -150,8 +151,13 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
           </span>
         </button>
 
-        {/* One on-photo fact, white pill (always light, it sits on photography). */}
-        {space.instant_book && (
+        {/* One on-photo fact, white pill (always light, it sits on photography).
+            "Demo" wins over Instant Book: it is the fact that matters most. */}
+        {space.is_demo ? (
+          <span className="absolute left-3 top-3 inline-flex items-center rounded-full bg-[#ffffff]/95 px-2.5 py-1 text-xs font-semibold text-neutral-900 shadow-sm">
+            Demo
+          </span>
+        ) : space.instant_book && (
           <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#ffffff]/95 px-2.5 py-1 text-xs font-semibold text-neutral-900 shadow-sm">
             <Zap className="h-3.5 w-3.5 text-[#b45309]" aria-hidden="true" />
             Instant Book
@@ -206,9 +212,9 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
           </p>
           <p className="flex shrink-0 items-center gap-1 text-sm text-ink-muted">
             <Users className="h-4 w-4" aria-hidden="true" />
-            <span className="sr-only">Up to</span>
+            {space.category !== "auditorium" && <span className="sr-only">Up to</span>}
             {space.capacity}
-            <span className="sr-only">{space.capacity === 1 ? "person" : "people"}</span>
+            <span className="sr-only">{capacityUnit(space.category, space.capacity)}</span>
           </p>
         </div>
       </div>

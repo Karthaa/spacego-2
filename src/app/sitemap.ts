@@ -1,16 +1,5 @@
 import type { MetadataRoute } from "next";
-
-function siteOrigin(): string {
-  const fallback = "http://localhost:3000";
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (!raw) return fallback;
-  try {
-    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-    return url.origin;
-  } catch {
-    return fallback;
-  }
-}
+import { isTestSite, siteOrigin } from "@/lib/site";
 
 type Entry = {
   path: string;
@@ -31,6 +20,8 @@ const PUBLIC_ROUTES: Entry[] = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  // The test site carries demo listings and is not indexed.
+  if (isTestSite()) return [];
   const origin = siteOrigin();
   const lastModified = new Date();
   return PUBLIC_ROUTES.map(({ path, changeFrequency, priority }) => ({
