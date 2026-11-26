@@ -10,7 +10,12 @@ INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
   ('00000000-0000-4000-8000-0000000b0002', 'addr-guest@example.invalid', '{"role":"seeker","full_name":"Confirmed Guest"}'),
   ('00000000-0000-4000-8000-0000000b0003', 'addr-pending@example.invalid', '{"role":"seeker","full_name":"Pending Guest"}'),
   ('00000000-0000-4000-8000-0000000b0004', 'addr-admin@example.invalid', '{"role":"owner","full_name":"Address Admin"}');
+-- Some projects (staging, production) have a trigger that only lets
+-- service_role or an admin grant the admin role. Act as service_role for
+-- this fixture only; the setting is local to this transaction.
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true); END $$;
 UPDATE public.profiles SET role = 'admin' WHERE id = '00000000-0000-4000-8000-0000000b0004';
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '', true); END $$;
 
 -- Fixture listings, written as the admin so they are published and approved.
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000b0004', true);

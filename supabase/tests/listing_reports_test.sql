@@ -10,7 +10,12 @@ INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
   ('00000000-0000-4000-8000-0000000f0002', 'rp-other@example.invalid', '{"role":"seeker","full_name":"Other Guest"}'),
   ('00000000-0000-4000-8000-0000000f0003', 'rp-host@example.invalid', '{"role":"owner","full_name":"Report Host"}'),
   ('00000000-0000-4000-8000-0000000f0004', 'rp-admin@example.invalid', '{"role":"owner","full_name":"Report Admin"}');
+-- Some projects (staging, production) have a trigger that only lets
+-- service_role or an admin grant the admin role. Act as service_role for
+-- this fixture only; the setting is local to this transaction.
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true); END $$;
 UPDATE public.profiles SET role = 'admin' WHERE id = '00000000-0000-4000-8000-0000000f0004';
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '', true); END $$;
 
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000f0004', true);
 INSERT INTO public.spacego_spaces (id, data)

@@ -10,7 +10,12 @@ BEGIN;
 INSERT INTO auth.users (id, email, raw_user_meta_data)
 VALUES ('00000000-0000-4000-8000-00000000f001', 'geo-search-fixture@example.invalid',
         '{"role": "owner", "full_name": "Geo Search Fixture"}'::jsonb);
+-- Some projects (staging, production) have a trigger that only lets
+-- service_role or an admin grant the admin role. Act as service_role for
+-- this fixture only; the setting is local to this transaction.
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true); END $$;
 UPDATE public.profiles SET role = 'admin' WHERE id = '00000000-0000-4000-8000-00000000f001';
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '', true); END $$;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-00000000f001', true);
 
 -- Fixture rows (ids prefixed so they cannot collide with real data).

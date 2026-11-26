@@ -8,7 +8,12 @@ BEGIN;
 INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
   ('00000000-0000-4000-8000-0000000c0001', 'checks-owner@example.invalid', '{"role":"owner","full_name":"Checks Owner"}'),
   ('00000000-0000-4000-8000-0000000c0002', 'checks-admin@example.invalid', '{"role":"owner","full_name":"Checks Admin"}');
+-- Some projects (staging, production) have a trigger that only lets
+-- service_role or an admin grant the admin role. Act as service_role for
+-- this fixture only; the setting is local to this transaction.
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true); END $$;
 UPDATE public.profiles SET role = 'admin' WHERE id = '00000000-0000-4000-8000-0000000c0002';
+DO $$ BEGIN PERFORM set_config('request.jwt.claims', '', true); END $$;
 
 CREATE FUNCTION pg_temp.act_as(p_uid text) RETURNS void LANGUAGE sql AS $$
   SELECT set_config('request.jwt.claim.sub', p_uid, true);
