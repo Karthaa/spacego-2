@@ -146,7 +146,7 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
         {/* Title */}
         <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{space.title}</h1>
+            <h1 className="font-display text-4xl leading-tight text-ink sm:text-5xl">{space.title}</h1>
             {/* No ratings: there is no reviews feature yet (stored values are demo data). */}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-muted">
               {place && (

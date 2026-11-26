@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
 /*
- * SpaceGo design tokens
+ * SpaceGo design tokens (design system v2, see docs/DESIGN_SYSTEM.md)
  * ---------------------------------------------------------------------------
- * - One accent (teal), a neutral slate scale, and semantic success / warning /
- *   danger colours. Every other Tailwind hue used in older screens (sky,
- *   indigo, purple, ...) is remapped to the accent so there is only one.
+ * - One accent (evergreen teal), warm neutrals, and semantic success /
+ *   warning / danger colours. Every other Tailwind hue used in older screens
+ *   (sky, indigo, purple, ...) is remapped to the accent so there is only one.
+ * - The neutral scale is Tailwind's `slate` name with warm values, and the
+ *   accent is the `teal` scale deepened, so older screens follow without edits.
  * - Light and dark themes. Dark mode inverts the palette variables, so every
  *   utility (including those on dashboards not yet redesigned) follows.
  *   Theme source: <html data-theme="light|dark"> set before paint by the
@@ -17,23 +19,38 @@
 @theme {
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* Display serif: marketing headlines and listing titles only, never UI. */
+  --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
 
-  /* Radii: 6 / 10 / 14. Larger legacy radii collapse onto the 14px step. */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 14px;
-  --radius-2xl: 14px;
-  --radius-3xl: 14px;
+  /* Radii: 8 / 12 / 16 / 24 (+ rounded-full for pills). */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 24px;
+  --radius-3xl: 24px;
 
   /* Two elevation levels. Legacy shadow sizes map onto them. */
   --shadow-2xs: none;
-  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow-md: 0 8px 24px -8px rgb(15 23 42 / 0.16), 0 2px 6px -2px rgb(15 23 42 / 0.08);
-  --shadow-lg: 0 8px 24px -8px rgb(15 23 42 / 0.16), 0 2px 6px -2px rgb(15 23 42 / 0.08);
-  --shadow-xl: 0 8px 24px -8px rgb(15 23 42 / 0.16), 0 2px 6px -2px rgb(15 23 42 / 0.08);
-  --shadow-2xl: 0 8px 24px -8px rgb(15 23 42 / 0.16), 0 2px 6px -2px rgb(15 23 42 / 0.08);
+  --shadow-xs: 0 1px 2px 0 rgb(28 27 25 / 0.06);
+  --shadow-sm: 0 1px 2px 0 rgb(28 27 25 / 0.05), 0 2px 8px -2px rgb(28 27 25 / 0.06);
+  --shadow-md: 0 10px 30px -10px rgb(28 27 25 / 0.18), 0 2px 8px -2px rgb(28 27 25 / 0.08);
+  --shadow-lg: 0 10px 30px -10px rgb(28 27 25 / 0.18), 0 2px 8px -2px rgb(28 27 25 / 0.08);
+  --shadow-xl: 0 10px 30px -10px rgb(28 27 25 / 0.18), 0 2px 8px -2px rgb(28 27 25 / 0.08);
+  --shadow-2xl: 0 10px 30px -10px rgb(28 27 25 / 0.18), 0 2px 8px -2px rgb(28 27 25 / 0.08);
+
+  /* Warm neutrals (light theme). Dark values are further down. */
+  --color-slate-50: #fafaf8;
+  --color-slate-100: #f3f2ef;
+  --color-slate-200: #e7e5e0;
+  --color-slate-300: #d6d3cc;
+  --color-slate-400: #a8a39a;
+  --color-slate-500: #6b6760;
+  --color-slate-600: #57544e;
+  --color-slate-700: #3f3c37;
+  --color-slate-800: #2a2825;
+  --color-slate-900: #1c1b19;
+  --color-slate-950: #0f0e0d;
 
   /* Semantic tokens (resolve through the palette, so they follow the theme). */
   --color-canvas: var(--color-slate-50);
@@ -221,19 +238,20 @@ body {
   background: var(--color-slate-400);
 }
 
-/* GENERATED from tailwindcss theme.css: single-accent remap (sky, indigo, purple ... -> teal) */
+/* Single-accent remap (sky, indigo, purple ... -> teal). The teal scale is
+   SpaceGo's evergreen: 600 is the accent, 700 its hover, 50/800 the soft pair. */
 @theme {
-  --color-teal-50: oklch(98.4% 0.014 180.72);
-  --color-teal-100: oklch(95.3% 0.051 180.801);
-  --color-teal-200: oklch(91% 0.096 180.426);
-  --color-teal-300: oklch(85.5% 0.138 181.071);
-  --color-teal-400: oklch(77.7% 0.152 181.912);
-  --color-teal-500: oklch(60% 0.118 184.704);
-  --color-teal-600: oklch(51.1% 0.096 186.391);
-  --color-teal-700: oklch(43.7% 0.078 188.216);
-  --color-teal-800: oklch(38.6% 0.063 188.416);
-  --color-teal-900: oklch(27.7% 0.046 192.524);
-  --color-teal-950: oklch(22% 0.04 189);
+  --color-teal-50: #e8f2ef;
+  --color-teal-100: #d3e8e2;
+  --color-teal-200: #a9d2c7;
+  --color-teal-300: #77b5a6;
+  --color-teal-400: #3f9483;
+  --color-teal-500: #1f7f6f;
+  --color-teal-600: #0f6b5f;
+  --color-teal-700: #0b564c;
+  --color-teal-800: #0b4a41;
+  --color-teal-900: #0a3a34;
+  --color-teal-950: #06231f;
   --color-sky-50: var(--color-teal-50);
   --color-sky-100: var(--color-teal-100);
   --color-sky-200: var(--color-teal-200);
@@ -316,29 +334,29 @@ body {
 /* GENERATED dark palette */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-white: #121925;
-  --color-slate-50: #0b0f17;
-  --color-slate-100: #151b26;
-  --color-slate-200: #242c3a;
-  --color-slate-300: #344154;
-  --color-slate-400: #6b7a90;
-  --color-slate-500: #9aa8bb;
-  --color-slate-600: #c3cdda;
-  --color-slate-700: #dde3ec;
-  --color-slate-800: #eef2f7;
-  --color-slate-900: #f6f8fb;
+  --color-white: #181715;
+  --color-slate-50: #0f0e0d;
+  --color-slate-100: #1d1c1a;
+  --color-slate-200: #2b2926;
+  --color-slate-300: #3a3834;
+  --color-slate-400: #75716a;
+  --color-slate-500: #a29e96;
+  --color-slate-600: #c9c5bd;
+  --color-slate-700: #e1ded8;
+  --color-slate-800: #efede9;
+  --color-slate-900: #f7f6f3;
   --color-slate-950: #ffffff;
-  --color-teal-50: oklch(27.7% 0.046 192.524);
-  --color-teal-100: oklch(38.6% 0.063 188.416);
-  --color-teal-200: oklch(43.7% 0.078 188.216);
-  --color-teal-300: oklch(51.1% 0.096 186.391);
-  --color-teal-400: oklch(60% 0.118 184.704);
-  --color-teal-500: oklch(77.7% 0.152 181.912);
-  --color-teal-600: oklch(77.7% 0.152 181.912);
-  --color-teal-700: oklch(85.5% 0.138 181.071);
-  --color-teal-800: oklch(91% 0.096 180.426);
-  --color-teal-900: oklch(95.3% 0.051 180.801);
-  --color-teal-950: oklch(98.4% 0.014 180.72);
+  --color-teal-50: #0e2723;
+  --color-teal-100: #133a33;
+  --color-teal-200: #184840;
+  --color-teal-300: #1f5f53;
+  --color-teal-400: #2e7d6d;
+  --color-teal-500: #4db39c;
+  --color-teal-600: #5cc4ac;
+  --color-teal-700: #84d6c2;
+  --color-teal-800: #b5e8db;
+  --color-teal-900: #ddf4ee;
+  --color-teal-950: #f1fbf8;
   --color-emerald-50: oklch(26.2% 0.051 172.552);
   --color-emerald-100: oklch(37.8% 0.077 168.94);
   --color-emerald-200: oklch(43.2% 0.095 166.913);
@@ -377,29 +395,29 @@ body {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-white: #121925;
-    --color-slate-50: #0b0f17;
-    --color-slate-100: #151b26;
-    --color-slate-200: #242c3a;
-    --color-slate-300: #344154;
-    --color-slate-400: #6b7a90;
-    --color-slate-500: #9aa8bb;
-    --color-slate-600: #c3cdda;
-    --color-slate-700: #dde3ec;
-    --color-slate-800: #eef2f7;
-    --color-slate-900: #f6f8fb;
+    --color-white: #181715;
+    --color-slate-50: #0f0e0d;
+    --color-slate-100: #1d1c1a;
+    --color-slate-200: #2b2926;
+    --color-slate-300: #3a3834;
+    --color-slate-400: #75716a;
+    --color-slate-500: #a29e96;
+    --color-slate-600: #c9c5bd;
+    --color-slate-700: #e1ded8;
+    --color-slate-800: #efede9;
+    --color-slate-900: #f7f6f3;
     --color-slate-950: #ffffff;
-    --color-teal-50: oklch(27.7% 0.046 192.524);
-    --color-teal-100: oklch(38.6% 0.063 188.416);
-    --color-teal-200: oklch(43.7% 0.078 188.216);
-    --color-teal-300: oklch(51.1% 0.096 186.391);
-    --color-teal-400: oklch(60% 0.118 184.704);
-    --color-teal-500: oklch(77.7% 0.152 181.912);
-    --color-teal-600: oklch(77.7% 0.152 181.912);
-    --color-teal-700: oklch(85.5% 0.138 181.071);
-    --color-teal-800: oklch(91% 0.096 180.426);
-    --color-teal-900: oklch(95.3% 0.051 180.801);
-    --color-teal-950: oklch(98.4% 0.014 180.72);
+    --color-teal-50: #0e2723;
+    --color-teal-100: #133a33;
+    --color-teal-200: #184840;
+    --color-teal-300: #1f5f53;
+    --color-teal-400: #2e7d6d;
+    --color-teal-500: #4db39c;
+    --color-teal-600: #5cc4ac;
+    --color-teal-700: #84d6c2;
+    --color-teal-800: #b5e8db;
+    --color-teal-900: #ddf4ee;
+    --color-teal-950: #f1fbf8;
     --color-emerald-50: oklch(26.2% 0.051 172.552);
     --color-emerald-100: oklch(37.8% 0.077 168.94);
     --color-emerald-200: oklch(43.2% 0.095 166.913);

@@ -1,49 +1,61 @@
 import React from "react";
 import Link from "next/link";
-import { Armchair, Building, Clapperboard, GraduationCap, Mic, Presentation, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { CATEGORIES } from "@/lib/categories";
 import type { WorkspaceCategory } from "@/types";
+import { SafeImage } from "@/components/ui/SafeImage";
+import { SectionHeader } from "@/components/home/SectionHeader";
 
-const ICONS: Record<WorkspaceCategory, React.ComponentType<{ className?: string }>> = {
-  coworking: Armchair,
-  private_office: Building,
-  meeting_room: Users,
-  training_room: GraduationCap,
-  studio: Mic,
-  event_space: Presentation,
+const unsplash = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=80`;
+
+/** One interior photo per type of space (decorative; the label carries the meaning). */
+const PHOTOS: Record<WorkspaceCategory, string> = {
+  coworking: unsplash("photo-1504384308090-c894fdcc538d"),
+  private_office: unsplash("photo-1497215728101-856f4ea42174"),
+  meeting_room: unsplash("photo-1517502884422-41eaead166d4"),
+  training_room: unsplash("photo-1517048676732-d65bc937f952"),
+  studio: unsplash("photo-1598488035139-bdbb2231ce04"),
+  event_space: unsplash("photo-1511578314322-379afb476865"),
 };
 
 export function CategoryBrowse() {
   return (
-    <section aria-labelledby="browse-heading" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <h2 id="browse-heading" className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-        Browse by type of space
-      </h2>
-      <p className="mt-2 text-base text-ink-muted">Pick what you need and narrow it down by location and size.</p>
+    <section aria-labelledby="browse-heading" className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 sm:pt-20 lg:px-8">
+      <SectionHeader
+        id="browse-heading"
+        title="Browse by type of space"
+        description="From a desk for the afternoon to a venue for a launch."
+        action={{ href: "/spaces", label: "All spaces" }}
+      />
 
-      <ul className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CATEGORIES.map((category) => {
-          const Icon = ICONS[category.id] ?? Clapperboard;
-          return (
-            <li key={category.id}>
-              <Link
-                href={`/spaces?category=${category.id}`}
-                className="flex h-full items-start gap-4 rounded-lg border border-line bg-surface p-5 transition-colors duration-150 hover:border-line-strong hover:bg-surface-muted"
-              >
-                <span
+      {/* Phones: one swipeable row. From sm: a grid. */}
+      <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-6">
+        {CATEGORIES.map((category) => (
+          <li key={category.id} className="w-40 shrink-0 snap-start sm:w-auto">
+            <Link href={`/spaces?category=${category.id}`} className="group block rounded-lg">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-surface-muted">
+                <SafeImage
+                  fill
+                  src={PHOTOS[category.id]}
+                  alt=""
+                  width={800}
+                  height={1000}
+                  sizes="(min-width: 1024px) 13rem, (min-width: 640px) 33vw, 10rem"
+                  loading="lazy"
+                  className="object-cover transition-transform duration-300 ease-standard group-hover:scale-[1.03]"
+                />
+              </div>
+              <p className="mt-3 flex items-center gap-1 text-sm font-semibold text-ink">
+                {category.label}
+                <ArrowRight
+                  className="h-3.5 w-3.5 -translate-x-1 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100"
                   aria-hidden="true"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent-soft-ink"
-                >
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span>
-                  <span className="block text-base font-semibold text-ink">{category.label}</span>
-                  <span className="mt-0.5 block text-sm text-ink-muted">{category.description}</span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+                />
+              </p>
+              <p className="mt-0.5 line-clamp-2 text-sm text-ink-muted">{category.description}</p>
+            </Link>
+          </li>
+        ))}
       </ul>
     </section>
   );

@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 export type ButtonVariant =
   | "primary"
   | "teal"
+  | "ink"
   | "secondary"
   | "outline"
   | "ghost"
@@ -32,13 +33,17 @@ export function buttonClasses({
   className?: string;
 } = {}): string {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-md font-medium whitespace-nowrap select-none",
+    // Pill buttons (design system v2).
+    "inline-flex items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap select-none",
     "cursor-pointer transition-[color,background-color,border-color,opacity,box-shadow] duration-150 ease-standard",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     "disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
     // Hover states are mirrored on :active so touch screens get press feedback.
     (variant === "primary" || variant === "teal") &&
       "bg-accent text-accent-ink hover:bg-accent-hover active:bg-accent-hover",
+    // Near-black (near-white in dark mode) for neutral, high-emphasis actions.
+    variant === "ink" &&
+      "bg-ink text-surface hover:bg-ink/85 active:bg-ink/85",
     variant === "secondary" &&
       "bg-surface-muted text-ink hover:bg-line active:bg-line",
     variant === "outline" &&
@@ -49,7 +54,7 @@ export function buttonClasses({
       "bg-danger-solid text-white hover:bg-danger active:bg-danger",
     // Sizes: 44px targets on touch screens; compact sm on fine pointers.
     size === "sm" && "h-9 px-3.5 text-sm pointer-coarse:h-11",
-    size === "md" && "h-11 px-4 text-sm",
+    size === "md" && "h-11 px-5 text-sm",
     size === "lg" && "h-12 px-6 text-base",
     size === "icon" && "h-11 w-11 p-0",
     className

@@ -3,8 +3,8 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, Zap, ChevronLeft, ChevronRight, Users } from "lucide-react";
-import { Space } from "@/types";
+import { Heart, Zap, ChevronLeft, ChevronRight, Users, BadgeCheck } from "lucide-react";
+import { Space, VerificationLevel } from "@/types";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/Toast";
@@ -23,6 +23,13 @@ interface SpaceCardProps {
   /** "grid" (default) stacks the photo above the text; "list" places it beside. */
   layout?: "grid" | "list";
 }
+
+/** Short label for verification tiers a SpaceGo admin has recorded a dated check for. */
+const TIER_LABEL: Partial<Record<VerificationLevel, string>> = {
+  pro: "SpaceGo Pro",
+  ready: "SpaceGo Ready",
+  checked: "Reviewed by SpaceGo",
+};
 
 /** Headline price: daily first, then hourly, then monthly. */
 export function headlinePrice(space: Space): { amount: number; unit: string } | null {
@@ -81,12 +88,14 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
     setImageIndex((prev) => (prev + delta + images.length) % images.length);
   };
 
+  const tier = TIER_LABEL[space.verification_level];
+
   return (
     <article
       className={cn(
         "group relative",
         layout === "list" &&
-          "grid grid-cols-1 gap-4 rounded-lg border border-line bg-surface p-3 transition-colors duration-150 hover:border-line-strong sm:grid-cols-[16rem_1fr]"
+          "grid grid-cols-1 gap-4 rounded-lg border border-line bg-surface p-3 transition-[border-color,box-shadow] duration-150 hover:border-line-strong hover:shadow-sm sm:grid-cols-[16rem_1fr]"
       )}
     >
       <div className="relative aspect-[4/3] overflow-hidden rounded-lg bg-surface-muted">
@@ -101,6 +110,7 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
               ? "(min-width: 640px) 16rem, 100vw"
               : "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
           }
+          className="object-cover transition-transform duration-300 ease-standard group-hover:scale-[1.03]"
         />
 
         {images.length > 1 && (
@@ -130,28 +140,39 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
           disabled={isSaving}
           aria-pressed={favorited}
           aria-label={favorited ? `Remove ${space.title} from saved spaces` : `Save ${space.title}`}
-          className="group/fav absolute right-1 top-1 z-10 flex h-11 w-11 items-center justify-center rounded-full"
+          className="group/fav absolute right-1.5 top-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 transition-colors duration-150 group-hover/fav:bg-black/60">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ffffff]/90 shadow-sm transition-transform duration-150 group-hover/fav:scale-105">
             <Heart
               aria-hidden="true"
-              className={cn("h-4 w-4", favorited ? "fill-rose-500 text-rose-500" : "text-photo-ink")}
+              className={cn("h-4 w-4", favorited ? "fill-rose-500 text-rose-500" : "text-neutral-900")}
             />
           </span>
         </button>
 
+        {/* One on-photo fact, white pill (always light, it sits on photography). */}
         {space.instant_book && (
-          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-sm bg-black/60 px-2 py-1 text-xs font-medium text-photo-ink">
-            <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#ffffff]/95 px-2.5 py-1 text-xs font-semibold text-neutral-900 shadow-sm">
+            <Zap className="h-3.5 w-3.5 text-[#b45309]" aria-hidden="true" />
             Instant Book
           </span>
         )}
       </div>
 
       <div className={cn(layout === "grid" ? "pt-3" : "flex flex-col justify-center")}>
-        {/* Ratings are intentionally not shown: SpaceGo has no reviews feature
-            yet, and stored rating values are demo data. */}
-        <h3 className="min-w-0 text-base font-semibold text-ink">
+        {/* Type eyebrow, then title. Ratings are intentionally not shown here:
+            only reviews from completed bookings count, and stored rating
+            values are demo data. */}
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-ink-subtle">
+          {categoryNoun(space.category)}
+          {tier && (
+            <span className="inline-flex items-center gap-1 normal-case tracking-normal text-accent">
+              <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              {tier}
+            </span>
+          )}
+        </p>
+        <h3 className="mt-1 min-w-0 text-base font-semibold text-ink">
           {/* The title link covers the whole card for a large click target. */}
           <Link
             href={href}
@@ -166,29 +187,30 @@ export function SpaceCard({ space, isFavorited, onFavoriteToggle, layout = "grid
           </Link>
         </h3>
 
-        <p className="mt-0.5 text-sm text-ink-muted">
-          {categoryNoun(space.category)}
-          {place && <> &middot; {place}</>}
-        </p>
-        <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-muted">
-          <Users className="h-4 w-4" aria-hidden="true" />
-          Up to {space.capacity} {space.capacity === 1 ? "person" : "people"}
-        </p>
+        {place && <p className="mt-0.5 truncate text-sm text-ink-muted">{place}</p>}
 
         {layout === "list" && space.headline && (
           <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{space.headline}</p>
         )}
 
-        <p className="mt-2 text-base text-ink">
-          {price ? (
-            <>
-              <span className="font-semibold">{formatCurrency(price.amount, space.pricing.currency)}</span>
-              <span className="text-ink-muted"> / {price.unit}</span>
-            </>
-          ) : (
-            <span className="text-ink-muted">Price on request</span>
-          )}
-        </p>
+        <div className="mt-2 flex items-baseline justify-between gap-3">
+          <p className="text-base text-ink">
+            {price ? (
+              <>
+                <span className="font-semibold tabular-nums">{formatCurrency(price.amount, space.pricing.currency)}</span>
+                <span className="text-sm text-ink-muted"> / {price.unit}</span>
+              </>
+            ) : (
+              <span className="text-ink-muted">Price on request</span>
+            )}
+          </p>
+          <p className="flex shrink-0 items-center gap-1 text-sm text-ink-muted">
+            <Users className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">Up to</span>
+            {space.capacity}
+            <span className="sr-only">{space.capacity === 1 ? "person" : "people"}</span>
+          </p>
+        </div>
       </div>
     </article>
   );
