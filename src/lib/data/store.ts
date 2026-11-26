@@ -1358,6 +1358,21 @@ export const SpaceGoStore = {
       return { ok: true, data: booking };
     }
 
+    // Mirrors the database rule: one open request per guest, space and time.
+    const start = Date.parse(bookingInput.start_date);
+    const end = Date.parse(bookingInput.end_date);
+    const duplicate = SpaceGoStore.getBookings().some(
+      (b) =>
+        b.user_id === bookingInput.user.id &&
+        b.space_id === bookingInput.space.id &&
+        (b.status === "pending" || b.status === "approved") &&
+        Date.parse(b.start_date) < end &&
+        Date.parse(b.end_date) > start
+    );
+    if (duplicate) {
+      return { ok: false, error: "You already have a request or booking for this space at this time" };
+    }
+
     const id = `SPG-${new Date().getFullYear()}-${newLocalId("x").slice(2, 8).toUpperCase()}`;
     const status: BookingStatus = bookingInput.space.instant_book ? "approved" : "pending";
     const accessCode =

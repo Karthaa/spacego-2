@@ -86,4 +86,23 @@ out.push(`seeker inserts a review directly: ${r.error ? "BLOCKED " + r.error.cod
 }
 r = await anon.from("spacego_space_reviews").select("id");
 out.push(`anon reads the reviews table: ${r.error ? "BLOCKED " + r.error.code : r.data.length + " rows (bad)"}`);
+
+// Booking integrity (20261202): no duplicate overlapping requests; history recorded.
+{
+  const start = new Date(Date.now() + (60 + Math.floor(Math.random() * 600)) * 86400000);
+  start.setUTCHours(4, 30, 0, 0);
+  const args = {
+    p_space_id: "local-test-2", p_start_date: start.toISOString(), p_end_date: new Date(start.getTime() + 2 * 3600000).toISOString(),
+    p_duration_type: "hourly", p_duration_units: 2, p_seats: 1,
+  };
+  const first = await seeker.c.rpc("spacego_create_booking", args);
+  if (first.error) throw first.error;
+  r = await seeker.c.rpc("spacego_create_booking", args);
+  out.push(`seeker sends the same request twice: ${r.error ? "BLOCKED " + r.error.code : "ALLOWED (bad)"}`);
+  await seeker.c.rpc("spacego_update_booking_status", { p_booking_id: first.data.id, p_new_status: "cancelled" });
+  r = await seeker.c.from("spacego_booking_events").select("from_status,to_status").eq("booking_id", first.data.id).order("id");
+  out.push(`booking history: ${r.error ? r.error.message : r.data.map((e) => `${e.from_status ?? "new"}->${e.to_status}`).join(", ")}`);
+  const other = await createClient(URL, ANON, { auth: { persistSession: false } }).from("spacego_booking_events").select("id").eq("booking_id", first.data.id);
+  out.push(`anon reads booking history: ${other.error ? "BLOCKED " + other.error.code : other.data.length + " rows"}`);
+}
 console.log(out.join("\n"));
