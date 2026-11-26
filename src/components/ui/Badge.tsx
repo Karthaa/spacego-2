@@ -16,7 +16,7 @@ export function Badge({ className, variant = "default", size = "sm", children, .
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm font-medium whitespace-nowrap [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
+        "inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0",
         size === "sm" && "px-2 py-0.5 text-xs",
         size === "md" && "px-2.5 py-1 text-sm",
         (variant === "default" || variant === "neutral") && "bg-surface-muted text-ink-muted",

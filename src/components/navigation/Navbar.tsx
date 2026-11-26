@@ -22,6 +22,7 @@ import { NotificationItem, UserRole } from "@/types";
 import { cn } from "@/lib/utils";
 import { Logo as BrandLogo } from "@/components/brand/Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { MobileTabBar } from "./MobileTabBar";
 
 const ROLE_LABEL: Record<UserRole, string> = {
   seeker: "Member",
@@ -101,6 +102,10 @@ export function Navbar() {
     router.refresh();
   };
 
+  // Phone tab bar only where nothing else is pinned to the bottom of the screen
+  // (/discover has its own map/list switch; listing pages have the booking box).
+  const showTabBar = pathname === "/" || pathname === "/spaces";
+
   const navLinks = [
     { href: "/discover", label: "Near me", active: pathname.startsWith("/discover") },
     { href: "/spaces", label: "Find a space", active: pathname.startsWith("/spaces") },
@@ -112,9 +117,11 @@ export function Navbar() {
     "flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-ink hover:bg-surface-muted";
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-line bg-surface">
+    <>
+    <header className="sticky top-0 z-40 w-full border-b border-line/80 bg-surface/80 backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+        {/* Desktop: logo | centred navigation | account (three columns). */}
+        <div className="flex h-16 items-center justify-between gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr]">
           <Logo />
 
           <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
@@ -124,8 +131,10 @@ export function Navbar() {
                 href={link.href}
                 aria-current={link.active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors",
-                  link.active ? "text-ink" : "text-ink-muted hover:bg-surface-muted hover:text-ink"
+                  "flex h-10 items-center whitespace-nowrap rounded-full px-4 text-sm font-medium transition-colors",
+                  link.active
+                    ? "bg-surface-muted text-ink"
+                    : "text-ink-muted hover:bg-surface-muted hover:text-ink"
                 )}
               >
                 {link.label}
@@ -133,10 +142,10 @@ export function Navbar() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-1" ref={dropdownRef}>
+          <div className="flex items-center gap-1 lg:justify-self-end" ref={dropdownRef}>
             <Link
               href={listSpaceHref}
-              className="hidden h-11 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-surface-muted lg:flex"
+              className="hidden h-10 items-center whitespace-nowrap rounded-full px-4 text-sm font-medium text-ink hover:bg-surface-muted xl:flex"
             >
               List your space
             </Link>
@@ -286,7 +295,7 @@ export function Navbar() {
                 <Link href="/auth/login" className={buttonClasses({ variant: "ghost", size: "md" })}>
                   Log in
                 </Link>
-                <Link href="/auth/register" className={buttonClasses({ variant: "primary", size: "md" })}>
+                <Link href="/auth/register" className={buttonClasses({ variant: "ink", size: "md" })}>
                   Sign up
                 </Link>
               </div>
@@ -375,6 +384,14 @@ export function Navbar() {
         </div>
       )}
     </header>
+    {showTabBar && (
+      <MobileTabBar
+        pathname={pathname}
+        accountHref={isAuthenticated ? dashboardHref : "/auth/login"}
+        accountLabel={isAuthenticated ? "Account" : "Log in"}
+      />
+    )}
+    </>
   );
 }
 

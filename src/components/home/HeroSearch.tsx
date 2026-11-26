@@ -3,12 +3,10 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LocateFixed, MapPin, Search, Users } from "lucide-react";
+import { LocateFixed, MapPin, Search, Users, LayoutGrid } from "lucide-react";
 import { SpaceGoStore } from "@/lib/data/store";
 import { CATEGORIES } from "@/lib/categories";
 import type { Space, WorkspaceCategory } from "@/types";
-import { Button } from "@/components/ui/Button";
-import { fieldClasses } from "@/components/ui/Input";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { cn } from "@/lib/utils";
 import { matchKnownPlaces } from "@/lib/geo/places";
@@ -27,6 +25,11 @@ function countMatches(spaces: Space[], location: string, category: string, seats
   }).length;
 }
 
+/*
+ * Home hero: a rounded photo panel with the headline, and one segmented
+ * search bar floating over its lower edge (a single pill on desktop, a stacked
+ * card on phones). Every segment keeps a visible label.
+ */
 export function HeroSearch({ spaces }: { spaces: Space[] }) {
   const router = useRouter();
   const [location, setLocation] = useState("");
@@ -64,65 +67,82 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
     router.push(`/spaces${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
-  const fieldLabel = "mb-1 block text-sm font-medium text-ink";
+  // A segment: label above a borderless control. On phones each segment is a
+  // bordered field; from lg the bar becomes one pill with hairline dividers.
+  const segment =
+    "relative flex flex-col justify-center rounded-md border border-line bg-surface px-4 py-2.5 transition-colors focus-within:border-ink lg:rounded-full lg:border-0 lg:px-6 lg:py-3 lg:hover:bg-surface-muted lg:focus-within:bg-surface-muted";
+  const segmentLabel = "text-xs font-semibold text-ink";
+  const segmentControl =
+    "mt-0.5 w-full min-w-0 border-0 bg-transparent p-0 text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-0";
 
   return (
-    <section aria-labelledby="hero-heading" className="relative isolate overflow-hidden bg-black">
-      {/* Decorative background photo: the LCP element, so load it first. */}
-      <SafeImage
-        fill
-        src={HERO_IMAGE}
-        alt=""
-        width={2000}
-        height={1333}
-        sizes="100vw"
-        loading="eager"
-        fetchPriority="high"
-        wrapperClassName="-z-10"
-      />
-      {/* Flat scrim for legible text on the photo (no gradient). */}
-      <div className="absolute inset-0 -z-10 bg-black/55" aria-hidden="true" />
+    <section aria-labelledby="hero-heading" className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+      <div className="relative isolate overflow-hidden rounded-xl bg-black">
+        {/* Decorative background photo: the LCP element, so load it first. */}
+        <SafeImage
+          fill
+          src={HERO_IMAGE}
+          alt=""
+          width={2000}
+          height={1333}
+          sizes="(min-width: 1280px) 80rem, 100vw"
+          loading="eager"
+          fetchPriority="high"
+          wrapperClassName="-z-10"
+        />
+        {/* Flat scrim for legible text on the photo (no gradient). */}
+        <div className="absolute inset-0 -z-10 bg-black/50" aria-hidden="true" />
 
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28 lg:px-8">
-        <div className="max-w-2xl">
-          <h1 id="hero-heading" className="text-4xl font-semibold tracking-tight text-photo-ink sm:text-5xl">
+        <div className="px-6 pb-28 pt-16 sm:px-10 sm:pb-32 sm:pt-24 lg:px-14 lg:pb-36 lg:pt-28">
+          <p className="text-sm font-medium text-photo-ink/85">Desks, offices, meeting rooms and studios</p>
+          <h1
+            id="hero-heading"
+            className="mt-3 max-w-3xl font-display text-5xl leading-[1.02] text-photo-ink sm:text-6xl lg:text-7xl"
+          >
             Find the right space to work, meet and create
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-photo-ink/90">
-            Desks, private offices, meeting rooms and studios from local hosts.
-            Request a booking and the host confirms it, or book instantly where it&apos;s offered.
+          <p className="mt-5 max-w-xl text-base text-photo-ink/85 sm:text-lg">
+            Book by the hour, day or month from local hosts. The host confirms your request, or it&apos;s
+            confirmed instantly where Instant Book is on.
           </p>
         </div>
+      </div>
 
-        <form
-          onSubmit={handleSearch}
-          role="search"
-          aria-label="Search workspaces"
-          className="mt-8 grid grid-cols-1 gap-3 rounded-lg border border-line bg-surface p-4 shadow-md sm:grid-cols-2 lg:grid-cols-[1.6fr_1.2fr_0.8fr_auto] lg:items-end"
-        >
-          <div className="sm:col-span-2 lg:col-span-1">
-            <label htmlFor="hero-location" className={fieldLabel}>Where</label>
-            <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />
-              <input
-                id="hero-location"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="City, neighbourhood or address"
-                className={cn(fieldClasses, "h-12 pl-10")}
-                autoComplete="off"
-              />
-            </div>
+      <form
+        onSubmit={handleSearch}
+        role="search"
+        aria-label="Search workspaces"
+        className={cn(
+          "relative z-10 mx-auto -mt-20 grid max-w-5xl gap-2 rounded-lg border border-line bg-surface p-3 shadow-md",
+          "sm:-mt-24 sm:grid-cols-2",
+          "lg:-mt-12 lg:grid-cols-[1.6fr_1.2fr_0.9fr_auto] lg:items-center lg:gap-0 lg:rounded-full lg:p-2"
+        )}
+      >
+        <div className={cn(segment, "sm:col-span-2 lg:col-span-1")}>
+          <label htmlFor="hero-location" className={segmentLabel}>Where</label>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 shrink-0 text-ink-subtle lg:hidden" aria-hidden="true" />
+            <input
+              id="hero-location"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City, neighbourhood or address"
+              className={segmentControl}
+              autoComplete="off"
+            />
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="hero-category" className={fieldLabel}>Type of space</label>
+        <div className={cn(segment, "lg:before:absolute lg:before:left-0 lg:before:top-1/4 lg:before:h-1/2 lg:before:w-px lg:before:bg-line")}>
+          <label htmlFor="hero-category" className={segmentLabel}>Type of space</label>
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4 shrink-0 text-ink-subtle lg:hidden" aria-hidden="true" />
             <select
               id="hero-category"
               value={category}
               onChange={(e) => setCategory(e.target.value as WorkspaceCategory | "all")}
-              className={cn(fieldClasses, "h-12 cursor-pointer")}
+              className={cn(segmentControl, "cursor-pointer appearance-none")}
             >
               <option value="all">Any type</option>
               {CATEGORIES.map((c) => (
@@ -130,40 +150,48 @@ export function HeroSearch({ spaces }: { spaces: Space[] }) {
               ))}
             </select>
           </div>
+        </div>
 
-          <div>
-            <label htmlFor="hero-seats" className={fieldLabel}>People</label>
-            <div className="relative">
-              <Users className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />
-              <input
-                id="hero-seats"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={500}
-                value={seats}
-                onChange={(e) => setSeats(e.target.value)}
-                placeholder="Any"
-                className={cn(fieldClasses, "h-12 pl-10")}
-              />
-            </div>
+        <div className={cn(segment, "lg:before:absolute lg:before:left-0 lg:before:top-1/4 lg:before:h-1/2 lg:before:w-px lg:before:bg-line")}>
+          <label htmlFor="hero-seats" className={segmentLabel}>People</label>
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 shrink-0 text-ink-subtle lg:hidden" aria-hidden="true" />
+            <input
+              id="hero-seats"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={500}
+              value={seats}
+              onChange={(e) => setSeats(e.target.value)}
+              placeholder="Any"
+              className={segmentControl}
+            />
           </div>
+        </div>
 
-          <Button type="submit" size="lg" className="w-full sm:col-span-2 lg:col-span-1 lg:w-auto">
-            <Search className="h-4 w-4" aria-hidden="true" />
-            Search
-          </Button>
-        </form>
-        <p className="mt-4 text-sm text-photo-ink/90">
-          <Link
-            href="/discover"
-            className="inline-flex min-h-11 items-center gap-2 rounded-sm font-medium text-photo-ink underline-offset-4 hover:underline"
-          >
-            <LocateFixed className="h-4 w-4" aria-hidden="true" />
-            Find spaces near you on a map
-          </Link>
-        </p>
-      </div>
+        <button
+          type="submit"
+          className={cn(
+            "inline-flex h-12 items-center justify-center gap-2 rounded-full bg-accent px-6 text-base font-semibold text-accent-ink",
+            "transition-colors duration-150 hover:bg-accent-hover active:bg-accent-hover sm:col-span-2",
+            "lg:col-span-1 lg:ml-2 lg:h-14 lg:px-7"
+          )}
+        >
+          <Search className="h-5 w-5" aria-hidden="true" />
+          Search
+        </button>
+      </form>
+
+      <p className="mt-4 flex justify-center">
+        <Link
+          href="/discover"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+        >
+          <LocateFixed className="h-4 w-4" aria-hidden="true" />
+          Or find spaces near you on a map
+        </Link>
+      </p>
     </section>
   );
 }
