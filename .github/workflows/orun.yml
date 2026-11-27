@@ -46,7 +46,7 @@ jobs:
     outputs:
       lane-matrix: ${{ steps.matrix.outputs.lane-matrix }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - uses: sourceplane/orun-action@4ae7cbe734386586be4a3cd25cfc364fcf77cb07 # v1.2.0
@@ -140,10 +140,10 @@ jobs:
       npm_config_store_dir: /home/runner/.pnpm-store
       PNPM_STORE_DIR: /home/runner/.pnpm-store
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Keyed by the lockfile alone: every lane shares one entry.
       - name: pnpm store cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /home/runner/.pnpm-store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
