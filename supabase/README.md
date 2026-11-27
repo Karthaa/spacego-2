@@ -52,6 +52,7 @@ then production, each as one transaction:
 | `20261205_spacego_new_types_and_demo_flag.sql` | Parking and auditorium types; `is_demo` flag | 26 Nov | 26 Nov |
 | `20261206_spacego_whole_venue_pricing.sql` | Halls and event venues priced per booking | 26 Nov | 26 Nov |
 | `20261207_spacego_security_hardening.sql` | Closes the unused older tables to the API; fixed `search_path` for the role-guard function | **not yet** | **not yet** |
+| `20261208_spacego_rate_limits.sql` | Rate limits on enquiries, search logging, booking requests and property requests | **not yet** | **not yet** |
 
 The dates come from the session reports in `docs/history/` and the checks run
 when each was applied. `tooling/sql/bundle.mjs` can join several files into
@@ -164,6 +165,27 @@ Under **Authentication → Signing Keys**:
   keys are available. If the project still uses legacy symmetric keys, the
   client falls back to the Auth server. Rotate to asymmetric keys when possible.
 
+## Rate limits
+
+The browser calls Supabase directly with the public key, so the limits live in
+the database (`20261208`): a `BEFORE INSERT` trigger on the four tables that
+the public and signed-in request functions write to. Windows are fixed and in
+UTC.
+
+| Request | Limit | Over the limit |
+|---|---|---|
+| Enquiry (`spacego_submit_enquiry`) | 5 an hour per email address; 10 an hour and 30 a day per signed-in account; 20 every 10 minutes and 200 a day for all signed-out visitors together | Refused with a message the form shows |
+| Search logging (`spacego_log_demand`) | 10 every 10 minutes for the same search; 60 a minute and 10,000 a day in total | Not logged; search still works |
+| Booking request (`spacego_create_booking`) | 20 an hour, 60 a day per account | Refused with a message |
+| Property request (`spacego_submit_activation`) | 10 an hour, 30 a day per account | Refused with a message |
+
+Only API requests made with the public key or a user's session count. The SQL
+editor and the service role are not limited. The counters keep no IP address,
+so a flood of signed-out enquiries can use up the shared signed-out limit for
+a while; signed-in users still get through. Cloudflare Turnstile checked on a
+server route is the next step if that happens. To change a limit, edit
+`spacego_rate_limit_guard()` in the migration and run that function again.
+
 ## Current environment mapping
 
 - Orun **stage** → Supabase project `SpaceGo-Staging`
@@ -186,11 +208,15 @@ done
 migration. It also warns about any `SECURITY DEFINER` function without a fixed
 `search_path` that was created outside these migrations.
 
+`rate_limits_test.sql` checks `20261208`. It resets the counters inside its
+transaction, so for the second or so it runs, other requests that hit the same
+counters wait for it.
+
 ## Status
 
 Migrations through `20261206` are applied on staging and production (25 and
 26 Nov 2026, from the records in `docs/history/` and the checks run then).
 Whether each project's dashboard settings above (site URL, redirect URLs,
 email templates) are complete isn't recorded here, so check them before
-relying on email sign-up and password reset. `20261207` is written and tested
-on local copies only.
+relying on email sign-up and password reset. `20261207` and `20261208` are
+written and tested on local copies only.

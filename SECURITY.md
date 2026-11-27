@@ -31,6 +31,9 @@ Only the current `main` branch, as deployed, gets security fixes.
   `profiles` table, never from user metadata. Users can't change their own role.
 - **Redirects** after sign-in accept same-site paths only, and redirect hosts
   are checked against `NEXT_PUBLIC_SITE_URL`.
+- **Rate limits** in the database on the forms anyone can send (enquiries,
+  search logging) and on booking and property requests
+  (`supabase/migrations/20261208_spacego_rate_limits.sql`).
 - **HTTP security headers** on every page: HSTS, `nosniff`, no framing,
   a strict referrer policy, a permissions policy, and a Content-Security-Policy
   (see `src/lib/security-headers.ts`).
