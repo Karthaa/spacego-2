@@ -196,7 +196,8 @@ export function LocationSearch({
           type="button"
           onClick={onUseMyLocation}
           disabled={locating}
-          aria-label="Use my current location"
+          // Starts with the visible text, so voice control users can say it.
+          aria-label={locating ? "Locating… finding your current location" : "Near me: use my current location"}
           className={cn(
             "inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-line-strong bg-surface px-3 text-sm font-medium text-ink",
             "transition-[background-color,transform] duration-150 hover:bg-surface-muted active:scale-[0.97] disabled:opacity-70",
