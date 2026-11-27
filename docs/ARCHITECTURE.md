@@ -65,7 +65,9 @@ How reads and writes are allowed:
 ## Security layers
 
 1. **Database:** RLS on every table, guarded functions, triggers, sanitised
-   views (above). Tested by `supabase/tests/`.
+   views (above), and rate limits on enquiries, search logging, booking
+   requests and property requests (migration 20261208). Tested by
+   `supabase/tests/`.
 2. **HTTP headers** on every page (`src/lib/security-headers.ts`, applied in
    `next.config.ts`): HSTS, `nosniff`, no framing, Referrer-Policy,
    Permissions-Policy, COOP, and a Content-Security-Policy. The safe part of
