@@ -1,7 +1,12 @@
 # Weekly dependency updates. Minor and patch updates arrive grouped in one
 # pull request per ecosystem; each major update gets its own, since those can
-# break things (MapLibre 6 and ESLint 10 are due). Security updates also need
-# "Dependabot security updates" turned on in the repository settings.
+# break things. Security updates also need "Dependabot security updates"
+# turned on in the repository settings.
+#
+# MapLibre 6 needs a code change before its update can merge: it loads its
+# worker from a separate file, and in our bundle it can't find it, so every
+# map stays blank. Pass the bundled maplibre-gl-worker.mjs to setWorkerUrl()
+# before creating a map.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -15,6 +20,11 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Types for Node 22, the version the app builds with (.nvmrc). Remove
+      # this when the project moves to a newer Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

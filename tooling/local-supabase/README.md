@@ -8,7 +8,7 @@ as a Supabase project: `/auth/v1`, `/rest/v1`, `/storage/v1`).
 It never touches staging or production. JWT secret and keys are generated
 per run into `$STATE` (default `/tmp/spacego-local`), not into the repo.
 
-Requirements: Docker, Node 20+, and a local Postgres 16 with PostGIS that
+Requirements: Docker, Node 22+, and a local Postgres 16 with PostGIS that
 you can reach as a superuser (`apt install postgresql-16 postgresql-16-postgis-3`).
 
 ```bash
