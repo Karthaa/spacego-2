@@ -18,6 +18,12 @@ test("anything that could leave the site is refused", () => {
     "/\n/evil.example",
     "/\t/evil.example",
     "/\r/evil.example",
+    // These resolve to "//evil.example" once dot segments and backslashes are applied.
+    "/..//evil.example",
+    "/.//evil.example",
+    "/%2e%2e//evil.example",
+    "/./\\evil.example",
+    "/..\\/evil.example",
     "",
     null,
     undefined,
