@@ -4,6 +4,8 @@ import { securityHeaders } from "./src/lib/security-headers";
 const nextConfig: NextConfig = {
   // OpenNext bundles Next's standalone output into the Worker.
   output: "standalone",
+  // Don't announce the framework in an X-Powered-By header.
+  poweredByHeader: false,
   images: {
     // Cloudflare Workers has no Next image optimizer; serve remote images as-is.
     unoptimized: true,
