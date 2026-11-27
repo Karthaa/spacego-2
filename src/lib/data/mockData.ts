@@ -802,7 +802,7 @@ export const INITIAL_ACTIVATION_REQUESTS: PropertyActivationRequest[] = [
   {
     id: "ACT-2026-3421",
     owner_name: "Vikram Malhotra",
-    email: "vikram.m@keralaproperties.in",
+    email: "vikram.m@example.com",
     phone: "+91 98450 12345",
     property_address: "Infopark Road, Kakkanad",
     city: "Kochi",
@@ -835,7 +835,7 @@ export const INITIAL_ACTIVATION_REQUESTS: PropertyActivationRequest[] = [
   {
     id: "ACT-2026-3422",
     owner_name: "Sarah Jenkins",
-    email: "s.jenkins@mayfairholdings.co.uk",
+    email: "s.jenkins@example.com",
     phone: "+44 20 7946 0192",
     property_address: "22 Berkeley Square, Mayfair",
     city: "London",
@@ -926,7 +926,7 @@ export const INITIAL_ENQUIRIES: WorkspaceEnquiry[] = [
   {
     id: "enq-1",
     user_name: "Daniel Cho",
-    email: "daniel@hyperflow.io",
+    email: "daniel@example.com",
     company: "HyperFlow Systems",
     location_requested: "Austin, Downtown",
     category_requested: "private_office",
@@ -940,7 +940,7 @@ export const INITIAL_ENQUIRIES: WorkspaceEnquiry[] = [
   {
     id: "enq-2",
     user_name: "Pooja Menon",
-    email: "p.menon@stridescale.com",
+    email: "p.menon@example.com",
     company: "StrideScale Edutech",
     location_requested: "Kochi, Kakkanad",
     category_requested: "training_room",
@@ -954,7 +954,7 @@ export const INITIAL_ENQUIRIES: WorkspaceEnquiry[] = [
   {
     id: "enq-3",
     user_name: "Robert MacIntyre",
-    email: "robert@highlandgrowth.co.uk",
+    email: "robert@example.com",
     company: "Highland Growth Capital",
     location_requested: "Edinburgh, City Centre",
     category_requested: "meeting_room",

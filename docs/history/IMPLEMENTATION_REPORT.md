@@ -201,7 +201,7 @@ view and RPCs from `20261121`. None of them deletes or rewrites existing rows.
 | `20261121_spacego_rls_hardening` | applied | applied by you on 25 Nov; checks 15.1 and 15.6 to 15.9 pass (26 Nov) | applied 26 Nov, 11:28 IST; checks 15.1, 15.5, 15.6 to 15.9 pass; row counts unchanged |
 | `20261126` to `20261204` (nine files) | applied from scratch, tests pass | applied 26 Nov, ~12:55 IST, as one transaction (`tooling/sql/bundle.mjs`); 7 of 7 test files pass; row counts unchanged | applied 26 Nov, ~13:00 IST, the same script; 7 of 7 test files pass; row counts unchanged; 2 existing accounts untouched |
 
-The apply order and checks are in `docs/MORNING_APPROVALS.md`.
+The apply order and checks are in `docs/history/MORNING_APPROVALS.md`.
 
 ## 12. Security policies changed
 

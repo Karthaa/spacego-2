@@ -1,0 +1,29 @@
+# Weekly dependency updates. Minor and patch updates arrive grouped in one
+# pull request per ecosystem; each major update gets its own, since those can
+# break things (MapLibre 6 and ESLint 10 are due). Security updates also need
+# "Dependabot security updates" turned on in the repository settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

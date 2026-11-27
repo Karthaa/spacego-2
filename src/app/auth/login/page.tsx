@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { Logo } from "@/components/navigation/Navbar";
-import { authErrorMessage } from "@/lib/auth/messages";
+import { authLinkErrorMessage } from "@/lib/auth/messages";
 import { homeForRole, safeNextPath } from "@/lib/auth/redirects";
 import { Mail, Lock, AlertTriangle, LogOut } from "lucide-react";
 
@@ -131,7 +131,7 @@ function LoginContent() {
               role="alert"
               className="rounded-md bg-danger-soft p-3 text-sm font-medium text-danger"
             >
-              {formError ?? authErrorMessage(queryError)}
+              {formError ?? authLinkErrorMessage(queryError)}
             </div>
           )}
 
